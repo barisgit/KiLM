@@ -177,4 +177,75 @@ def list_libraries(kicad_lib_dir: str) -> Tuple[List[str], List[str]]:
     if footprints_dir.exists():
         footprints = [d.stem for d in footprints_dir.glob("*.pretty") if d.is_dir()]
     
-    return symbols, footprints 
+    return symbols, footprints
+
+
+def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict]]:
+    """
+    List all libraries currently configured in KiCad
+    
+    Args:
+        kicad_config: Path to the KiCad configuration directory
+        
+    Returns:
+        A tuple of (symbol libraries, footprint libraries) as lists of dictionaries
+        containing library details
+        
+    Raises:
+        FileNotFoundError: If library tables are not found
+    """
+    sym_table = kicad_config / "sym-lib-table"
+    fp_table = kicad_config / "fp-lib-table"
+    
+    symbol_libs = []
+    footprint_libs = []
+    
+    if sym_table.exists():
+        with open(sym_table, "r") as f:
+            content = f.read()
+            
+        # Extract all library entries
+        lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)
+        for name, details in lib_entries:
+            lib_info = {"name": name}
+            
+            # Extract other properties
+            uri_match = re.search(r'\(uri "([^"]+)"\)', details)
+            if uri_match:
+                lib_info["uri"] = uri_match.group(1)
+                
+            type_match = re.search(r'\(type "([^"]+)"\)', details)
+            if type_match:
+                lib_info["type"] = type_match.group(1)
+                
+            descr_match = re.search(r'\(descr "([^"]+)"\)', details)
+            if descr_match:
+                lib_info["description"] = descr_match.group(1)
+                
+            symbol_libs.append(lib_info)
+    
+    if fp_table.exists():
+        with open(fp_table, "r") as f:
+            content = f.read()
+            
+        # Extract all library entries
+        lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)
+        for name, details in lib_entries:
+            lib_info = {"name": name}
+            
+            # Extract other properties
+            uri_match = re.search(r'\(uri "([^"]+)"\)', details)
+            if uri_match:
+                lib_info["uri"] = uri_match.group(1)
+                
+            type_match = re.search(r'\(type "([^"]+)"\)', details)
+            if type_match:
+                lib_info["type"] = type_match.group(1)
+                
+            descr_match = re.search(r'\(descr "([^"]+)"\)', details)
+            if descr_match:
+                lib_info["description"] = descr_match.group(1)
+                
+            footprint_libs.append(lib_info)
+    
+    return symbol_libs, footprint_libs 

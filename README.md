@@ -6,7 +6,9 @@ A command-line tool for managing KiCad libraries across projects and workstation
 
 - Automatically detect KiCad configurations across different platforms (Windows, macOS, Linux)
 - Add symbol and footprint libraries to KiCad from a centralized repository
-- Create timestamped backups of configuration files
+- Set environment variables directly in KiCad configuration
+- Pin favorite libraries for quick access in KiCad
+- Create timestamped backups of configuration files (only when changes are needed)
 - Support for environment variables
 - Dry-run mode to preview changes
 - Compatible with KiCad 6.x and newer
@@ -60,6 +62,27 @@ kicad-lib-manager setup --kicad-lib-dir ~/path/to/libraries --kicad-3d-dir ~/pat
 
 # Preview changes without making them (dry run)
 kicad-lib-manager setup --dry-run
+
+# Setup without pinning libraries
+kicad-lib-manager setup --no-pin-libraries
+```
+
+### Managing Pinned Libraries
+
+KiCad has a feature to pin libraries as favorites for quick access. You can manage these pinned libraries with:
+
+```bash
+# Pin all libraries from your library directory
+kicad-lib-manager pin
+
+# Pin specific libraries
+kicad-lib-manager pin --symbols MySymbolLib AnotherLib --footprints MyFootprintLib
+
+# Unpin specific libraries
+kicad-lib-manager unpin --symbols LibToUnpin --footprints FootprintToUnpin
+
+# Unpin all libraries
+kicad-lib-manager unpin --all
 ```
 
 ### List Available Libraries
@@ -67,6 +90,18 @@ kicad-lib-manager setup --dry-run
 ```bash
 kicad-lib-manager list
 ```
+
+### Check Current Configuration
+
+```bash
+kicad-lib-manager status
+```
+
+This will show:
+- KiCad configuration directory location
+- Environment variables set in KiCad
+- Pinned libraries
+- Currently configured symbol and footprint libraries
 
 ## Custom Library Descriptions
 

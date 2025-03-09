@@ -10,13 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Set
 
 from .utils.env_vars import find_environment_variables, expand_user_path
-from .utils.file_ops import (
-    validate_lib_table,
-    add_symbol_lib,
-    add_footprint_lib,
-    list_libraries,
-)
 from .utils.backup import create_backup
+from .utils.file_ops import list_libraries, list_configured_libraries
 
 
 def find_kicad_config() -> Path:
@@ -121,7 +116,7 @@ def add_libraries(
     kicad_config: Path,
     kicad_3d_dir: Optional[str] = None,
     dry_run: bool = False,
-) -> Set[str]:
+) -> Tuple[Set[str], bool]:
     """
     Add all libraries from the repository to KiCad configuration
     
@@ -132,12 +127,16 @@ def add_libraries(
         dry_run: If True, don't make any changes
         
     Returns:
-        A set of added library names
+        A tuple containing:
+        - A set of added library names
+        - A boolean indicating whether any changes were made
         
     Raises:
         FileNotFoundError: If required directories are not found
         ValueError: If library tables have an invalid format
     """
+    from .utils.file_ops import validate_lib_table, add_symbol_lib, add_footprint_lib
+    
     kicad_lib_path = Path(kicad_lib_dir)
     sym_table = kicad_config / "sym-lib-table"
     fp_table = kicad_config / "fp-lib-table"
@@ -146,9 +145,18 @@ def add_libraries(
         raise FileNotFoundError(f"KiCad library directory not found at {kicad_lib_dir}")
     
     # Validate library tables
+    changes_made = False
     for table_path in [sym_table, fp_table]:
         if not validate_lib_table(table_path, dry_run):
-            raise ValueError(f"Invalid library table format at {table_path}")
+            changes_made = True
+            if dry_run:
+                print(f"Would fix invalid library table format at {table_path}")
+            else:
+                print(f"Fixed invalid library table format at {table_path}")
+                
+    if not changes_made and any(not validate_lib_table(table_path, True) for table_path in [sym_table, fp_table]):
+        # Tables need fixing but we're in dry_run mode
+        changes_made = True
     
     added_libraries = set()
     
@@ -162,6 +170,7 @@ def add_libraries(
             
             if add_symbol_lib(lib_name, lib_path, description, sym_table, dry_run):
                 added_libraries.add(f"symbol:{lib_name}")
+                changes_made = True
     
     # Add footprint libraries
     footprints_dir = kicad_lib_path / "footprints"
@@ -174,5 +183,6 @@ def add_libraries(
                 
                 if add_footprint_lib(lib_name, lib_path, description, fp_table, dry_run):
                     added_libraries.add(f"footprint:{lib_name}")
+                    changes_made = True
     
-    return added_libraries 
+    return added_libraries, changes_made 
