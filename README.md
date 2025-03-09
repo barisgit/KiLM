@@ -21,50 +21,96 @@ A command-line tool for managing KiCad libraries across projects and workstation
 pip install kicad-lib-manager
 ```
 
-### From Source
-
-```bash
-git clone https://github.com/yourusername/kicad-lib-manager.git
-cd kicad-lib-manager
-pip install -e .
-```
-
 ## Usage
 
-### Setting Up Environment Variables
+### Initialize a Library
 
-1. Define the following environment variables in your shell configuration:
-
-   ```bash
-   # For Bash/Zsh
-   export KICAD_USER_LIB=~/path/to/your/kicad-libraries
-   export KICAD_3D_LIB="~/path/to/your/kicad-3d-models"
-   
-   # For Fish
-   set -U KICAD_USER_LIB ~/path/to/your/kicad-libraries
-   set -U KICAD_3D_LIB "~/path/to/your/kicad-3d-models"
-   
-   # For Windows PowerShell
-   [System.Environment]::SetEnvironmentVariable("KICAD_USER_LIB", "C:\path\to\your\kicad-libraries", "User")
-   [System.Environment]::SetEnvironmentVariable("KICAD_3D_LIB", "C:\path\to\your\kicad-3d-models", "User")
-   ```
-
-2. Source your configuration or restart your terminal
-
-### Configure KiCad Libraries
+The first step is to initialize your KiCad library. This creates metadata for your library and registers it in the configuration:
 
 ```bash
-# Using environment variables
-kicad-lib-manager setup
+# Initialize the current directory as a KiCad library
+kilm init
 
-# Explicitly specify paths
-kicad-lib-manager setup --kicad-lib-dir ~/path/to/libraries --kicad-3d-dir ~/path/to/3d-models
+# Initialize with a custom name
+kilm init --name my-kicad-library
+
+# Initialize with a description
+kilm init --description "My custom KiCad library"
+
+# Initialize with a custom environment variable
+kilm init --env-var MY_CUSTOM_LIB
+```
+
+### Add a 3D Models Library
+
+You can add multiple 3D model libraries, each with its own environment variable:
+
+```bash
+# Add the current directory as a 3D models library
+kilm add-3d
+
+# Add a specific directory
+kilm add-3d --directory ~/path/to/3d-models
+
+# Add with a custom name and environment variable
+kilm add-3d --name my-3d-models --env-var MY_CUSTOM_3D_VAR
+```
+
+### View Configured Libraries
+
+You can view all configured libraries with:
+
+```bash
+# List all configured libraries
+kilm config
+
+# List only GitHub libraries (symbols/footprints)
+kilm config --type github
+
+# List only cloud libraries (3D models)
+kilm config --type cloud
+
+# Show detailed information
+kilm config --verbose
+```
+
+### Configure KiCad
+
+With libraries initialized, you can set up KiCad to use them:
+
+```bash
+# Set up using the current libraries
+kilm setup
+
+# Set up all configured libraries
+kilm setup --all-libraries
+
+# Set up specific libraries by name
+kilm setup --symbol-lib-dirs "main-lib,project-lib" --threed-lib-dirs "my-3d-models"
 
 # Preview changes without making them (dry run)
-kicad-lib-manager setup --dry-run
+kilm setup --dry-run
 
-# Setup without pinning libraries
-kicad-lib-manager setup --no-pin-libraries
+# Show verbose output for debugging
+kilm setup --verbose
+```
+
+### Using Environment Variables (Legacy Method)
+
+You can still use environment variables if preferred:
+
+```bash
+# For Bash/Zsh
+export KICAD_USER_LIB=~/path/to/your/kicad-libraries
+export KICAD_3D_LIB="~/path/to/your/kicad-3d-models"
+
+# For Fish
+set -U KICAD_USER_LIB ~/path/to/your/kicad-libraries
+set -U KICAD_3D_LIB "~/path/to/your/kicad-3d-models"
+
+# For Windows PowerShell
+[System.Environment]::SetEnvironmentVariable("KICAD_USER_LIB", "C:\path\to\your\kicad-libraries", "User")
+[System.Environment]::SetEnvironmentVariable("KICAD_3D_LIB", "C:\path\to\your\kicad-3d-models", "User")
 ```
 
 ### Managing Pinned Libraries
@@ -73,31 +119,32 @@ KiCad has a feature to pin libraries as favorites for quick access. You can mana
 
 ```bash
 # Pin all libraries from your library directory
-kicad-lib-manager pin
+kilm pin
 
 # Pin specific libraries
-kicad-lib-manager pin --symbols MySymbolLib AnotherLib --footprints MyFootprintLib
+kilm pin --symbols MySymbolLib AnotherLib --footprints MyFootprintLib
 
 # Unpin specific libraries
-kicad-lib-manager unpin --symbols LibToUnpin --footprints FootprintToUnpin
+kilm unpin --symbols LibToUnpin --footprints FootprintToUnpin
 
 # Unpin all libraries
-kicad-lib-manager unpin --all
+kilm unpin --all
 ```
 
 ### List Available Libraries
 
 ```bash
-kicad-lib-manager list
+kilm list
 ```
 
 ### Check Current Configuration
 
 ```bash
-kicad-lib-manager status
+kilm status
 ```
 
 This will show:
+- kilm configuration details
 - KiCad configuration directory location
 - Environment variables set in KiCad
 - Pinned libraries

@@ -92,6 +92,8 @@ def config_list(library_type, verbose):
                             click.echo(f"      Description: {metadata['description']}")
                         if "version" in metadata:
                             click.echo(f"      Version: {metadata['version']}")
+                        if "env_var" in metadata and metadata["env_var"]:
+                            click.echo(f"      Environment Variable: {metadata['env_var']}")
                         if "capabilities" in metadata:
                             caps = metadata["capabilities"]
                             click.echo(f"      Capabilities: " + 
@@ -137,6 +139,8 @@ def config_list(library_type, verbose):
                             click.echo(f"      Description: {metadata['description']}")
                         if "version" in metadata:
                             click.echo(f"      Version: {metadata['version']}")
+                        if "env_var" in metadata and metadata["env_var"]:
+                            click.echo(f"      Environment Variable: {metadata['env_var']}")
                         if "model_count" in metadata:
                             click.echo(f"      3D Models: {metadata['model_count']}")
                     else:

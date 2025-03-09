@@ -8,6 +8,7 @@ import click
 
 from ..library_manager import find_kicad_config
 from ..utils.env_vars import update_pinned_libraries
+from ..utils.backup import create_backup
 
 
 @click.command()
@@ -32,11 +33,17 @@ from ..utils.env_vars import update_pinned_libraries
     help="Show what would be done without making changes",
 )
 @click.option(
+    "--max-backups",
+    default=5,
+    show_default=True,
+    help="Maximum number of backups to keep",
+)
+@click.option(
     "--verbose", "-v",
     is_flag=True,
     help="Show verbose output for debugging",
 )
-def unpin(symbols, footprints, all, dry_run, verbose):
+def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
     """Unpin libraries in KiCad"""
     # Find KiCad configuration
     try:
@@ -126,6 +133,9 @@ def unpin(symbols, footprints, all, dry_run, verbose):
         
         # Write changes if needed
         if changes_needed and not dry_run:
+            # Create backup before making changes
+            create_backup(kicad_common, max_backups)
+            
             with open(kicad_common, "w") as f:
                 json.dump(config, f, indent=2)
         
@@ -134,6 +144,7 @@ def unpin(symbols, footprints, all, dry_run, verbose):
                 click.echo(f"Would unpin {len(symbols) if symbols else 0} symbol and {len(footprints) if footprints else 0} footprint libraries in KiCad")
             else:
                 click.echo(f"Unpinned {len(symbols) if symbols else 0} symbol and {len(footprints) if footprints else 0} footprint libraries in KiCad")
+                click.echo(f"Created backup of kicad_common.json")
                 click.echo("Restart KiCad for changes to take effect")
         else:
             click.echo("No changes needed, libraries already unpinned in KiCad")

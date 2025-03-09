@@ -11,7 +11,11 @@ from typing import Dict, List, Optional, Tuple, Any, Set
 
 from .utils.env_vars import find_environment_variables, expand_user_path
 from .utils.backup import create_backup
-from .utils.file_ops import list_libraries, list_configured_libraries
+from .utils.file_ops import (
+    list_libraries, 
+    list_configured_libraries, 
+    validate_lib_table
+)
 
 
 def find_kicad_config() -> Path:
@@ -115,74 +119,195 @@ def add_libraries(
     kicad_lib_dir: str,
     kicad_config: Path,
     kicad_3d_dir: Optional[str] = None,
+    additional_3d_dirs: Optional[Dict[str, str]] = None,
     dry_run: bool = False,
 ) -> Tuple[Set[str], bool]:
     """
-    Add all libraries from the repository to KiCad configuration
+    Add KiCad libraries to the configuration.
     
     Args:
-        kicad_lib_dir: The KiCad library directory
-        kicad_config: The KiCad configuration directory
-        kicad_3d_dir: The KiCad 3D models directory
-        dry_run: If True, don't make any changes
-        
+        kicad_lib_dir: Path to the KiCad library directory
+        kicad_config: Path to the KiCad configuration directory
+        kicad_3d_dir: Path to the KiCad 3D models directory (optional)
+        additional_3d_dirs: Dictionary of additional 3D model directories with their
+                          environment variable names as keys (optional)
+        dry_run: If True, don't actually make any changes
+    
     Returns:
-        A tuple containing:
-        - A set of added library names
-        - A boolean indicating whether any changes were made
+        Tuple of (set of libraries added, whether changes were needed)
         
     Raises:
-        FileNotFoundError: If required directories are not found
-        ValueError: If library tables have an invalid format
+        FileNotFoundError: If the library directory does not exist
+        ValueError: If the library directory does not contain symbols or footprints
     """
-    from .utils.file_ops import validate_lib_table, add_symbol_lib, add_footprint_lib
+    # Check if library directory exists
+    kicad_lib_dir = expand_user_path(kicad_lib_dir)
+    lib_dir = Path(kicad_lib_dir)
+    if not lib_dir.exists():
+        raise FileNotFoundError(f"KiCad library directory not found: {kicad_lib_dir}")
     
-    kicad_lib_path = Path(kicad_lib_dir)
+    # Check if 3D models directory exists
+    if kicad_3d_dir:
+        kicad_3d_dir = expand_user_path(kicad_3d_dir)
+        models_dir = Path(kicad_3d_dir)
+        if not models_dir.exists():
+            raise FileNotFoundError(f"KiCad 3D models directory not found: {kicad_3d_dir}")
+    
+    # Check if additional 3D model directories exist
+    all_3d_dirs = {}
+    if kicad_3d_dir:
+        all_3d_dirs["KICAD_3D_LIB"] = kicad_3d_dir
+        
+    if additional_3d_dirs:
+        for env_var, path in additional_3d_dirs.items():
+            path = expand_user_path(path)
+            dir_path = Path(path)
+            if not dir_path.exists():
+                print(f"Warning: 3D models directory not found: {path} (skipping)")
+                continue
+            
+            # Only add if this is a different path than the main 3D models directory
+            if kicad_3d_dir and os.path.normpath(path) == os.path.normpath(kicad_3d_dir):
+                continue
+                
+            all_3d_dirs[env_var] = path
+    
+    # Get list of available libraries
+    symbols, footprints = list_libraries(kicad_lib_dir)
+    if not symbols and not footprints:
+        raise ValueError(f"No libraries found in {kicad_lib_dir}")
+    
+    # Check if library tables exist
     sym_table = kicad_config / "sym-lib-table"
     fp_table = kicad_config / "fp-lib-table"
     
-    if not kicad_lib_path.exists():
-        raise FileNotFoundError(f"KiCad library directory not found at {kicad_lib_dir}")
+    # Get existing libraries
+    sym_libs, fp_libs = list_configured_libraries(kicad_config)
+    sym_lib_names = {lib["name"] for lib in sym_libs}
+    fp_lib_names = {lib["name"] for lib in fp_libs}
     
-    # Validate library tables
-    changes_made = False
-    for table_path in [sym_table, fp_table]:
-        if not validate_lib_table(table_path, dry_run):
-            changes_made = True
-            if dry_run:
-                print(f"Would fix invalid library table format at {table_path}")
-            else:
-                print(f"Fixed invalid library table format at {table_path}")
+    # Check for new libraries
+    new_symbols = [lib for lib in symbols if lib not in sym_lib_names]
+    new_footprints = [lib for lib in footprints if lib not in fp_lib_names]
+    
+    # Generate variable references for 3D model paths
+    env_var_refs = {}
+    for env_var, path in all_3d_dirs.items():
+        # Convert to format KiCad expects: ${ENV_VAR}
+        env_var_refs[path] = f"${{{env_var}}}"
+    
+    # Add new libraries to symbol table
+    sym_changes_needed = False
+    new_sym_entries = []
+    for lib in new_symbols:
+        # Construct the URI - check if kicad_lib_dir is a valid env var or a path
+        if kicad_lib_dir.startswith('/') or (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
+            # It's an absolute path, use as is
+            uri = f"{kicad_lib_dir}/symbols/{lib}.kicad_sym"
+        else:
+            # It's an environment variable name, use ${ENV_VAR} syntax
+            uri = f"${{{kicad_lib_dir}}}/symbols/{lib}.kicad_sym"
+        
+        # Add the library
+        new_sym_entries.append({
+            "name": lib,
+            "uri": uri,
+            "options": "",
+            "description": get_library_description("symbols", lib, kicad_lib_dir),
+        })
+        sym_changes_needed = True
+    
+    # Add new libraries to footprint table
+    fp_changes_needed = False
+    new_fp_entries = []
+    for lib in new_footprints:
+        # Construct the URI - check if kicad_lib_dir is a valid env var or a path
+        if kicad_lib_dir.startswith('/') or (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
+            # It's an absolute path, use as is
+            uri = f"{kicad_lib_dir}/footprints/{lib}.pretty"
+        else:
+            # It's an environment variable name, use ${ENV_VAR} syntax
+            uri = f"${{{kicad_lib_dir}}}/footprints/{lib}.pretty"
+        
+        # Get 3D model paths for this footprint library
+        model_env_vars = {}
+        for path, var_ref in env_var_refs.items():
+            model_env_vars[path] = var_ref
+        
+        # Add the library
+        new_fp_entries.append({
+            "name": lib,
+            "uri": uri,
+            "options": "",
+            "description": get_library_description("footprints", lib, kicad_lib_dir),
+        })
+        fp_changes_needed = True
+    
+    # Only make changes if needed
+    changes_needed = sym_changes_needed or fp_changes_needed
+    if changes_needed and not dry_run:
+        # Add new entries to symbol table
+        if sym_changes_needed:
+            add_entries_to_table(sym_table, new_sym_entries)
+        
+        # Add new entries to footprint table
+        if fp_changes_needed:
+            add_entries_to_table(fp_table, new_fp_entries)
+    
+    # Return the set of added libraries
+    added_libraries = set(new_symbols + new_footprints)
+    return added_libraries, changes_needed 
+
+
+def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> None:
+    """
+    Add entries to a KiCad library table file
+    
+    Args:
+        table_path: Path to the library table
+        entries: List of entries to add
+    """
+    # Make sure the table exists and has a valid format
+    validate_lib_table(table_path, False)
+    
+    # Read existing content
+    with open(table_path, "r") as f:
+        content = f.read()
+    
+    # Find the last proper closing parenthesis of the table
+    closing_paren_index = -1
+    lines = content.splitlines()
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].strip() == ")":
+            closing_paren_index = i
+            break
+    
+    if closing_paren_index == -1:
+        raise ValueError(f"Could not find closing parenthesis in library table: {table_path}")
+    
+    # Insert new entries before the closing parenthesis
+    new_content = ""
+    for i, line in enumerate(lines):
+        if i == closing_paren_index:
+            # Insert entries before the closing parenthesis line
+            for entry in entries:
+                # Process the URI to make sure it's properly formatted
+                uri = entry['uri']
                 
-    if not changes_made and any(not validate_lib_table(table_path, True) for table_path in [sym_table, fp_table]):
-        # Tables need fixing but we're in dry_run mode
-        changes_made = True
-    
-    added_libraries = set()
-    
-    # Add symbol libraries
-    symbols_dir = kicad_lib_path / "symbols"
-    if symbols_dir.exists():
-        for sym_file in symbols_dir.glob("*.kicad_sym"):
-            lib_name = sym_file.stem
-            lib_path = str(sym_file.absolute())
-            description = get_library_description("symbols", lib_name, kicad_lib_dir)
-            
-            if add_symbol_lib(lib_name, lib_path, description, sym_table, dry_run):
-                added_libraries.add(f"symbol:{lib_name}")
-                changes_made = True
-    
-    # Add footprint libraries
-    footprints_dir = kicad_lib_path / "footprints"
-    if footprints_dir.exists():
-        for pretty_dir in footprints_dir.glob("*.pretty"):
-            if pretty_dir.is_dir():
-                lib_name = pretty_dir.stem
-                lib_path = str(pretty_dir.absolute())
-                description = get_library_description("footprints", lib_name, kicad_lib_dir)
+                # Check if URI starts with ${/ - this indicates an improperly formatted path
+                if uri.startswith("${/") or uri.startswith("${\\"):
+                    # Extract the path from inside the curly braces
+                    path_start = uri.find("{") + 1
+                    path_end = uri.find("}")
+                    if path_start > 0 and path_end > path_start:
+                        path = uri[path_start:path_end]
+                        # Replace with the actual path without environment variable syntax
+                        uri = path + uri[path_end+1:]
                 
-                if add_footprint_lib(lib_name, lib_path, description, fp_table, dry_run):
-                    added_libraries.add(f"footprint:{lib_name}")
-                    changes_made = True
+                new_content += f"  (lib (name \"{entry['name']}\")(type \"KiCad\")(uri \"{uri}\")(options \"{entry['options']}\")(descr \"{entry['description']}\"))\n"
+        
+        new_content += line + "\n"
     
-    return added_libraries, changes_made 
+    # Write updated content
+    with open(table_path, "w") as f:
+        f.write(new_content) 

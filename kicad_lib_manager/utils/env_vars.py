@@ -147,15 +147,16 @@ def expand_user_path(path: str) -> str:
 
 
 def update_kicad_env_vars(
-    kicad_config: Path, env_vars: dict, dry_run: bool = False
+    kicad_config: Path, env_vars: dict, dry_run: bool = False, max_backups: int = 5
 ) -> bool:
     """
     Update environment variables in KiCad's common configuration file
     
     Args:
         kicad_config: Path to the KiCad configuration directory
-        env_vars: Dictionary of environment variables to update
+        env_vars: Dictionary of environment variables to set
         dry_run: If True, don't make any changes
+        max_backups: Maximum number of backups to keep
         
     Returns:
         True if changes were made, False otherwise
@@ -164,6 +165,7 @@ def update_kicad_env_vars(
         FileNotFoundError: If the KiCad common configuration file is not found
     """
     import json
+    from .backup import create_backup
     
     # Validate input
     if not env_vars or not isinstance(env_vars, dict):
@@ -198,6 +200,9 @@ def update_kicad_env_vars(
     
     # Write changes if needed
     if changes_needed and not dry_run:
+        # Create backup before making changes
+        create_backup(kicad_common, max_backups)
+        
         with open(kicad_common, "w") as f:
             json.dump(config, f, indent=2)
     
@@ -208,7 +213,8 @@ def update_pinned_libraries(
     kicad_config: Path, 
     symbol_libs: List[str] = None, 
     footprint_libs: List[str] = None, 
-    dry_run: bool = False
+    dry_run: bool = False,
+    max_backups: int = 5
 ) -> bool:
     """
     Update pinned libraries in KiCad's common configuration file
@@ -218,6 +224,7 @@ def update_pinned_libraries(
         symbol_libs: List of symbol libraries to pin
         footprint_libs: List of footprint libraries to pin
         dry_run: If True, don't make any changes
+        max_backups: Maximum number of backups to keep
         
     Returns:
         True if changes were made, False otherwise
@@ -226,6 +233,7 @@ def update_pinned_libraries(
         FileNotFoundError: If the KiCad common configuration file is not found
     """
     import json
+    from .backup import create_backup
     
     # Default empty lists if None
     symbol_libs = symbol_libs or []
@@ -283,6 +291,9 @@ def update_pinned_libraries(
     
     # Write changes if needed
     if changes_needed and not dry_run:
+        # Create backup before making changes
+        create_backup(kicad_common, max_backups)
+        
         with open(kicad_common, "w") as f:
             json.dump(config, f, indent=2)
     

@@ -13,6 +13,7 @@ from ..utils.metadata import (
     read_github_metadata,
     write_github_metadata,
     get_default_github_metadata,
+    generate_env_var_name,
     GITHUB_METADATA_FILE
 )
 
@@ -36,18 +37,34 @@ from ..utils.metadata import (
     default=None,
 )
 @click.option(
+    "--env-var",
+    help="Custom environment variable name for this library",
+    default=None,
+)
+@click.option(
     "--force",
     is_flag=True,
     default=False,
     help="Overwrite existing metadata file if present",
     show_default=True,
 )
-def init(name, set_current, description, force):
+@click.option(
+    "--no-env-var",
+    is_flag=True,
+    default=False,
+    help="Don't assign an environment variable to this library",
+    show_default=True,
+)
+def init(name, set_current, description, env_var, force, no_env_var):
     """Initialize the current directory as a KiCad library collection.
     
     This command sets up the current directory as a KiCad library containing
     symbols, footprints, and templates. It creates the required folders if they
     don't exist and registers the library in the local configuration.
+    
+    Each library can have its own unique environment variable name, which
+    will be used when setting up KiCad. This allows you to have multiple symbol/footprint
+    libraries and reference them individually.
     
     If a metadata file (kilm.yaml) already exists, information from it will be
     used unless overridden by command line options.
@@ -65,7 +82,12 @@ def init(name, set_current, description, force):
         click.echo(f"Found existing metadata file ({GITHUB_METADATA_FILE}).")
         library_name = metadata.get("name")
         library_description = metadata.get("description")
+        library_env_var = metadata.get("env_var")
         click.echo(f"Using existing name: {library_name}")
+        
+        # Show environment variable if present
+        if library_env_var and not no_env_var:
+            click.echo(f"Using existing environment variable: {library_env_var}")
         
         # Override with command line parameters if provided
         if name:
@@ -76,10 +98,21 @@ def init(name, set_current, description, force):
             library_description = description
             click.echo(f"Overriding with provided description: {library_description}")
             
+        if env_var:
+            library_env_var = env_var
+            click.echo(f"Overriding with provided environment variable: {library_env_var}")
+        elif no_env_var:
+            library_env_var = None
+            click.echo("Disabling environment variable as requested")
+            
         # Update metadata if command line parameters were provided
-        if name or description:
+        if name or description or env_var or no_env_var:
             metadata["name"] = library_name
             metadata["description"] = library_description
+            if library_env_var and not no_env_var:
+                metadata["env_var"] = library_env_var
+            else:
+                metadata["env_var"] = None
             metadata["updated_with"] = "kilm"
             write_github_metadata(current_dir, metadata)
             click.echo(f"Updated metadata file with new information.")
@@ -96,15 +129,24 @@ def init(name, set_current, description, force):
         # Override with command line parameters if provided
         if name:
             metadata["name"] = name
+            # If name is provided but env_var isn't, regenerate the env_var based on the new name
+            if not env_var and not no_env_var:
+                metadata["env_var"] = generate_env_var_name(name, "KICAD_LIB")
         
         if description:
             metadata["description"] = description
+        
+        if env_var:
+            metadata["env_var"] = env_var
+        elif no_env_var:
+            metadata["env_var"] = None
         
         # Write metadata file
         write_github_metadata(current_dir, metadata)
         click.echo(f"Metadata file created.")
         
         library_name = metadata["name"]
+        library_env_var = metadata.get("env_var")
     
     # Create library directory structure if folders don't exist
     required_folders = ["symbols", "footprints", "templates"]
@@ -157,6 +199,9 @@ def init(name, set_current, description, force):
         click.echo(f"Library '{library_name}' initialized successfully!")
         click.echo(f"Type: GitHub library (symbols, footprints, templates)")
         click.echo(f"Path: {current_dir}")
+        
+        if library_env_var:
+            click.echo(f"Assigned environment variable: {library_env_var}")
         
         if set_current:
             click.echo("This is now your current active library.")
