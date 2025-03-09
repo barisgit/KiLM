@@ -6,13 +6,38 @@ import os
 import re
 import subprocess
 import shutil
+import json
 from pathlib import Path
 from typing import Optional, List
+
+# Import Config here, but only use it when needed to avoid circular imports
+try:
+    from ..config import Config
+except ImportError:
+    Config = None
+
+# Try to import metadata utilities without causing circular imports
+try:
+    from ..utils.metadata import (
+        read_github_metadata,
+        read_cloud_metadata,
+        GITHUB_METADATA_FILE,
+        CLOUD_METADATA_FILE
+    )
+except ImportError:
+    read_github_metadata = None
+    read_cloud_metadata = None
+    GITHUB_METADATA_FILE = "kilm.yaml"
+    CLOUD_METADATA_FILE = ".kilm_metadata"
 
 
 def find_environment_variables(var_name: str) -> Optional[str]:
     """
-    Find environment variables from various shell configurations
+    Find environment variables from various sources in the following order:
+    1. Config file
+    2. Metadata files in current directory
+    3. Environment variables
+    4. Shell config files
     
     Args:
         var_name: The name of the environment variable to find
@@ -20,6 +45,47 @@ def find_environment_variables(var_name: str) -> Optional[str]:
     Returns:
         The value of the environment variable, or None if not found
     """
+    # First check configuration file if it's a known variable
+    if Config is not None:
+        try:
+            config = Config()
+            
+            # Check for KiCad library variables in config
+            if var_name == "KICAD_USER_LIB":
+                lib_path = config.get_symbol_library_path()
+                if lib_path:
+                    return lib_path
+                    
+            # Check for 3D model variables in config
+            elif var_name == "KICAD_3D_LIB":
+                lib_path = config.get_3d_library_path()
+                if lib_path:
+                    return lib_path
+        except Exception:
+            # If there's any error with config, fall back to other methods
+            pass
+    
+    # Check for metadata file in current directory
+    try:
+        current_dir = Path.cwd().resolve()
+        
+        # For KiCad library directory, check for GitHub metadata
+        if var_name == "KICAD_USER_LIB" and read_github_metadata:
+            metadata_file = current_dir / GITHUB_METADATA_FILE
+            if metadata_file.exists():
+                # Found metadata file in current directory, probably a KiCad library
+                return str(current_dir)
+                
+        # For 3D library directory, check for cloud metadata
+        elif var_name == "KICAD_3D_LIB" and read_cloud_metadata:
+            metadata_file = current_dir / CLOUD_METADATA_FILE
+            if metadata_file.exists():
+                # Found metadata file in current directory, probably a 3D model library
+                return str(current_dir)
+    except Exception:
+        # If any error occurs, continue to other methods
+        pass
+    
     # Check environment directly
     if var_name in os.environ:
         return os.environ[var_name]
@@ -50,13 +116,18 @@ def find_environment_variables(var_name: str) -> Optional[str]:
     pattern = re.compile(rf'^(?:export\s+)?{var_name}=[\'\"]?(.*?)[\'\"]?$')
     
     for config_file in config_files:
-        if config_file.exists():
+        if not config_file.exists():
+            continue
+            
+        try:
             with open(config_file, "r") as f:
                 for line in f:
-                    match = pattern.match(line.strip())
+                    match = pattern.search(line.strip())
                     if match:
                         return match.group(1)
-    
+        except Exception:
+            pass
+            
     return None
 
 
