@@ -6,6 +6,7 @@ Initializes the current directory as a KiCad library directory (symbols, footpri
 import os
 import sys
 import click
+import yaml
 from pathlib import Path
 
 from ..config import Config
@@ -164,6 +165,32 @@ def init(name, set_current, description, env_var, force, no_env_var):
             except Exception as e:
                 click.echo(f"Error creating {folder} directory: {e}", err=True)
                 sys.exit(1)
+    
+    # Create empty library_descriptions.yaml if it doesn't exist
+    library_descriptions_file = current_dir / "library_descriptions.yaml"
+    if not library_descriptions_file.exists():
+        try:
+            # Create a template with comments and examples
+            template_content = """# Library Descriptions for KiCad
+# Format: 
+#   library_name: "Description text"
+# 
+# Example:
+#   Symbols_library: "Sample symbol library description"
+
+# Symbol library descriptions
+symbols:
+  Symbols_library: "Sample symbol library description"
+
+# Footprint library descriptions
+footprints:
+  Footprints_library: "Sample footprint library description"
+"""
+            with open(library_descriptions_file, "w") as f:
+                f.write(template_content)
+            click.echo(f"Created library_descriptions.yaml template file.")
+        except Exception as e:
+            click.echo(f"Warning: Could not create library_descriptions.yaml file: {e}", err=True)
     
     # Update the metadata with current capabilities
     updated_capabilities = {
