@@ -1,4 +1,4 @@
-# KiCad Library Manager
+# KiCad Library Manager (KiLM)
 
 A command-line tool for managing KiCad libraries across projects and workstations.
 
@@ -18,7 +18,7 @@ A command-line tool for managing KiCad libraries across projects and workstation
 ### From PyPI
 
 ```bash
-pip install kicad-lib-manager
+pip install kilm
 ```
 
 ## Usage
