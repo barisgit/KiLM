@@ -30,7 +30,7 @@ def main():
 
 # Register commands
 main.add_command(setup)
-main.add_command(list_cmd, name="list")  # Use list_cmd function but keep command name as "list"
+main.add_command(list_cmd, name="list")
 main.add_command(status)
 main.add_command(pin)
 main.add_command(unpin)

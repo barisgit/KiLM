@@ -21,6 +21,39 @@ A command-line tool for managing KiCad libraries across projects and workstation
 pip install kilm
 ```
 
+### Using pipx (recommended for CLI tools)
+
+[pipx](https://pypa.github.io/pipx/) installs the tool in an isolated environment while making it available globally:
+
+```bash
+# Install pipx if you don't have it
+python -m pip install --user pipx
+python -m pipx ensurepath
+
+# Install kilm
+pipx install kilm
+```
+
+### Using uv (faster Python package installer)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver:
+
+```bash
+# Install uv if you don't have it
+curl -sSf https://astral.sh/uv/install.sh | sh
+
+# Install kilm using uv
+uv pip install kilm
+```
+
+### From source
+
+```bash
+git clone https://github.com/barisgit/kilm.git
+cd kilm
+pip install -e .
+```
+
 ## Usage
 
 ### Initialize a Library
@@ -40,6 +73,8 @@ kilm init --description "My custom KiCad library"
 # Initialize with a custom environment variable
 kilm init --env-var MY_CUSTOM_LIB
 ```
+
+Note: Metadata for configurations is saved in ~/.config/kicad-lib-manager/
 
 ### Add a 3D Models Library
 
@@ -202,3 +237,37 @@ MIT
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Update Libraries
+
+You can update all configured GitHub-based libraries with a single command:
+
+```bash
+# Update all configured GitHub libraries
+kilm update
+
+# Preview updates without making changes
+kilm update --dry-run
+
+# Show detailed output during update
+kilm update --verbose
+```
+
+This will perform a `git pull` on all configured symbol and footprint libraries that are Git repositories, ensuring they're up-to-date with their remote sources.
+
+### Add Git Hooks
+
+You can add a Git post-merge hook to automatically update your KiCad libraries whenever you pull changes:
+
+```bash
+# Add hook to current Git repository
+kilm add-hook
+
+# Add hook to a different repository
+kilm add-hook --directory ~/path/to/repo
+
+# Overwrite existing hook if present
+kilm add-hook --force
+```
+
+The hook will automatically run `kilm update` after every `git pull` or `git merge` operation, keeping your libraries up-to-date. If you want to automatically detect new libraries and add them to KiCad as well modify hook in `.git/post-merge` to run `kilm setup` (more risky).
