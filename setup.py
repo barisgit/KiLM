@@ -1,8 +1,17 @@
 from setuptools import setup, find_packages
+import re
+
+def get_version():
+    """Get version from __init__.py."""
+    with open("kicad_lib_manager/__init__.py", "r") as f:
+        version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", f.read(), re.M)
+        if version_match:
+            return version_match.group(1)
+    raise RuntimeError("Unable to find version string.")
 
 setup(
     name="kilm",
-    version="0.1.1",
+    version=get_version(),
     packages=find_packages(),
     install_requires=[
         "click>=8.0",
