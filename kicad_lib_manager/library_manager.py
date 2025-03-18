@@ -115,6 +115,38 @@ def get_library_description(
         return f"{lib_name} footprint library"
 
 
+def format_uri(base_path: str, lib_name: str, lib_type: str) -> str:
+    """Format the URI for a library entry, handling environment variables correctly."""
+    # Validate inputs
+    if not base_path:
+        raise ValueError("Base path cannot be empty")
+    
+    if lib_type not in ["symbols", "footprints"]:
+        raise ValueError(f"Invalid library type: {lib_type}. Must be 'symbols' or 'footprints'")
+    
+    # Check if the path is already in ${} format
+    if base_path.startswith('${'):
+        if not base_path.endswith('}'):
+            raise ValueError(f"Invalid environment variable format: {base_path}")
+        # Extract the path from inside ${}
+        path = base_path[2:-1]
+        # If it's an absolute path (starts with / or drive letter), use it directly
+        if path.startswith('/') or (path.startswith('\\') and len(path) > 1) or (len(path) > 2 and path[1] == ':'):
+            return f"{path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        # Otherwise, it's an environment variable name
+        return f"${{{path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+    
+    # Check if base_path is an environment variable name
+    # For Windows paths, we need to check for drive letter first
+    is_windows_path = len(base_path) > 2 and base_path[1] == ':'
+    if not base_path.startswith('/') and not (base_path.startswith('\\') and len(base_path) > 1) and not is_windows_path:
+        # It's an environment variable name, use ${ENV_VAR} syntax
+        return f"${{{base_path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+    else:
+        # It's an absolute path, use as is
+        return f"{base_path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+
+
 def add_libraries(
     kicad_lib_dir: str,
     kicad_config: Path,
@@ -141,6 +173,21 @@ def add_libraries(
         ValueError: If the library directory does not contain symbols or footprints
     """
     # Check if library directory exists
+    # First expand any environment variables in the path
+    if kicad_lib_dir.startswith('${') and kicad_lib_dir.endswith('}'):
+        env_var = kicad_lib_dir[2:-1]
+        if env_var in os.environ:
+            kicad_lib_dir = os.environ[env_var]
+        else:
+            raise FileNotFoundError(f"Environment variable {env_var} not found")
+    elif not kicad_lib_dir.startswith('/') and not (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
+        # If it's an environment variable name without ${}
+        if kicad_lib_dir in os.environ:
+            kicad_lib_dir = os.environ[kicad_lib_dir]
+        else:
+            raise FileNotFoundError(f"Environment variable {kicad_lib_dir} not found")
+    
+    # Now expand any user paths
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
     lib_dir = Path(kicad_lib_dir)
     if not lib_dir.exists():
@@ -200,20 +247,14 @@ def add_libraries(
     sym_changes_needed = False
     new_sym_entries = []
     for lib in new_symbols:
-        # Construct the URI - check if kicad_lib_dir is a valid env var or a path
-        if kicad_lib_dir.startswith('/') or (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
-            # It's an absolute path, use as is
-            uri = f"{kicad_lib_dir}/symbols/{lib}.kicad_sym"
-        else:
-            # It's an environment variable name, use ${ENV_VAR} syntax
-            uri = f"${{{kicad_lib_dir}}}/symbols/{lib}.kicad_sym"
+        uri = format_uri(kicad_lib_dir, lib, "symbols")
         
-        # Add the library
+        # Add the library with UTF-8 encoded description
         new_sym_entries.append({
             "name": lib,
             "uri": uri,
             "options": "",
-            "description": get_library_description("symbols", lib, kicad_lib_dir),
+            "description": get_library_description("symbols", lib, kicad_lib_dir).encode('utf-8').decode('utf-8'),
         })
         sym_changes_needed = True
     
@@ -221,25 +262,14 @@ def add_libraries(
     fp_changes_needed = False
     new_fp_entries = []
     for lib in new_footprints:
-        # Construct the URI - check if kicad_lib_dir is a valid env var or a path
-        if kicad_lib_dir.startswith('/') or (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
-            # It's an absolute path, use as is
-            uri = f"{kicad_lib_dir}/footprints/{lib}.pretty"
-        else:
-            # It's an environment variable name, use ${ENV_VAR} syntax
-            uri = f"${{{kicad_lib_dir}}}/footprints/{lib}.pretty"
+        uri = format_uri(kicad_lib_dir, lib, "footprints")
         
-        # Get 3D model paths for this footprint library
-        model_env_vars = {}
-        for path, var_ref in env_var_refs.items():
-            model_env_vars[path] = var_ref
-        
-        # Add the library
+        # Add the library with UTF-8 encoded description
         new_fp_entries.append({
             "name": lib,
             "uri": uri,
             "options": "",
-            "description": get_library_description("footprints", lib, kicad_lib_dir),
+            "description": get_library_description("footprints", lib, kicad_lib_dir).encode('utf-8').decode('utf-8'),
         })
         fp_changes_needed = True
     
