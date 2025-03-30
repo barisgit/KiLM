@@ -180,7 +180,13 @@ def add_libraries(
             kicad_lib_dir = os.environ[env_var]
         else:
             raise FileNotFoundError(f"Environment variable {env_var} not found")
-    elif not kicad_lib_dir.startswith('/') and not (kicad_lib_dir.startswith('\\') and len(kicad_lib_dir) > 1):
+    # Check if it's NOT an absolute path (Unix/Windows) or UNC path (Windows)
+    # and treat it as a potential environment variable name if it's not.
+    elif not (
+        kicad_lib_dir.startswith('/') or 
+        (len(kicad_lib_dir) > 2 and kicad_lib_dir[1] == ':') or # Check for C: style paths
+        (kicad_lib_dir.startswith('\\\\')) # Check for UNC paths like \\server\share
+    ):
         # If it's an environment variable name without ${}
         if kicad_lib_dir in os.environ:
             kicad_lib_dir = os.environ[kicad_lib_dir]

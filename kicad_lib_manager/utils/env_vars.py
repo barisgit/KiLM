@@ -192,7 +192,10 @@ def update_kicad_env_vars(
     changes_needed = False
     current_vars = config["environment"]["vars"]
     
-    for key, value in env_vars.items():
+    # Filter out any None values from env_vars
+    valid_env_vars = {key: value for key, value in env_vars.items() if value is not None}
+    
+    for key, value in valid_env_vars.items():
         if key not in current_vars or current_vars[key] != value:
             changes_needed = True
             if not dry_run:
