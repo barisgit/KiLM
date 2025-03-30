@@ -2,4 +2,4 @@
 KiCad Library Manager - Library management utilities for KiCad
 """
 
-__version__ = "0.1.3" 
+__version__ = "0.1.4" 

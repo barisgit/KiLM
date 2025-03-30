@@ -132,19 +132,22 @@ def format_uri(base_path: str, lib_name: str, lib_type: str) -> str:
         path = base_path[2:-1]
         # If it's an absolute path (starts with / or drive letter), use it directly
         if path.startswith('/') or (path.startswith('\\') and len(path) > 1) or (len(path) > 2 and path[1] == ':'):
-            return f"{path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+            uri = f"{path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
         # Otherwise, it's an environment variable name
-        return f"${{{path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
-    
-    # Check if base_path is an environment variable name
-    # For Windows paths, we need to check for drive letter first
-    is_windows_path = len(base_path) > 2 and base_path[1] == ':'
-    if not base_path.startswith('/') and not (base_path.startswith('\\') and len(base_path) > 1) and not is_windows_path:
-        # It's an environment variable name, use ${ENV_VAR} syntax
-        return f"${{{base_path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        uri = f"${{{path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
     else:
-        # It's an absolute path, use as is
-        return f"{base_path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        # Check if base_path is an environment variable name
+        # For Windows paths, we need to check for drive letter first
+        is_windows_path = len(base_path) > 2 and base_path[1] == ':'
+        if not base_path.startswith('/') and not (base_path.startswith('\\') and len(base_path) > 1) and not is_windows_path:
+            # It's an environment variable name, use ${ENV_VAR} syntax
+            uri = f"${{{base_path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        else:
+            # It's an absolute path, use as is
+            uri = f"{base_path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        
+    # Ensure forward slashes for cross-platform compatibility
+    return uri.replace('\\', '/')
 
 
 def add_libraries(

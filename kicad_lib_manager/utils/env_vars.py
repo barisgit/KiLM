@@ -196,10 +196,13 @@ def update_kicad_env_vars(
     valid_env_vars = {key: value for key, value in env_vars.items() if value is not None}
     
     for key, value in valid_env_vars.items():
-        if key not in current_vars or current_vars[key] != value:
+        # Ensure path uses forward slashes
+        normalized_value = value.replace('\\', '/')
+        
+        if key not in current_vars or current_vars[key] != normalized_value:
             changes_needed = True
             if not dry_run:
-                current_vars[key] = value
+                current_vars[key] = normalized_value
     
     # Write changes if needed
     if changes_needed and not dry_run:
