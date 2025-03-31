@@ -22,24 +22,24 @@ def validate_lib_table(table_path: Path, dry_run: bool = False) -> bool:
         if not dry_run:
             # Create a new file with the correct format
             table_type = table_path.stem.split("-")[0]
-            with open(table_path, "w") as f:
-                f.write(f"({table_type}_lib_table\n)")
+            with open(table_path, "w", encoding='utf-8') as f:
+                f.write(f"({table_type}_lib_table\\n)")
         return True
     
-    with open(table_path, "r") as f:
+    with open(table_path, "r", encoding='utf-8') as f:
         content = f.read()
     
     # Check if file begins with table declaration and ends with closing parenthesis
     table_type = table_path.stem.split("-")[0]
-    if not re.match(rf"^\({table_type}_lib_table", content) or not content.rstrip().endswith(")"):
+    if not re.match(rf"^\\({table_type}_lib_table", content) or not content.rstrip().endswith(")"):
         if not dry_run:
-            # Fix the file
-            with open(table_path, "w") as f:
-                f.write(f"({table_type}_lib_table\n)")
+            # Fix the file, ensuring UTF-8 encoding
+            with open(table_path, "w", encoding='utf-8') as f:
+                f.write(f"({table_type}_lib_table\\n)")
                 # Add any existing entries that might be salvageable
                 lib_entries = re.findall(r"  \(lib \(name .+?\)\)", content, re.DOTALL)
                 for entry in lib_entries:
-                    f.write(entry + "\n")
+                    f.write(entry + "\\n")
                 f.write(")")
         return False
     
@@ -66,7 +66,7 @@ def add_symbol_lib(
     Returns:
         True if the library was added, False if it already exists
     """
-    with open(sym_table, "r") as f:
+    with open(sym_table, "r", encoding='utf-8') as f:
         content = f.read()
     
     # Check if library already exists
@@ -88,8 +88,9 @@ def add_symbol_lib(
         lines.append(entry)
         lines.append(")")
         
-        with open(sym_table, "w") as f:
-            f.write("\n".join(lines) + "\n")
+        # Ensure UTF-8 encoding when writing
+        with open(sym_table, "w", encoding='utf-8') as f:
+            f.write("\\n".join(lines) + "\\n")
         
         return True
     else:
@@ -116,7 +117,7 @@ def add_footprint_lib(
     Returns:
         True if the library was added, False if it already exists
     """
-    with open(fp_table, "r") as f:
+    with open(fp_table, "r", encoding='utf-8') as f:
         content = f.read()
     
     # Check if library already exists
@@ -138,8 +139,9 @@ def add_footprint_lib(
         lines.append(entry)
         lines.append(")")
         
-        with open(fp_table, "w") as f:
-            f.write("\n".join(lines) + "\n")
+        # Ensure UTF-8 encoding when writing
+        with open(fp_table, "w", encoding='utf-8') as f:
+            f.write("\\n".join(lines) + "\\n")
         
         return True
     else:
@@ -201,7 +203,7 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
     footprint_libs = []
     
     if sym_table.exists():
-        with open(sym_table, "r") as f:
+        with open(sym_table, "r", encoding='utf-8') as f:
             content = f.read()
             
         # Extract all library entries
@@ -225,7 +227,7 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
             symbol_libs.append(lib_info)
     
     if fp_table.exists():
-        with open(fp_table, "r") as f:
+        with open(fp_table, "r", encoding='utf-8') as f:
             content = f.read()
             
         # Extract all library entries

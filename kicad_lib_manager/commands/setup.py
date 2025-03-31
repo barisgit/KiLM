@@ -38,7 +38,8 @@ def fix_invalid_uris(kicad_config: Path, backup_first: bool = True, max_backups:
     
     for table_path in [sym_table, fp_table]:
         if table_path.exists():
-            with open(table_path, "r") as f:
+            # Ensure UTF-8 encoding when reading
+            with open(table_path, "r", encoding='utf-8') as f:
                 content = f.read()
             
             # Look for URIs with invalid environment variable syntax like ${/path/to/lib}
@@ -51,9 +52,10 @@ def fix_invalid_uris(kicad_config: Path, backup_first: bool = True, max_backups:
                         create_backup(table_path, max_backups)
                     
                     # Replace invalid URIs
-                    fixed_content = re.sub(pattern, r'(uri "\1/\2")', content)
+                    fixed_content = re.sub(pattern, r'(uri "\\1/\\2")', content)
                     
-                    with open(table_path, "w") as f:
+                    # Ensure UTF-8 encoding when writing
+                    with open(table_path, "w", encoding='utf-8') as f:
                         f.write(fixed_content)
     
     return changes_made

@@ -116,38 +116,61 @@ def get_library_description(
 
 
 def format_uri(base_path: str, lib_name: str, lib_type: str) -> str:
-    """Format the URI for a library entry, handling environment variables correctly."""
-    # Validate inputs
+    """
+    Format a URI for a KiCad library.
+    
+    Args:
+        base_path: The base path to the library directory
+        lib_name: The name of the library
+        lib_type: The type of library (symbols or footprints)
+        
+    Returns:
+        The formatted URI string
+        
+    Raises:
+        ValueError: If base_path is empty, lib_type is invalid, or path format is invalid
+    """
     if not base_path:
         raise ValueError("Base path cannot be empty")
     
     if lib_type not in ["symbols", "footprints"]:
-        raise ValueError(f"Invalid library type: {lib_type}. Must be 'symbols' or 'footprints'")
+        raise ValueError(f"Invalid library type: {lib_type}")
     
-    # Check if the path is already in ${} format
-    if base_path.startswith('${'):
-        if not base_path.endswith('}'):
+    # Validate ${...} format if present
+    if base_path.startswith("${"):
+        if not base_path.endswith("}"):
             raise ValueError(f"Invalid environment variable format: {base_path}")
-        # Extract the path from inside ${}
+    
+    # Helper function to check if a path is absolute
+    def is_absolute_path(path: str) -> bool:
+        return (
+            path.startswith('/') or  # Unix-style
+            path.startswith('\\') or  # Windows-style with backslash
+            (len(path) > 1 and path[1] == ':')  # Windows-style with drive letter
+        )
+    
+    # Normalize path separators to forward slashes first
+    base_path = base_path.replace('\\', '/')
+    
+    # Check if the path is already in ${...} format
+    if base_path.startswith("${") and base_path.endswith("}"):
+        # Extract the path from inside the curly braces
         path = base_path[2:-1]
-        # If it's an absolute path (starts with / or drive letter), use it directly
-        if path.startswith('/') or (path.startswith('\\') and len(path) > 1) or (len(path) > 2 and path[1] == ':'):
-            uri = f"{path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
-        # Otherwise, it's an environment variable name
-        uri = f"${{{path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
+        if is_absolute_path(path):
+            # If it's an absolute path, remove the ${...} wrapper
+            base_path = path
+        # Otherwise, keep the ${...} wrapper for environment variables
     else:
-        # Check if base_path is an environment variable name
-        # For Windows paths, we need to check for drive letter first
-        is_windows_path = len(base_path) > 2 and base_path[1] == ':'
-        if not base_path.startswith('/') and not (base_path.startswith('\\') and len(base_path) > 1) and not is_windows_path:
-            # It's an environment variable name, use ${ENV_VAR} syntax
-            uri = f"${{{base_path}}}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
-        else:
-            # It's an absolute path, use as is
-            uri = f"{base_path}/{lib_type}/{lib_name}.{'kicad_sym' if lib_type == 'symbols' else 'pretty'}"
-        
-    # Ensure forward slashes for cross-platform compatibility
-    return uri.replace('\\', '/')
+        # If it's not in ${...} format, check if it's an absolute path
+        if not is_absolute_path(base_path):
+            # If it's not an absolute path, treat it as an environment variable
+            base_path = f"${{{base_path}}}"
+    
+    # Construct the URI based on library type
+    if lib_type == "symbols":
+        return f"{base_path}/symbols/{lib_name}.kicad_sym"
+    else:
+        return f"{base_path}/footprints/{lib_name}.pretty"
 
 
 def add_libraries(
@@ -309,8 +332,8 @@ def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> Non
     # Make sure the table exists and has a valid format
     validate_lib_table(table_path, False)
     
-    # Read existing content
-    with open(table_path, "r") as f:
+    # Read existing content, ensuring UTF-8 encoding
+    with open(table_path, "r", encoding='utf-8') as f:
         content = f.read()
     
     # Find the last proper closing parenthesis of the table
@@ -347,6 +370,6 @@ def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> Non
         
         new_content += line + "\n"
     
-    # Write updated content
-    with open(table_path, "w") as f:
+    # Write updated content, ensuring UTF-8 encoding
+    with open(table_path, "w", encoding='utf-8') as f:
         f.write(new_content) 
