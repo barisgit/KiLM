@@ -1,7 +1,7 @@
 import pytest
 import os
 from pathlib import Path
-from kicad_lib_manager.library_manager import add_libraries, format_uri
+from kicad_lib_manager.library_manager import add_libraries, format_uri, add_entries_to_table
 
 def test_format_uri_absolute_path():
     """Test URI formatting with absolute paths."""
@@ -107,3 +107,40 @@ def test_add_libraries_utf8(tmp_path):
     assert "test_čš" in added_libs
     assert "test_šž" in added_libs
     assert changes 
+
+def test_add_entries_with_special_chars(tmp_path):
+    """Test adding entries with special characters in paths."""
+    # Create a temporary library table
+    table_path = tmp_path / "fp-lib-table"
+    with open(table_path, "w", encoding='utf-8') as f:
+        f.write("(fp_lib_table\n  (version 7)\n)\n")
+    
+    # Test entries with special characters
+    entries = [
+        {
+            "name": "TestLib1",
+            "uri": "${/Users/test/žćš/footprints.pretty}",
+            "options": "",
+            "description": "Test library with special chars"
+        },
+        {
+            "name": "TestLib2",
+            "uri": "${/Users/test/žćš/symbols.kicad_sym}",
+            "options": "",
+            "description": "Another test library"
+        }
+    ]
+    
+    # Add entries
+    add_entries_to_table(table_path, entries)
+    
+    # Read the updated table
+    with open(table_path, "r", encoding='utf-8') as f:
+        content = f.read()
+    
+    # Verify the entries were added correctly
+    assert "TestLib1" in content
+    assert "TestLib2" in content
+    assert "/Users/test/žćš/footprints.pretty" in content
+    assert "/Users/test/žćš/symbols.kicad_sym" in content
+    assert "žćš" in content  # Verify special characters are preserved 

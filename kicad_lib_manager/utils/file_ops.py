@@ -7,43 +7,77 @@ from pathlib import Path
 from typing import List, Tuple
 
 
-def validate_lib_table(table_path: Path, dry_run: bool = False) -> bool:
+def read_file_with_encoding(file_path: Path, encodings: List[str] = None) -> str:
     """
-    Validate a KiCad library table file and fix it if needed
+    Read a file trying multiple encodings until successful
     
     Args:
-        table_path: Path to the library table file
-        dry_run: If True, don't make any changes
+        file_path: Path to the file to read
+        encodings: List of encodings to try. Defaults to ['utf-8', 'utf-16', 'iso-8859-1']
         
     Returns:
-        True if the table is valid, False otherwise
+        The file contents as a string
+        
+    Raises:
+        UnicodeDecodeError: If none of the encodings work
     """
+    if encodings is None:
+        encodings = ['utf-8', 'utf-16', 'iso-8859-1']
+    
+    last_error = None
+    for encoding in encodings:
+        try:
+            with open(file_path, "r", encoding=encoding) as f:
+                return f.read()
+        except UnicodeDecodeError as e:
+            last_error = e
+            continue
+    
+    if last_error:
+        raise last_error
+    return ""
+
+
+def write_file_with_encoding(file_path: Path, content: str, encoding: str = 'utf-8') -> None:
+    """
+    Write content to a file with the specified encoding
+    
+    Args:
+        file_path: Path to the file to write
+        content: Content to write
+        encoding: Encoding to use (defaults to utf-8)
+    """
+    with open(file_path, "w", encoding=encoding) as f:
+        f.write(content)
+
+
+def validate_lib_table(table_path: Path, create_if_missing: bool = True) -> None:
+    """
+    Validate a KiCad library table file
+    
+    Args:
+        table_path: Path to the library table
+        create_if_missing: If True, create the table if it doesn't exist
+        
+    Raises:
+        ValueError: If the table format is invalid
+    """
+    # Determine table type from filename
+    table_type = "fp" if table_path.name == "fp-lib-table" else "sym"
+    
+    # Create table if it doesn't exist
     if not table_path.exists():
-        if not dry_run:
-            # Create a new file with the correct format
-            table_type = table_path.stem.split("-")[0]
-            with open(table_path, "w", encoding='utf-8') as f:
-                f.write(f"({table_type}_lib_table\\n)")
-        return True
+        if create_if_missing:
+            write_file_with_encoding(table_path, f"({table_type}_lib_table\n  (version 7)\n)\n")
+        else:
+            raise ValueError(f"Library table not found: {table_path}")
     
-    with open(table_path, "r", encoding='utf-8') as f:
-        content = f.read()
+    # Read and validate content
+    content = read_file_with_encoding(table_path)
     
-    # Check if file begins with table declaration and ends with closing parenthesis
-    table_type = table_path.stem.split("-")[0]
-    if not re.match(rf"^\\({table_type}_lib_table", content) or not content.rstrip().endswith(")"):
-        if not dry_run:
-            # Fix the file, ensuring UTF-8 encoding
-            with open(table_path, "w", encoding='utf-8') as f:
-                f.write(f"({table_type}_lib_table\\n)")
-                # Add any existing entries that might be salvageable
-                lib_entries = re.findall(r"  \(lib \(name .+?\)\)", content, re.DOTALL)
-                for entry in lib_entries:
-                    f.write(entry + "\\n")
-                f.write(")")
-        return False
-    
-    return True
+    # Check if the content starts with the correct table type and ends with a closing parenthesis
+    if not content.startswith(f"({table_type}_lib_table") or not content.rstrip().endswith(")"):
+        raise ValueError(f"Invalid library table format in {table_path}")
 
 
 def add_symbol_lib(
@@ -66,8 +100,7 @@ def add_symbol_lib(
     Returns:
         True if the library was added, False if it already exists
     """
-    with open(sym_table, "r", encoding='utf-8') as f:
-        content = f.read()
+    content = read_file_with_encoding(sym_table)
     
     # Check if library already exists
     if re.search(rf'\(lib \(name "{re.escape(lib_name)}"\)', content):
@@ -88,9 +121,8 @@ def add_symbol_lib(
         lines.append(entry)
         lines.append(")")
         
-        # Ensure UTF-8 encoding when writing
-        with open(sym_table, "w", encoding='utf-8') as f:
-            f.write("\\n".join(lines) + "\\n")
+        # Write with UTF-8 encoding
+        write_file_with_encoding(sym_table, "\n".join(lines) + "\n")
         
         return True
     else:
@@ -117,8 +149,7 @@ def add_footprint_lib(
     Returns:
         True if the library was added, False if it already exists
     """
-    with open(fp_table, "r", encoding='utf-8') as f:
-        content = f.read()
+    content = read_file_with_encoding(fp_table)
     
     # Check if library already exists
     if re.search(rf'\(lib \(name "{re.escape(lib_name)}"\)', content):
@@ -139,9 +170,8 @@ def add_footprint_lib(
         lines.append(entry)
         lines.append(")")
         
-        # Ensure UTF-8 encoding when writing
-        with open(fp_table, "w", encoding='utf-8') as f:
-            f.write("\\n".join(lines) + "\\n")
+        # Write with UTF-8 encoding
+        write_file_with_encoding(fp_table, "\n".join(lines) + "\n")
         
         return True
     else:
@@ -203,8 +233,7 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
     footprint_libs = []
     
     if sym_table.exists():
-        with open(sym_table, "r", encoding='utf-8') as f:
-            content = f.read()
+        content = read_file_with_encoding(sym_table)
             
         # Extract all library entries
         lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)
@@ -227,8 +256,7 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
             symbol_libs.append(lib_info)
     
     if fp_table.exists():
-        with open(fp_table, "r", encoding='utf-8') as f:
-            content = f.read()
+        content = read_file_with_encoding(fp_table)
             
         # Extract all library entries
         lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)

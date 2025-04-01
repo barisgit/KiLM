@@ -356,17 +356,31 @@ def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> Non
                 # Process the URI to make sure it's properly formatted
                 uri = entry['uri']
                 
-                # Check if URI starts with ${/ - this indicates an improperly formatted path
+                # Check if URI starts with ${/ or ${\ - this indicates an improperly formatted path
                 if uri.startswith("${/") or uri.startswith("${\\"):
-                    # Extract the path from inside the curly braces
-                    path_start = uri.find("{") + 1
-                    path_end = uri.find("}")
-                    if path_start > 0 and path_end > path_start:
-                        path = uri[path_start:path_end]
-                        # Replace with the actual path without environment variable syntax
-                        uri = path + uri[path_end+1:]
+                    # Extract the path from inside the curly braces using a more robust method
+                    try:
+                        # Find the first { and last }
+                        start = uri.find("{")
+                        end = uri.rfind("}")
+                        if start != -1 and end != -1 and end > start:
+                            path = uri[start + 1:end]
+                            # Replace with the actual path without environment variable syntax
+                            uri = path + uri[end + 1:]
+                    except Exception:
+                        # If there's any error in processing, keep the original URI
+                        pass
                 
-                new_content += f"  (lib (name \"{entry['name']}\")(type \"KiCad\")(uri \"{uri}\")(options \"{entry['options']}\")(descr \"{entry['description']}\"))\n"
+                # Format the entry with proper escaping
+                entry_str = (
+                    f"  (lib "
+                    f"(name \"{entry['name']}\")"
+                    f"(type \"KiCad\")"
+                    f"(uri \"{uri}\")"
+                    f"(options \"{entry['options']}\")"
+                    f"(descr \"{entry['description']}\"))\n"
+                )
+                new_content += entry_str
         
         new_content += line + "\n"
     
