@@ -1,5 +1,9 @@
 # KiCad Library Manager (KiLM)
 
+[![PyPI version](https://img.shields.io/pypi/v/kilm.svg)](https://pypi.org/project/kilm/)
+[![Python versions](https://img.shields.io/pypi/pyversions/kilm.svg)](https://pypi.org/project/kilm/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 A command-line tool for managing KiCad libraries across projects and workstations.
 
 ## Features
@@ -12,6 +16,20 @@ A command-line tool for managing KiCad libraries across projects and workstation
 - Support for environment variables
 - Dry-run mode to preview changes
 - Compatible with KiCad 6.x and newer
+- Project template management to standardize new designs
+
+## Requirements
+
+- Python 3.7 or newer
+- KiCad 6.x or newer (must be run at least once before using this tool)
+
+### Dependencies
+
+- click >= 8.0
+- pyyaml >= 6.0
+- pathlib >= 1.0.1
+- pathspec >= 0.12.1
+- jinja2 >= 3.1.6
 
 ## Installation
 
@@ -53,6 +71,15 @@ git clone https://github.com/barisgit/kilm.git
 cd kilm
 pip install -e .
 ```
+
+## Configuration
+
+KiLM stores its configuration in the following location:
+
+- **Linux/macOS**: `~/.config/kicad-lib-manager/`
+- **Windows**: `%APPDATA%\kicad-lib-manager\`
+
+The main configuration file is `config.yaml`, which contains information about your libraries and settings.
 
 ## Usage
 
@@ -97,16 +124,16 @@ You can view all configured libraries with:
 
 ```bash
 # List all configured libraries
-kilm config
+kilm config list
 
 # List only GitHub libraries (symbols/footprints)
-kilm config --type github
+kilm config list --type github
 
 # List only cloud libraries (3D models)
-kilm config --type cloud
+kilm config list --type cloud
 
 # Show detailed information
-kilm config --verbose
+kilm config list --verbose
 ```
 
 ### Configure KiCad
@@ -216,6 +243,22 @@ kilm template create MyProject --dry-run
 kilm template create MyProject --skip-hooks
 ```
 
+#### Listing Available Templates
+
+```bash
+# List all available templates
+kilm template list
+
+# List templates with detailed information including variables
+kilm template list --verbose
+
+# List templates from a specific library
+kilm template list --library my-library
+
+# Output template list in JSON format
+kilm template list --json
+```
+
 #### Template Structure
 
 Templates are stored in a `templates` directory within each library, with the following structure:
@@ -257,6 +300,40 @@ This will show:
 - Environment variables set in KiCad
 - Pinned libraries
 - Currently configured symbol and footprint libraries
+
+### Update Libraries
+
+You can update all configured GitHub-based libraries with a single command:
+
+```bash
+# Update all configured GitHub libraries
+kilm update
+
+# Preview updates without making changes
+kilm update --dry-run
+
+# Show detailed output during update
+kilm update --verbose
+```
+
+This will perform a `git pull` on all configured symbol and footprint libraries that are Git repositories, ensuring they're up-to-date with their remote sources.
+
+### Add Git Hooks
+
+You can add a Git post-merge hook to automatically update your KiCad libraries whenever you pull changes:
+
+```bash
+# Add hook to current Git repository
+kilm add-hook
+
+# Add hook to a different repository
+kilm add-hook --directory ~/path/to/repo
+
+# Overwrite existing hook if present
+kilm add-hook --force
+```
+
+The hook will automatically run `kilm update` after every `git pull` or `git merge` operation, keeping your libraries up-to-date. If you want to automatically detect new libraries and add them to KiCad as well modify hook in `.git/hooks/post-merge` to run `kilm setup` (more risky).
 
 ## Custom Library Descriptions
 
@@ -303,44 +380,71 @@ For automatic library updates, you can create a Git hook in your project:
    chmod +x .git/hooks/post-merge
    ```
 
+## Troubleshooting
+
+### Common Issues
+
+1. **KiCad configuration not found**
+   
+   Make sure KiCad has been run at least once on your system before using KiLM.
+
+2. **Changes not appearing in KiCad**
+   
+   Restart KiCad after running `kilm setup` to load the new configuration.
+
+3. **Environment variables not working**
+   
+   If using the environment variable method, ensure your shell has been restarted after setting them.
+
+4. **Template creation failing**
+   
+   Check for non-standard files in your project that might be causing issues, and use the `--exclude` option to skip them.
+
+## Development
+
+### Setting Up Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/barisgit/kilm.git
+cd kilm
+
+# Install development dependencies
+pip install -e ".[dev]"
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/test_config_commands.py
+
+# Run with coverage
+pytest --cov=kicad_lib_manager
+```
+
+### Code Formatting
+
+Code is formatted using Black:
+
+```bash
+# Format code
+black .
+```
+
 ## License
 
-MIT
+See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Update Libraries
-
-You can update all configured GitHub-based libraries with a single command:
-
-```bash
-# Update all configured GitHub libraries
-kilm update
-
-# Preview updates without making changes
-kilm update --dry-run
-
-# Show detailed output during update
-kilm update --verbose
-```
-
-This will perform a `git pull` on all configured symbol and footprint libraries that are Git repositories, ensuring they're up-to-date with their remote sources.
-
-### Add Git Hooks
-
-You can add a Git post-merge hook to automatically update your KiCad libraries whenever you pull changes:
-
-```bash
-# Add hook to current Git repository
-kilm add-hook
-
-# Add hook to a different repository
-kilm add-hook --directory ~/path/to/repo
-
-# Overwrite existing hook if present
-kilm add-hook --force
-```
-
-The hook will automatically run `kilm update` after every `git pull` or `git merge` operation, keeping your libraries up-to-date. If you want to automatically detect new libraries and add them to KiCad as well modify hook in `.git/post-merge` to run `kilm setup` (more risky).
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
