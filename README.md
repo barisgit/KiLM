@@ -2,6 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/kilm.svg)](https://pypi.org/project/kilm/)
 [![Python versions](https://img.shields.io/pypi/pyversions/kilm.svg)](https://pypi.org/project/kilm/)
+[![PyPI Downloads](https://static.pepy.tech/badge/kilm)](https://pepy.tech/projects/kilm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-website-brightgreen.svg)](https://kilm.aristovnik.me)
 
