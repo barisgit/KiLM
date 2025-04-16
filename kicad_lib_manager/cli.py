@@ -16,6 +16,7 @@ from .commands.add_3d import add_3d
 from .commands.config_list import config_list
 from .commands.update import update
 from .commands.add_hook import add_hook
+from .commands.template import template
 
 
 @click.group()
@@ -39,6 +40,7 @@ main.add_command(add_3d)
 main.add_command(config_list, name="config")
 main.add_command(update)
 main.add_command(add_hook, name="add-hook")
+main.add_command(template)
 
 
 if __name__ == "__main__":

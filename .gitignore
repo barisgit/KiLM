@@ -39,3 +39,9 @@ docs/_build/
 
 # Logs
 *.log
+
+# Test files
+test_lib/
+test_template/
+
+TODO.md

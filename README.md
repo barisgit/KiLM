@@ -166,6 +166,79 @@ kilm unpin --symbols LibToUnpin --footprints FootprintToUnpin
 kilm unpin --all
 ```
 
+### Working with Templates
+
+KiLM provides tools for managing KiCad project templates, allowing you to create reusable project structures:
+
+#### Creating a Template from an Existing Project
+
+```bash
+# Create a template named 'basic-project' from the current directory
+# (will run in interactive mode by default)
+kilm template make basic-project
+
+# Create a template from a specific directory
+kilm template make basic-project path/to/project
+
+# Create a template with a description and use case
+kilm template make basic-project --description "Basic KiCad project" \
+    --use-case "Starting point for simple PCB designs"
+
+# Create a template with variables
+kilm template make basic-project --variable "author=John Doe"
+
+# Preview template creation without making changes
+kilm template make basic-project --dry-run
+
+# Create a template without interactive prompts
+kilm template make basic-project --non-interactive
+```
+
+#### Creating a Project from a Template
+
+```bash
+# Create a project named 'MyProject' in the current directory
+kilm template create MyProject
+
+# Create a project in a specific directory
+kilm template create MyProject path/to/project
+
+# Create a project with a specific template
+kilm template create MyProject --template basic-project
+
+# Set template variables
+kilm template create MyProject --set-var author="John Doe" --set-var version=1.0
+
+# Preview project creation without making changes
+kilm template create MyProject --dry-run
+
+# Skip post-creation hooks
+kilm template create MyProject --skip-hooks
+```
+
+#### Template Structure
+
+Templates are stored in a `templates` directory within each library, with the following structure:
+
+```
+templates/
+  template-name/
+    metadata.yaml       # Template metadata and configuration
+    hooks/
+      post_create.py    # Post-creation hook script
+    template/           # The actual template files
+      {{ project_filename }}.kicad_pro.jinja2  # Main project file
+      {{ project_filename }}.kicad_sch.jinja2  # Main schematic file
+      {{ project_filename }}.kicad_pcb.jinja2  # Main PCB file
+      README.md.jinja2                         # Documentation
+      ...                                     # Other project files
+```
+
+The template files can use Jinja2 syntax for variable substitution, both in file contents and filenames. For example:
+
+- A file named `{{ project_name }}_v{{ version }}.txt.jinja2` will be rendered as `MyProject_v1.0.txt` with the appropriate variables.
+- The KiCad files use the `project_filename` variable to ensure consistent naming across all project files.
+
 ### List Available Libraries
 
 ```bash

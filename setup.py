@@ -17,6 +17,8 @@ setup(
         "click>=8.0",
         "pyyaml>=6.0",
         "pathlib>=1.0.1",
+        "pathspec>=0.12.1",
+        "jinja2>=3.1.6",
     ],
     extras_require={
         "dev": [

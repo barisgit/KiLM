@@ -171,6 +171,13 @@ def update_kicad_env_vars(
     if not env_vars or not isinstance(env_vars, dict):
         return False
     
+    # Filter out empty strings from env_vars, but keep None values
+    valid_env_vars = {k: v for k, v in env_vars.items() if v is None or str(v).strip()}
+    
+    # If no environment variables to process, return False
+    if not valid_env_vars:
+        return False
+    
     kicad_common = kicad_config / "kicad_common.json"
     
     if not kicad_common.exists():
@@ -192,10 +199,15 @@ def update_kicad_env_vars(
     changes_needed = False
     current_vars = config["environment"]["vars"]
     
-    # Filter out any None values from env_vars
-    valid_env_vars = {key: value for key, value in env_vars.items() if value is not None}
-    
     for key, value in valid_env_vars.items():
+        # Handle None values by removing the variable
+        if value is None:
+            if key in current_vars:
+                changes_needed = True
+                if not dry_run:
+                    del current_vars[key]
+            continue
+            
         # Ensure path uses forward slashes
         normalized_value = value.replace('\\', '/')
         
