@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 import jinja2
 import pathspec
+import questionary
 
 from ..config import Config
 from ..utils.template import (
@@ -166,29 +167,26 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                     click.echo(f"  {t_name} ({library}): {description}")
                 return
     else:
-        # Interactive template selection
-        click.echo("Available templates:")
-        template_list = list(all_templates.items())
-        for i, (t_name, t_data) in enumerate(template_list):
-            library = t_data.get("source_library", "unknown")
-            description = t_data.get("description", "")
-            click.echo(f"{i+1}. {t_name} ({library}): {description}")
+        # Interactive template selection using questionary
+        template_choices = [
+            questionary.Choice(
+                title=f"{t_name} ({t_data.get('source_library', 'unknown')}) - {t_data.get('description', '')}", 
+                value=t_name # Use template name as the value
+            )
+            for t_name, t_data in all_templates.items()
+        ]
         
-        # Get selection
-        while True:
-            try:
-                selection = click.prompt(
-                    "Select template (number)",
-                    type=int,
-                    default=1
-                )
-                if 1 <= selection <= len(template_list):
-                    selected_template = template_list[selection-1][1] # Get the metadata dict
-                    break
-                else:
-                    click.echo(f"Please enter a number between 1 and {len(template_list)}")
-            except ValueError:
-                click.echo("Please enter a valid number")
+        selected_template_name = questionary.select(
+            "Select template:",
+            choices=template_choices,
+            use_shortcuts=True
+        ).ask()
+        
+        if selected_template_name is None: # Handle cancellation
+            click.echo("Template selection cancelled.")
+            return
+            
+        selected_template = all_templates.get(selected_template_name)
     
     # Ensure selected_template is not None before proceeding
     if not selected_template:
@@ -247,48 +245,91 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
         
     click.echo()
     click.echo("Template Variables:")
+    
+    # Combine initial variables from args and --set-var
+    variables.update(command_line_vars)
 
-    # Process each variable defined in the template metadata
+    # Sequentially prompt for variables not already provided
     for var_name, var_info in template_variables.items():
+        if var_name in variables:
+            # Variable already provided, echo its value
+            description = var_info.get("description", f"Value for {var_name}")
+            source = "argument" if var_name == "project_name" and name and "project_name" not in command_line_vars else "--set-var"
+            if var_name in command_line_vars or (var_name == "project_name" and name):
+                 click.echo(f"  {var_name}: {variables[var_name]} (from {source}) - {description}")
+            continue # Skip prompting
+
+        # Variable not provided, prompt the user
         description = var_info.get("description", f"Value for {var_name}")
         default = var_info.get("default", "")
         
-        # Value priority: --set-var > argument 'name' (for project_name) > interactive prompt > default
-        
-        value = None
-        if var_name in command_line_vars:
-            value = command_line_vars[var_name]
-            variables[var_name] = value
-            click.echo(f"  {var_name}: {value} (from --set-var) - {description}")
-        elif var_name == "project_name" and "project_name" in variables:
-            # Value already set from 'name' argument
-            value = variables[var_name]
-            click.echo(f"  {var_name}: {value} (from argument) - {description}")
-        else:
-            # Prompt user if not set via command line or argument
-            # Render the default value using already processed variables
-            rendered_default = default
-            if default and "{{" in default and "}}" in default:
-                try:
-                    rendered_default = render_template_string(default, variables)
-                except Exception as e:
-                    click.echo(f"Warning: Could not render default for {var_name}: {e}", err=True)
-                    rendered_default = default # Use original default on error
-            
-            # Prompt user for input
-            value = click.prompt(
-                f"  {var_name} ({description})",
-                default=rendered_default,
-                show_default=bool(rendered_default),
-                # Add type casting later if needed (e.g., bool, int)
-            )
-            variables[var_name] = value
-            # No need to echo here as prompt shows the interaction
+        # Render the default value using already known variables
+        rendered_default = default
+        if default and "{{" in default and "}}" in default:
+            try:
+                # Use the 'variables' dict which now contains previously entered answers
+                rendered_default = render_template_string(default, variables)
+            except jinja2.exceptions.UndefinedError as e:
+                 # If a variable needed for the default hasn't been entered yet,
+                 # keep the original template string or empty if undefined errors occur early
+                 click.echo(f"Debug: Undefined variable for default of {var_name}: {e}. Default might be incomplete.", err=True)
+                 rendered_default = "" # Or keep 'default'? Better to show empty than half-rendered?
+            except Exception as e:
+                click.echo(f"Warning: Could not render default for {var_name}: {e}", err=True)
+                rendered_default = default # Use original default on other errors
+
+        # Ask the question using questionary.text
+        answer = questionary.text(
+            f"{var_name} ({description})",
+            default=rendered_default,
+            # Add validation if needed, e.g., lambda text: len(text) > 0 or "Value cannot be empty"
+        ).ask()
+
+        if answer is None: # Handle Ctrl+C or cancellation
+            click.echo("Variable input cancelled.")
+            return # Exit the command gracefully
+
+        # Store the answer for use in subsequent default renderings
+        variables[var_name] = answer
 
     # --- End Variable Processing ---
 
+    # --- Post-process defaults for dependent variables ---
+    # Store original defaults that were templates
+    original_template_defaults = {}
+    for var_name, var_info in template_variables.items():
+        default = var_info.get("default", "")
+        if default and "{{" in default and "}}" in default:
+            original_template_defaults[var_name] = default
+    
+    # Re-render defaults for variables that might not have been rendered correctly initially
+    # and update the value if the user accepted the (potentially incorrect) default.
+    for var_name, original_default_template in original_template_defaults.items():
+        # Check if the variable exists in the final variables set
+        if var_name in variables:
+            # Calculate the default that was likely *shown* to the user
+            # (rendered only with prefilled vars available *before* the prompt)
+            try:
+                shown_default = render_template_string(original_default_template, variables)
+            except Exception:
+                shown_default = original_default_template # Fallback if initial render failed
+
+            # Render the default correctly using *all* collected variables
+            try:
+                correct_default = render_template_string(original_default_template, variables)
+            except Exception as e:
+                 click.echo(f"Warning: Could not re-render default for {var_name}: {e}", err=True)
+                 correct_default = variables[var_name] # Keep existing value on error
+
+            # If the user's final answer matches the *shown* default (meaning they didn't change it),
+            # update it with the *correctly* rendered default.
+            if variables[var_name] == shown_default and variables[var_name] != correct_default:
+                click.echo(f"Updating default for '{var_name}': '{shown_default}' -> '{correct_default}'")
+                variables[var_name] = correct_default
+    # --- End Post-processing ---
+
     click.echo()
-    click.echo(f"Variables collected: {json.dumps(variables, indent=2)}")
+    click.echo(f"Final variables: {json.dumps(variables, indent=2)}") # Changed message for clarity
 
     # --- Determine Final Project Directory ---
     final_project_dir = None

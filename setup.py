@@ -19,6 +19,7 @@ setup(
         "pathlib>=1.0.1",
         "pathspec>=0.12.1",
         "jinja2>=3.1.6",
+        "questionary>=1.10.0",
     ],
     extras_require={
         "dev": [
