@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Set, Tuple, Union
 import pathspec
 import jinja2
+import click
 
 # Default template directory name in a library
 TEMPLATES_DIR = "templates"
@@ -79,7 +80,8 @@ def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
         
         return pathspec.PathSpec.from_lines('gitwildmatch', lines)
     except Exception as e:
-        print(f"Warning: Error reading .gitignore file: {e}")
+        # Use click.echo for warnings/errors
+        click.echo(f"Warning: Error reading .gitignore file: {e}", err=True)
         return None
 
 
@@ -120,7 +122,8 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
             
             templates.append(metadata)
         except Exception as e:
-            print(f"Error reading template metadata from {metadata_file}: {e}")
+            # Use click.echo for warnings/errors
+            click.echo(f"Error reading template metadata from {metadata_file}: {e}", err=True)
     
     return templates
 
@@ -321,10 +324,10 @@ def process_markdown_file(source_file: Path, target_file: Path, variables: Dict[
         with open(target_file_jinja, 'w', encoding='utf-8') as f:
             f.write(new_content)
             
-        print(f"Processed Markdown file: {source_file.name}")
+        click.echo(f"Processed Markdown file: {source_file.name}")
     
     except Exception as e:
-        print(f"Error processing Markdown file {source_file.name}: {e}")
+        click.echo(f"Error processing Markdown file {source_file.name}: {e}", err=True)
         # Fallback to direct copy
         shutil.copy2(source_file, target_file)
 
@@ -376,7 +379,7 @@ def create_template_structure(
     
     # Debug gitignore if available
     if gitignore_spec:
-        print("Using .gitignore patterns for exclusion")
+        click.echo("Using .gitignore patterns for exclusion")
     
     # Max path length to prevent "file name too long" errors
     MAX_PATH_LENGTH = 512
@@ -387,7 +390,7 @@ def create_template_structure(
     main_pcb_file = None
     
     # First scan to find main KiCad files
-    print("Scanning for main KiCad files...")
+    click.echo("Scanning for main KiCad files...")
     for root, _, files in os.walk(source_directory):
         rel_root = os.path.relpath(root, source_directory)
         
@@ -417,15 +420,15 @@ def create_template_structure(
                 
                 if file_lower.endswith(KICAD_PROJECT_EXT) and not main_project_file:
                     main_project_file = os.path.join(root, file)
-                    print(f"Found main project file: {file}")
+                    click.echo(f"Found main project file: {file}")
                     
                 elif file_lower.endswith(KICAD_SCHEMATIC_EXT) and not main_schematic_file:
                     main_schematic_file = os.path.join(root, file)
-                    print(f"Found main schematic file: {file}")
+                    click.echo(f"Found main schematic file: {file}")
                     
                 elif file_lower.endswith(KICAD_PCB_EXT) and not main_pcb_file:
                     main_pcb_file = os.path.join(root, file)
-                    print(f"Found main PCB file: {file}")
+                    click.echo(f"Found main PCB file: {file}")
     
     # Copy files from source to template
     for root, dirs, files in os.walk(source_directory):
@@ -439,7 +442,7 @@ def create_template_structure(
             # Skip template directories and virtual environments
             if d in common_excludes:
                 dirs_to_remove.append(d)
-                print(f"Excluding common directory: {d}")
+                click.echo(f"Excluding common directory: {d}")
                 continue
                 
             # Check if this is a path we would exclude
@@ -454,16 +457,16 @@ def create_template_structure(
             # Prevent copying into template directory to avoid recursion
             if template_directory.as_posix() in os.path.join(source_directory, rel_path):
                 dirs_to_remove.append(d)
-                print(f"Preventing recursive template copy: {rel_path}")
+                click.echo(f"Preventing recursive template copy: {rel_path}")
                 continue
                 
             # Check for gitignore and custom exclusions
             if gitignore_spec and gitignore_spec.match_file(git_path):
                 dirs_to_remove.append(d)
-                print(f"Excluding directory from gitignore: {git_path}")
+                click.echo(f"Excluding directory from gitignore: {git_path}")
             elif additional_spec and additional_spec.match_file(git_path):
                 dirs_to_remove.append(d)
-                print(f"Excluding directory from additional patterns: {git_path}")
+                click.echo(f"Excluding directory from additional patterns: {git_path}")
                 
         for d in dirs_to_remove:
             if d in dirs:  # Extra check to avoid KeyError
@@ -475,7 +478,7 @@ def create_template_structure(
             
             # Check path length
             if len(str(target_dir)) > MAX_PATH_LENGTH:
-                print(f"Skipping directory due to path length: {rel_root}")
+                click.echo(f"Skipping directory due to path length: {rel_root}")
                 continue
                 
             os.makedirs(target_dir, exist_ok=True)
@@ -491,15 +494,15 @@ def create_template_structure(
             
             # Skip gitignored files and additional excluded files
             if gitignore_spec and gitignore_spec.match_file(git_path):
-                print(f"Excluding file from gitignore: {git_path}")
+                click.echo(f"Excluding file from gitignore: {git_path}")
                 continue
             if additional_spec and additional_spec.match_file(git_path):
-                print(f"Excluding file from additional patterns: {git_path}")
+                click.echo(f"Excluding file from additional patterns: {git_path}")
                 continue
             
             # Skip .kicad_prl files - they are project-specific preferences
             if file.lower().endswith(KICAD_PRL_EXT):
-                print(f"Excluding KiCad project preferences file: {git_path}")
+                click.echo(f"Excluding KiCad project preferences file: {git_path}")
                 continue
             
             source_file = source_directory / rel_path
@@ -520,7 +523,7 @@ def create_template_structure(
             
             # Check path length
             if len(str(target_file)) > MAX_PATH_LENGTH:
-                print(f"Skipping file due to path length: {rel_path}")
+                click.echo(f"Skipping file due to path length: {rel_path}")
                 continue
             
             # Process main project file
@@ -544,7 +547,7 @@ def create_template_structure(
                 try:
                     shutil.copy2(source_file, target_file)
                 except OSError as e:
-                    print(f"Error copying file {rel_path}: {e}")
+                    click.echo(f"Error copying file {rel_path}: {e}", err=True)
 
 
 def create_hook_script(hooks_dir: Path) -> None:
@@ -589,8 +592,8 @@ def post_create(context):
     #         f.write("Created with KiCad Library Manager\\n")
     
     # Print message to user
-    print(f"Project {context['variables']['project_name']} created successfully!")
-    print(f"Location: {context['project_dir']}")
+    click.echo(f"Project {context['variables']['project_name']} created successfully!")
+    click.echo(f"Location: {context['project_dir']}")
 '''
     
     with open(hook_script, "w") as f:
@@ -626,21 +629,21 @@ def process_kicad_project_file(source_file: Path, target_file: Path, variables: 
                 original_filename = project_data['meta']['filename']
                 # Replace with project_filename variable - using {{ project_name }}.kicad_pro pattern
                 project_data['meta']['filename'] = "{{ project_filename }}.kicad_pro"
-                print(f"  Templated project filename: '{original_filename}' → '{{ project_filename }}.kicad_pro'")
+                click.echo(f"  Templated project filename: '{original_filename}' → '{{ project_filename }}.kicad_pro'")
             
             # Write updated JSON to a .jinja2 file
             target_file_jinja = Path(str(target_file) + '.jinja2')
             with open(target_file_jinja, 'w', encoding='utf-8') as f:
                 json.dump(project_data, f, indent=2)
                 
-            print(f"Processed KiCad project file: {source_file.name} → {target_file_jinja.name}")
+            click.echo(f"Processed KiCad project file: {source_file.name} → {target_file_jinja.name}")
             
         except json.JSONDecodeError:
-            print(f"Warning: Could not parse {source_file.name} as JSON. Copying without changes.")
+            click.echo(f"Warning: Could not parse {source_file.name} as JSON. Copying without changes.")
             shutil.copy2(source_file, target_file)
     
     except Exception as e:
-        print(f"Error processing KiCad project file {source_file.name}: {e}")
+        click.echo(f"Error processing KiCad project file {source_file.name}: {e}", err=True)
         # Fallback to direct copy
         shutil.copy2(source_file, target_file)
 
@@ -662,17 +665,17 @@ def process_kicad_schematic_file(source_file: Path, target_file: Path, variables
         # Replace project references
         project_pattern = re.compile(r'\(project\s+"([^"]+)"')
         content = project_pattern.sub(r'(project "{{ project_filename }}"', content)
-        print(f"  Templated schematic project name references with '{{ project_filename }}'")
+        click.echo(f"  Templated schematic project name references with '{{ project_filename }}'")
         
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + '.jinja2')
         with open(target_file_jinja, 'w', encoding='utf-8') as f:
             f.write(content)
             
-        print(f"Processed KiCad schematic file: {source_file.name} → {target_file_jinja.name}")
+        click.echo(f"Processed KiCad schematic file: {source_file.name} → {target_file_jinja.name}")
     
     except Exception as e:
-        print(f"Error processing KiCad schematic file {source_file.name}: {e}")
+        click.echo(f"Error processing KiCad schematic file {source_file.name}: {e}", err=True)
         # Fallback to direct copy
         shutil.copy2(source_file, target_file)
 
@@ -703,17 +706,17 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path, variables: Dict
             return match.group(0)
         
         content = sheet_pattern.sub(sheet_replacer, content)
-        print(f"  Templated PCB sheet references with '{{ project_filename }}.kicad_sch'")
+        click.echo(f"  Templated PCB sheet references with '{{ project_filename }}.kicad_sch'")
         
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + '.jinja2')
         with open(target_file_jinja, 'w', encoding='utf-8') as f:
             f.write(content)
             
-        print(f"Processed KiCad PCB file: {source_file.name} → {target_file_jinja.name}")
+        click.echo(f"Processed KiCad PCB file: {source_file.name} → {target_file_jinja.name}")
     
     except Exception as e:
-        print(f"Error processing KiCad PCB file {source_file.name}: {e}")
+        click.echo(f"Error processing KiCad PCB file {source_file.name}: {e}", err=True)
         # Fallback to direct copy
         shutil.copy2(source_file, target_file)
 
@@ -734,7 +737,7 @@ def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
         template = jinja2.Template(template_str)
         return template.render(**variables)
     except jinja2.exceptions.TemplateError as e:
-        print(f"Warning: Failed to render template: {e}")
+        click.echo(f"Warning: Failed to render template: {e}", err=True)
         return template_str
 
 def render_filename(filename: str, variables: Dict[str, Any]) -> str:
@@ -756,7 +759,7 @@ def render_filename(filename: str, variables: Dict[str, Any]) -> str:
             template = env.from_string(filename)
             return template.render(**variables)
         except jinja2.exceptions.TemplateError as e:
-            print(f"Warning: Failed to render filename {filename}: {e}")
+            click.echo(f"Warning: Failed to render filename {filename}: {e}", err=True)
     
     return filename
 
@@ -788,7 +791,15 @@ def find_all_templates(config: Any) -> Dict[str, Dict[str, Any]]:
                 # Add source library information
                 all_templates[name]["source_library"] = library.get("name", "unknown")
                 all_templates[name]["library_path"] = library_path
-    
+            else:
+                # Store template
+                if name in all_templates:
+                    # Use click.echo for warnings/errors
+                    click.echo(f"Warning: Duplicate template name '{name}' found.", err=True)
+                    click.echo(f"  Existing: {all_templates[name]['path']}", err=True)
+                    click.echo(f"  New: {template['path']}", err=True)
+                all_templates[name] = template
+
     return all_templates
 
 def render_template_file(
@@ -818,7 +829,7 @@ def render_template_file(
             shutil.copy2(source_file, target_file)
             return True
         except Exception as e:
-            print(f"Error copying binary file {source_file}: {e}")
+            click.echo(f"Error copying binary file {source_file}: {e}", err=True)
             return False
     
     # For text files, render them if they have a .jinja2 extension
@@ -848,7 +859,7 @@ def render_template_file(
                 
                 return True
             except jinja2.exceptions.TemplateError as e:
-                print(f"Error rendering template {source_file.name}: {e}")
+                click.echo(f"Error rendering template {source_file.name}: {e}", err=True)
                 # Fall back to copying the file as-is
                 shutil.copy2(source_file, target_file)
                 return False
@@ -858,7 +869,7 @@ def render_template_file(
             return True
     
     except Exception as e:
-        print(f"Error processing file {source_file}: {e}")
+        click.echo(f"Error processing file {source_file}: {e}", err=True)
         # Try to copy anyway
         try:
             shutil.copy2(source_file, target_file)
@@ -870,6 +881,7 @@ def create_project_from_template(
     template_dir: Path,
     project_dir: Path,
     variables: Dict[str, Any],
+    metadata: Optional[Dict[str, Any]] = None,
     dry_run: bool = False,
     skip_hooks: bool = False
 ) -> bool:
@@ -880,6 +892,7 @@ def create_project_from_template(
         template_dir: Path to the template directory
         project_dir: Path to create the project in
         variables: Dictionary of template variables
+        metadata: Template metadata
         dry_run: If True, show what would be created without making changes
         skip_hooks: If True, skip running post-creation hooks
         
@@ -889,33 +902,36 @@ def create_project_from_template(
     template_content_dir = template_dir / TEMPLATE_CONTENT_DIR
     
     if not template_content_dir.exists() or not template_content_dir.is_dir():
-        print(f"Error: Template content directory {template_content_dir} does not exist")
+        click.echo(f"Error: Template content directory {template_content_dir} does not exist", err=True)
         return False
     
     # Check if project directory exists and is not empty
     if project_dir.exists():
         files = list(project_dir.iterdir())
         if files and not dry_run:
-            print(f"Warning: Target directory {project_dir} is not empty")
+            click.echo(f"Warning: Target directory {project_dir} is not empty", err=True)
             # Continue anyway - we'll merge the template with the existing directory
     
-    # Load template metadata
-    metadata_file = template_dir / TEMPLATE_METADATA
-    if not metadata_file.exists():
-        print(f"Error: Template metadata file {metadata_file} does not exist")
-        return False
-    
-    try:
-        with open(metadata_file, "r") as f:
-            metadata = yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error reading template metadata: {e}")
-        return False
+    # Use provided metadata if available, otherwise load it (fallback)
+    if metadata is None:
+        metadata_file = template_dir / TEMPLATE_METADATA
+        if not metadata_file.exists():
+            click.echo(f"Error: Template metadata file {metadata_file} does not exist and was not provided.", err=True)
+            return False
+        try:
+            with open(metadata_file, "r") as f:
+                metadata = yaml.safe_load(f)
+            if not metadata: # Handle empty metadata file
+                click.echo(f"Warning: Template metadata file is empty: {metadata_file}", err=True)
+                metadata = {} # Use empty dict
+        except Exception as e:
+            click.echo(f"Error reading template metadata {metadata_file}: {e}", err=True)
+            return False
     
     # Check if we need to merge with variables from a parent template
     if "extends" in metadata and metadata["extends"]:
         # TODO: Handle template inheritance
-        print(f"Warning: Template inheritance not fully implemented yet")
+        click.echo(f"Warning: Template inheritance not fully implemented yet", err=True)
     
     # Binary file extensions that should not be rendered
     binary_extensions = {
@@ -940,7 +956,7 @@ def create_project_from_template(
             target_dir = project_dir / rendered_dir_path
             
             if dry_run:
-                print(f"Would create directory: {target_dir}")
+                click.echo(f"Would create directory: {target_dir}")
             else:
                 target_dir.mkdir(parents=True, exist_ok=True)
         else:
@@ -977,9 +993,10 @@ def create_project_from_template(
     
     # In dry run mode, just show what would be created
     if dry_run:
-        print("\nThe following files would be created:")
+        click.echo() # Add spacing
+        click.echo("The following files would be created:")
         for file_info in files_to_create:
-            print(f"  {file_info['target']}")
+            click.echo(f"  {file_info['target']}")
         return True
     
     # Actually create the files
@@ -992,7 +1009,7 @@ def create_project_from_template(
         )
         
         if not success:
-            print(f"Warning: Failed to create {file_info['target']}")
+            click.echo(f"Warning: Failed to create {file_info['target']}", err=True)
     
     # Run post-creation hook if present and not skipped
     if not skip_hooks:
@@ -1001,7 +1018,7 @@ def create_project_from_template(
             try:
                 run_post_create_hook(hook_script, project_dir, variables, metadata)
             except Exception as e:
-                print(f"Error running post-creation hook: {e}")
+                click.echo(f"Error running post-creation hook: {e}", err=True)
                 traceback.print_exc()
     
     return True
@@ -1031,7 +1048,7 @@ def run_post_create_hook(
     # Load the hook script
     spec = importlib.util.spec_from_file_location("hook", hook_script)
     if not spec or not spec.loader:
-        print(f"Error: Could not load hook script {hook_script}")
+        click.echo(f"Error: Could not load hook script {hook_script}", err=True)
         return
     
     hook = importlib.util.module_from_spec(spec)
@@ -1039,7 +1056,7 @@ def run_post_create_hook(
     
     # Check if the post_create function exists
     if not hasattr(hook, "post_create"):
-        print(f"Warning: Hook script {hook_script} does not have a post_create function")
+        click.echo(f"Warning: Hook script {hook_script} does not have a post_create function", err=True)
         return
     
     # Create the context

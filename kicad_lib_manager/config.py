@@ -6,6 +6,7 @@ import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
+import click
 
 DEFAULT_CONFIG = {
     "max_backups": 5,
@@ -33,7 +34,8 @@ class Config:
                 if loaded_config and isinstance(loaded_config, dict):
                     self._config.update(loaded_config)
             except Exception as e:
-                print(f"Error loading config file: {e}")
+                # Use click.echo for warnings/errors
+                click.echo(f"Error loading config file: {e}", err=True)
     
     def _get_config_file(self) -> Path:
         """Get the configuration file path"""

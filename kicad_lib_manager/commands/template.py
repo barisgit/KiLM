@@ -183,134 +183,196 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                     default=1
                 )
                 if 1 <= selection <= len(template_list):
-                    selected_template = template_list[selection-1][1]
+                    selected_template = template_list[selection-1][1] # Get the metadata dict
                     break
                 else:
                     click.echo(f"Please enter a number between 1 and {len(template_list)}")
             except ValueError:
                 click.echo("Please enter a valid number")
     
+    # Ensure selected_template is not None before proceeding
+    if not selected_template:
+         click.echo("Error: No template selected.", err=True)
+         return
+
     # Get template directory
-    template_dir = Path(selected_template.get("path"))
+    template_path_str = selected_template.get("path")
+    if not template_path_str:
+        click.echo(f"Error: Template metadata for '{selected_template.get('name')}' is missing the 'path'.", err=True)
+        return
+    template_dir = Path(template_path_str)
     
     # Load template metadata
     metadata_file = template_dir / TEMPLATE_METADATA
     try:
         with open(metadata_file, "r") as f:
             metadata = yaml.safe_load(f)
+        if not metadata: # Handle empty metadata file
+             click.echo(f"Warning: Template metadata file is empty: {metadata_file}", err=True)
+             metadata = {} # Use empty dict to avoid downstream errors
     except Exception as e:
-        click.echo(f"Error reading template metadata: {e}")
+        click.echo(f"Error reading template metadata {metadata_file}: {e}", err=True)
         return
     
-    # Get template variables
+    # Get template variables from metadata
     template_variables = metadata.get("variables", {})
     
-    # Interactive variable input if needed
-    variables = {}
-    
-    # First set the project name if provided
-    if name:
-        variables["project_name"] = name
-    
-    # Show template information
-    click.echo(f"\nTemplate: {metadata.get('name')}")
-    click.echo(f"Description: {metadata.get('description')}")
-    if metadata.get('use_case'):
-        click.echo(f"Use case: {metadata.get('use_case')}")
-    
-    # Parse variables from command line
-    command_line_vars = {}
+    # --- Variable Processing ---
+    variables = {} # Final variables dictionary
+    command_line_vars = {} # Variables set via --set-var
+
+    # Parse --set-var options first
     for var in set_var:
         if "=" in var:
             key, value = var.split("=", 1)
             command_line_vars[key.strip()] = value.strip()
-    
-    # Get variables interactively 
-    click.echo("\nTemplate variables:")
+
+    # Set project_name if provided as argument 'name'
+    if name:
+        # Only set project_name if it's defined in template or not already set via --set-var
+        if "project_name" in template_variables and "project_name" not in command_line_vars:
+             variables["project_name"] = name
+        elif "project_name" not in template_variables and "project_name" not in command_line_vars:
+             # If project_name is not an official template var, still use it if provided
+             variables["project_name"] = name
+             # Optionally add a warning if it's not a defined variable?
+             # click.echo(f"Warning: 'project_name' used but not defined in template variables.", err=True)
+
+    # Show template info
+    click.echo()
+    click.echo(f"Using Template: {metadata.get('name', 'Unknown')}")
+    click.echo(f"Description: {metadata.get('description', 'N/A')}")
+    if metadata.get('use_case'):
+        click.echo(f"Use case: {metadata.get('use_case')}")
+        
+    click.echo()
+    click.echo("Template Variables:")
+
+    # Process each variable defined in the template metadata
     for var_name, var_info in template_variables.items():
         description = var_info.get("description", f"Value for {var_name}")
         default = var_info.get("default", "")
         
-        # If the variable has already been set, use that value
-        if var_name in variables:
-            value = variables[var_name]
-            click.echo(f"  {var_name}: {value} - {description}")
-            continue
-            
-        # If the variable was set on the command line, use that value
+        # Value priority: --set-var > argument 'name' (for project_name) > interactive prompt > default
+        
+        value = None
         if var_name in command_line_vars:
             value = command_line_vars[var_name]
             variables[var_name] = value
-            click.echo(f"  {var_name}: {value} - {description}")
-            continue
-        
-        # Otherwise, prompt for the value
-        # First render the default value using any variables we already have
-        if default and "{{" in default and "}}" in default:
-            try:
-                rendered_default = render_template_string(default, variables)
-                default = rendered_default
-            except:
-                pass
-        
-        value = click.prompt(
-            f"  {var_name} ({description})",
-            default=default
-        )
-        variables[var_name] = value
-    
-    # Directory where project will be created
-    if "directory_name" in variables:
-        project_dir = project_dir / variables["directory_name"]
-    else:
-        # If no directory_name variable, use project_name as directory name
-        if "project_name" in variables:
-            # Use project_name but replace spaces with dashes and make lowercase
-            dir_name = variables["project_name"].lower().replace(" ", "-")
-            project_dir = project_dir / dir_name
-    
-    # Check if project directory already exists
-    if project_dir.exists() and not dry_run:
-        if not click.confirm(f"\nDirectory {project_dir} already exists. Continue?"):
-            return
-    
-    # Create project directory if it doesn't exist and we're not in dry run mode
-    if not project_dir.exists() and not dry_run:
-        try:
-            project_dir.mkdir(parents=True)
-        except Exception as e:
-            click.echo(f"Error creating project directory: {e}")
-            return
-    
-    # Ask about hooks
-    if not skip_hooks and not dry_run:
-        hook_script = template_dir / HOOKS_DIR / POST_CREATE_HOOK
-        if hook_script.exists():
-            if not click.confirm("\nRun post-creation hooks?", default=True):
-                skip_hooks = True
-    
-    # Show what will be created
-    click.echo(f"\nCreating project '{variables.get('project_name')}' from template '{metadata.get('name')}'")
-    click.echo(f"Project directory: {project_dir}")
-    
-    # Create the project
-    success = create_project_from_template(
-        template_dir=template_dir,
-        project_dir=project_dir,
-        variables=variables,
-        dry_run=dry_run,
-        skip_hooks=skip_hooks
-    )
-    
-    if success:
-        if dry_run:
-            click.echo("\nDry run completed. No files were created.")
+            click.echo(f"  {var_name}: {value} (from --set-var) - {description}")
+        elif var_name == "project_name" and "project_name" in variables:
+            # Value already set from 'name' argument
+            value = variables[var_name]
+            click.echo(f"  {var_name}: {value} (from argument) - {description}")
         else:
-            click.echo("\nProject created successfully!")
-            click.echo(f"Location: {project_dir}")
+            # Prompt user if not set via command line or argument
+            # Render the default value using already processed variables
+            rendered_default = default
+            if default and "{{" in default and "}}" in default:
+                try:
+                    rendered_default = render_template_string(default, variables)
+                except Exception as e:
+                    click.echo(f"Warning: Could not render default for {var_name}: {e}", err=True)
+                    rendered_default = default # Use original default on error
+            
+            # Prompt user for input
+            value = click.prompt(
+                f"  {var_name} ({description})",
+                default=rendered_default,
+                show_default=bool(rendered_default),
+                # Add type casting later if needed (e.g., bool, int)
+            )
+            variables[var_name] = value
+            # No need to echo here as prompt shows the interaction
+
+    # --- End Variable Processing ---
+
+    click.echo()
+    click.echo(f"Variables collected: {json.dumps(variables, indent=2)}")
+
+    # --- Determine Final Project Directory ---
+    final_project_dir = None
+    directory_name_template = template_variables.get("directory_name", {}).get("default", "")
+    directory_name_value = variables.get("directory_name", "")
+
+    # Try using the 'directory_name' variable value if it exists and is not just the template string
+    if directory_name_value and directory_name_value != directory_name_template:
+        final_project_dir = project_dir / directory_name_value
+    elif directory_name_template and "{{" in directory_name_template:
+         # If value wasn't provided/prompted, try rendering the default template
+        try:
+            dir_name_rendered = render_template_string(directory_name_template, variables)
+            final_project_dir = project_dir / dir_name_rendered
+            # Store the rendered value back into variables for consistency?
+            # variables["directory_name"] = dir_name_rendered
+        except Exception as e:
+            click.echo(f"Warning: Could not render default directory_name '{directory_name_template}': {e}", err=True)
+            # Fallback below
+    
+    # Fallback to using project_name variable if directory_name failed or wasn't conclusive
+    if not final_project_dir and "project_name" in variables:
+         project_name_sanitized = variables["project_name"].lower().replace(" ", "-")
+         final_project_dir = project_dir / project_name_sanitized
+         click.echo(f"Using project_name to determine directory: {final_project_dir}")
+
+    # Final check if we have a directory
+    if not final_project_dir:
+         click.echo("Error: Cannot determine project directory. Ensure 'project_name' or 'directory_name' variable is properly handled.", err=True)
+         return
+    # --- End Directory Determination ---
+
+    click.echo()
+    click.echo(f"Project will be created in: {final_project_dir}")
+
+    # --- Execution ---
+    if dry_run:
+        click.echo("Dry run enabled. No changes will be made.")
+        # Optionally, list files that *would* be created here
     else:
-        click.echo("\nError creating project.")
-        return
+        # Check if target directory exists and handle overwrite
+        if final_project_dir.exists():
+            if not click.confirm(f"Directory '{final_project_dir}' already exists. Overwrite?"):
+                click.echo("Aborted.")
+                return
+            else:
+                click.echo(f"Removing existing directory: {final_project_dir}")
+                try:
+                    shutil.rmtree(final_project_dir)
+                except Exception as e:
+                    click.echo(f"Error removing existing directory: {e}", err=True)
+                    return
+        
+        # Create parent directories if they don't exist
+        try:
+             final_project_dir.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+             click.echo(f"Error creating parent directories for {final_project_dir}: {e}", err=True)
+             return
+
+
+    # Create project from template using the utility function
+    try:
+        success = create_project_from_template(
+            template_dir=template_dir,
+            project_dir=final_project_dir,
+            variables=variables,
+            dry_run=dry_run,
+            skip_hooks=skip_hooks,
+            metadata=metadata # Pass metadata for post-hook if needed
+        )
+    except Exception as e:
+         click.echo(f"Error during project creation: {e}", err=True)
+         traceback.print_exc() # Print traceback for debugging
+         success = False
+
+
+    if success:
+        if not dry_run:
+             click.echo()
+             click.echo(f"Project '{variables.get('project_name', name)}' created successfully in '{final_project_dir}'")
+    else:
+        click.echo()
+        click.echo("Project creation failed.", err=True)
 
 
 @template.command()
@@ -719,7 +781,7 @@ def make(name, source_directory, description, use_case, output_directory, exclud
     help="Output in JSON format",
     show_default=True,
 )
-def list(library, verbose, json):
+def list_templates_cmd(library, verbose, json):
     """List all available templates.
     
     Displays all available templates across all configured libraries,
@@ -778,7 +840,8 @@ def list(library, verbose, json):
     
     # Display templates
     click.echo("Available Templates:")
-    click.echo("===================\n")
+    click.echo("===================")
+    click.echo()
     
     for lib_name, templates in templates_by_library.items():
         click.echo(f"Library: {lib_name}")
@@ -789,7 +852,8 @@ def list(library, verbose, json):
             use_case = data.get("use_case", "")
             version = data.get("version", "1.0.0")
             
-            click.echo(f"\n- {name} (v{version})")
+            click.echo()
+            click.echo(f"- {name} (v{version})")
             click.echo(f"  Description: {description}")
             
             if use_case:
@@ -802,7 +866,8 @@ def list(library, verbose, json):
             if verbose:
                 variables = data.get("variables", {})
                 if variables:
-                    click.echo("\n  Variables:")
+                    click.echo()
+                    click.echo("  Variables:")
                     for var_name, var_info in variables.items():
                         var_desc = var_info.get("description", "")
                         var_default = var_info.get("default", "")
@@ -813,7 +878,8 @@ def list(library, verbose, json):
                 if dependencies:
                     recommended = dependencies.get("recommended", [])
                     if recommended:
-                        click.echo("\n  Recommended Dependencies:")
+                        click.echo()
+                        click.echo("  Recommended Dependencies:")
                         for dep in recommended:
                             click.echo(f"    - {dep}")
             
