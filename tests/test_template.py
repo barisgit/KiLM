@@ -25,6 +25,7 @@ from kicad_lib_manager.utils.template import (
     write_template_metadata,
     render_template_string,
     render_filename,
+    render_filename_custom,
     find_all_templates,
     render_template_file,
     create_project_from_template,
@@ -65,6 +66,70 @@ class TestTemplateUtils:
         variables = {"project_name": "MyProject"}
         result = render_filename(filename, variables)
         assert result == "project.kicad_pro"
+    
+    def test_render_filename_custom_basic(self):
+        """Test basic custom filename rendering."""
+        filename = "%{project_name}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename_custom(filename, variables)
+        assert result == "MyProject.kicad_pro"
+    
+    def test_render_filename_custom_lower(self):
+        """Test custom filename rendering with lower transformation."""
+        filename = "%{project_name|lower}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename_custom(filename, variables)
+        assert result == "myproject.kicad_pro"
+    
+    def test_render_filename_custom_upper(self):
+        """Test custom filename rendering with upper transformation."""
+        filename = "%{project_name|upper}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename_custom(filename, variables)
+        assert result == "MYPROJECT.kicad_pro"
+    
+    def test_render_filename_custom_replace(self):
+        """Test custom filename rendering with replace transformation."""
+        filename = "%{project_name|replace(' ', '-')}.kicad_pro"
+        variables = {"project_name": "My Project"}
+        result = render_filename_custom(filename, variables)
+        assert result == "My-Project.kicad_pro"
+    
+    def test_render_filename_custom_chained(self):
+        """Test custom filename rendering with chained transformations."""
+        filename = "%{project_name|replace(' ', '-')|lower}.kicad_pro"
+        variables = {"project_name": "My Project"}
+        result = render_filename_custom(filename, variables)
+        assert result == "my-project.kicad_pro"
+    
+    def test_render_filename_custom_replace_quotes(self):
+        """Test custom filename rendering with quoted replace arguments."""
+        filename = "%{project_name|replace(' ', '_')}.kicad_pro"
+        variables = {"project_name": "My Project"}
+        result = render_filename_custom(filename, variables)
+        assert result == "My_Project.kicad_pro"
+    
+    def test_render_filename_custom_missing_variable(self):
+        """Test custom filename rendering with missing variable."""
+        filename = "%{missing_var}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename_custom(filename, variables)
+        # Should return original when variable is missing
+        assert result == "%{missing_var}.kicad_pro"
+    
+    def test_render_filename_fallback_to_jinja(self):
+        """Test that render_filename falls back to Jinja2 for backward compatibility."""
+        filename = "{{ project_name }}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename(filename, variables)
+        assert result == "MyProject.kicad_pro"
+    
+    def test_render_filename_custom_priority(self):
+        """Test that custom syntax takes priority over Jinja2."""
+        filename = "%{project_name}.kicad_pro"
+        variables = {"project_name": "MyProject"}
+        result = render_filename(filename, variables)
+        assert result == "MyProject.kicad_pro"
     
     def test_create_project_template_structure(self):
         """Test creating a template structure."""

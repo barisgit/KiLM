@@ -11,7 +11,7 @@ import shutil
 import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Set, Tuple, Union
+from typing import Dict, List, Any, Optional
 import pathspec
 import jinja2
 import click
@@ -49,6 +49,8 @@ KICAD_SCHEMATIC_EXT = '.kicad_sch'
 KICAD_PCB_EXT = '.kicad_pcb'
 KICAD_PRL_EXT = '.kicad_prl'  # Project local settings file
 
+# Windows-compatible filename templating constants
+FILENAME_VAR_PATTERN = re.compile(r'%\{([^}]+)\}')
 
 def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
     """
@@ -225,11 +227,11 @@ def create_template_metadata(
             },
             "directory_name": {
                 "description": "Directory/repository name (used for folder structure)",
-                "default": "{{ project_name|lower|replace(' ', '-') }}"
+                "default": "%{project_name|lower|replace(' ', '-')}"
             },
             "project_filename": {
                 "description": "Main KiCad project filename (without extension)",
-                "default": "{{ project_name }}"
+                "default": "%{project_name}"
             }
         }
     else:
@@ -243,13 +245,13 @@ def create_template_metadata(
         if not any(k.lower() == 'directory_name' for k in variables.keys()):
             variables["directory_name"] = {
                 "description": "Directory/repository name (used for folder structure)",
-                "default": "{{ project_name|lower|replace(' ', '-') }}"
+                "default": "%{project_name|lower|replace(' ', '-')}"
             }
             
         if not any(k.lower() == 'project_filename' for k in variables.keys()):
             variables["project_filename"] = {
                 "description": "Main KiCad project filename (without extension)",
-                "default": "{{ project_name }}"
+                "default": "%{project_name}"
             }
     
     metadata = {
@@ -511,13 +513,13 @@ def create_template_structure(
             file_path = os.path.join(root, file)
             
             # Generate target file path
-            # For main KiCad files, use generic names
+            # For main KiCad files, use generic names with Windows-compatible syntax
             if main_project_file and file_path == main_project_file:
-                target_file = template_content_dir / rel_root / "{{ project_filename }}.kicad_pro"
+                target_file = template_content_dir / rel_root / "%{project_filename}.kicad_pro"
             elif main_schematic_file and file_path == main_schematic_file:
-                target_file = template_content_dir / rel_root / "{{ project_filename }}.kicad_sch"
+                target_file = template_content_dir / rel_root / "%{project_filename}.kicad_sch"
             elif main_pcb_file and file_path == main_pcb_file:
-                target_file = template_content_dir / rel_root / "{{ project_filename }}.kicad_pcb"
+                target_file = template_content_dir / rel_root / "%{project_filename}.kicad_pcb"
             else:
                 target_file = template_content_dir / rel_path
             
@@ -627,7 +629,7 @@ def process_kicad_project_file(source_file: Path, target_file: Path, variables: 
             # Replace project title if found
             if project_name_var and 'meta' in project_data and 'filename' in project_data['meta']:
                 original_filename = project_data['meta']['filename']
-                # Replace with project_filename variable - using {{ project_name }}.kicad_pro pattern
+                # Replace with project_filename variable - using {{ project_name }}.kicad_pro pattern - this is inside the .jinja2 file, not in the filename so this is actually a correct syntax
                 project_data['meta']['filename'] = "{{ project_filename }}.kicad_pro"
                 click.echo(f"  Templated project filename: '{original_filename}' → '{{ project_filename }}.kicad_pro'")
             
@@ -665,7 +667,7 @@ def process_kicad_schematic_file(source_file: Path, target_file: Path, variables
         # Replace project references
         project_pattern = re.compile(r'\(project\s+"([^"]+)"')
         content = project_pattern.sub(r'(project "{{ project_filename }}"', content)
-        click.echo(f"  Templated schematic project name references with '{{ project_filename }}'")
+        click.echo("  Templated schematic project name references with '{{ project_filename }}'")
         
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + '.jinja2')
@@ -702,11 +704,11 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path, variables: Dict
             sheet_name = match.group(1)
             if original_filename in sheet_name:
                 # Replace with template variable
-                return f'(sheetfile "{{ project_filename }}.kicad_sch"'
+                return '(sheetfile "{{ project_filename }}.kicad_sch"'
             return match.group(0)
         
         content = sheet_pattern.sub(sheet_replacer, content)
-        click.echo(f"  Templated PCB sheet references with '{{ project_filename }}.kicad_sch'")
+        click.echo("  Templated PCB sheet references with '{{ project_filename }}.kicad_sch'")
         
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + '.jinja2')
@@ -724,7 +726,9 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path, variables: Dict
 # Add new functions for rendering templates and creating projects from templates
 def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
     """
-    Render a template string using Jinja2.
+    Render a template string using Jinja2 or custom Windows-compatible templating.
+    
+    First tries the custom Windows-compatible %{variable} syntax, then falls back to Jinja2.
     
     Args:
         template_str: The template string to render
@@ -733,6 +737,11 @@ def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
     Returns:
         Rendered string
     """
+    # First try custom Windows-compatible templating
+    if FILENAME_VAR_PATTERN.search(template_str):
+        return render_filename_custom(template_str, variables)
+    
+    # Fall back to Jinja2 for backwards compatibility
     try:
         template = jinja2.Template(template_str)
         return template.render(**variables)
@@ -740,9 +749,16 @@ def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
         click.echo(f"Warning: Failed to render template: {e}", err=True)
         return template_str
 
-def render_filename(filename: str, variables: Dict[str, Any]) -> str:
+def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
     """
-    Render a filename using Jinja2 if it contains template variables.
+    Render a filename using a custom Windows-compatible templating system.
+    
+    Uses %{variable_name} syntax instead of {{variable_name}} to avoid Windows filename restrictions.
+    Supports transformations like:
+    - %{project_name|lower} - converts to lowercase
+    - %{project_name|upper} - converts to uppercase
+    - %{project_name|replace(' ', '-')} - replaces spaces with dashes
+    - %{project_name|replace(' ', '_')|lower} - chain transformations
     
     Args:
         filename: The filename to render
@@ -751,7 +767,89 @@ def render_filename(filename: str, variables: Dict[str, Any]) -> str:
     Returns:
         Rendered filename
     """
-    # Only try to render if the filename contains a Jinja2 template pattern
+    def transform_value(value: str, transformations: List[str]) -> str:
+        """Apply a chain of transformations to a value."""
+        result = value
+        
+        for transform in transformations:
+            transform = transform.strip()
+            
+            if transform == 'lower':
+                result = result.lower()
+            elif transform == 'upper':
+                result = result.upper()
+            elif transform.startswith('replace('):
+                # Parse replace(old, new) transformation
+                try:
+                    # Extract the arguments from replace(old, new)
+                    args_str = transform[8:-1]  # Remove 'replace(' and ')'
+                    
+                    # Simple approach: split by comma and handle quotes properly
+                    # For the format replace(' ', '-') or replace(' ', '_')
+                    if args_str.count(',') == 1:
+                        parts = args_str.split(',', 1)
+                        old_val = parts[0].strip().strip('\'"')
+                        new_val = parts[1].strip().strip('\'"')
+                        result = result.replace(old_val, new_val)
+                    else:
+                        click.echo(f"Warning: Invalid replace transformation format: {transform}", err=True)
+                        
+                except Exception as e:
+                    click.echo(f"Warning: Error parsing replace transformation '{transform}': {e}", err=True)
+            else:
+                click.echo(f"Warning: Unknown transformation '{transform}'", err=True)
+        
+        return result
+    
+    def replacer(match):
+        """Replace a %{variable|transform1|transform2} pattern with the transformed value."""
+        var_expr = match.group(1)
+        
+        # Split by pipe to separate variable name from transformations
+        parts = var_expr.split('|')
+        var_name = parts[0].strip()
+        transformations = parts[1:] if len(parts) > 1 else []
+        
+        # Get the variable value
+        if var_name in variables:
+            value = str(variables[var_name])
+            
+            # Apply transformations
+            if transformations:
+                value = transform_value(value, transformations)
+            
+            return value
+        else:
+            click.echo(f"Warning: Variable '{var_name}' not found in template variables", err=True)
+            return match.group(0)  # Return original if variable not found
+    
+    # Only try to render if the filename contains our custom template pattern
+    if FILENAME_VAR_PATTERN.search(filename):
+        try:
+            return FILENAME_VAR_PATTERN.sub(replacer, filename)
+        except Exception as e:
+            click.echo(f"Warning: Failed to render filename {filename}: {e}", err=True)
+    
+    return filename
+
+def render_filename(filename: str, variables: Dict[str, Any]) -> str:
+    """
+    Render a filename using either Jinja2 or custom Windows-compatible templating.
+    
+    First tries the custom Windows-compatible %{variable} syntax, then falls back to Jinja2.
+    
+    Args:
+        filename: The filename to render
+        variables: Dictionary of variables to use in rendering
+        
+    Returns:
+        Rendered filename
+    """
+    # First try custom Windows-compatible templating
+    if FILENAME_VAR_PATTERN.search(filename):
+        return render_filename_custom(filename, variables)
+    
+    # Fall back to Jinja2 for backwards compatibility
     if "{{" in filename and "}}" in filename:
         try:
             # Create a proper Jinja2 environment
@@ -874,7 +972,8 @@ def render_template_file(
         try:
             shutil.copy2(source_file, target_file)
             return True
-        except:
+        except Exception as e   :
+            click.echo(f"Error copying file {source_file}: {e}", err=True)
             return False
 
 def create_project_from_template(
@@ -931,7 +1030,7 @@ def create_project_from_template(
     # Check if we need to merge with variables from a parent template
     if "extends" in metadata and metadata["extends"]:
         # TODO: Handle template inheritance
-        click.echo(f"Warning: Template inheritance not fully implemented yet", err=True)
+        click.echo("Warning: Template inheritance not fully implemented yet", err=True)
     
     # Binary file extensions that should not be rendered
     binary_extensions = {

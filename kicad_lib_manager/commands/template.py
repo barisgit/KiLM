@@ -9,10 +9,8 @@ import click
 import yaml
 import json
 import shutil
-import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
 import jinja2
 import pathspec
 import questionary
@@ -25,17 +23,12 @@ from ..utils.template import (
     HOOKS_DIR,
     POST_CREATE_HOOK,
     get_gitignore_spec,
-    list_templates_in_directory,
     find_potential_variables,
     create_template_metadata,
-    write_template_metadata,
     create_template_structure,
     render_template_string,
-    render_filename,
     find_all_templates,
-    render_template_file,
     create_project_from_template,
-    run_post_create_hook
 )
 
 
@@ -393,6 +386,33 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
 
     # Create project from template using the utility function
     try:
+        # Check if template uses old Jinja2 syntax in filenames and warn Windows users
+        if os.name == 'nt':  # Windows
+            template_content_dir = template_dir / TEMPLATE_CONTENT_DIR
+            if template_content_dir.exists():
+                old_syntax_files = []
+                for root, dirs, files in os.walk(template_content_dir):
+                    for file in files:
+                        if "{{" in file and "}}" in file:
+                            old_syntax_files.append(file)
+                
+                if old_syntax_files:
+                    click.echo()
+                    click.echo("⚠️  Windows Compatibility Notice:", err=True)
+                    click.echo("This template uses the old {{variable}} syntax in filenames, which may not work on Windows.", err=True)
+                    click.echo("Consider updating the template to use the new Windows-compatible %{variable} syntax.", err=True)
+                    click.echo("Files with old syntax:", err=True)
+                    for file in old_syntax_files[:3]:  # Show first 3 files
+                        click.echo(f"  - {file}", err=True)
+                    if len(old_syntax_files) > 3:
+                        click.echo(f"  ... and {len(old_syntax_files) - 3} more", err=True)
+                    click.echo()
+                    click.echo("New syntax examples:", err=True)
+                    click.echo("  - %{project_name}.kicad_pro", err=True)
+                    click.echo("  - %{project_name|lower}.kicad_sch", err=True)
+                    click.echo("  - %{project_name|replace(' ', '-')}.kicad_pcb", err=True)
+                    click.echo()
+        
         success = create_project_from_template(
             template_dir=template_dir,
             project_dir=final_project_dir,
@@ -754,11 +774,11 @@ def make(name, source_directory, description, use_case, output_directory, exclud
             for file in kicad_files:
                 # Show the templated filename that will be used
                 if file.lower().endswith('.kicad_pro'):
-                    templated_name = "{{ project_filename }}.kicad_pro"
+                    templated_name = "%{project_filename}.kicad_pro"
                 elif file.lower().endswith('.kicad_sch'):
-                    templated_name = "{{ project_filename }}.kicad_sch"
+                    templated_name = "%{project_filename}.kicad_sch"
                 elif file.lower().endswith('.kicad_pcb'):
-                    templated_name = "{{ project_filename }}.kicad_pcb"
+                    templated_name = "%{project_filename}.kicad_pcb"
                 else:
                     templated_name = file
                 
@@ -795,6 +815,15 @@ def make(name, source_directory, description, use_case, output_directory, exclud
         click.echo(f"2. Customize template files in {output_directory / TEMPLATE_CONTENT_DIR}")
         click.echo(f"3. Edit post-creation hook in {output_directory / HOOKS_DIR / POST_CREATE_HOOK} if needed")
         click.echo(f"4. Use your template with: kilm template create MyProject --template {name}")
+        
+        # Add information about filename templating syntax
+        click.echo("\n💡 Filename Templating:")
+        click.echo("For Windows compatibility, use %{variable} syntax in filenames:")
+        click.echo("  - %{project_name}.kicad_pro")
+        click.echo("  - %{project_name|lower}.kicad_sch") 
+        click.echo("  - %{project_name|replace(' ', '-')}.kicad_pcb")
+        click.echo("  - %{project_name|upper|replace(' ', '_')}.md")
+        click.echo("(Old {{variable}} syntax still works but may cause issues on Windows)")
     
     except Exception as e:
         click.echo(f"Error creating template: {str(e)}", err=True)
