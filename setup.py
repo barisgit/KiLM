@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 import re
 
+
 def get_version():
     """Get version from __init__.py."""
     with open("kicad_lib_manager/__init__.py", "r") as f:
@@ -8,6 +9,7 @@ def get_version():
         if version_match:
             return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
+
 
 setup(
     name="kilm",
@@ -31,7 +33,7 @@ setup(
     entry_points={
         "console_scripts": [
             "kicad-lib-manager=kicad_lib_manager.cli:main",
-            "kilm=kicad_lib_manager.cli:main",    
+            "kilm=kicad_lib_manager.cli:main",
         ],
     },
     author="Blaž Aristovnik, Paxia LCC",
@@ -50,4 +52,4 @@ setup(
         "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
     ],
     python_requires=">=3.7",
-) 
+)

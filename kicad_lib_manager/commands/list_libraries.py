@@ -23,20 +23,20 @@ def list_cmd(kicad_lib_dir):
         if not kicad_lib_dir:
             click.echo("Error: KICAD_USER_LIB not set and not provided", err=True)
             sys.exit(1)
-    
+
     # Expand user home directory if needed
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
-    
+
     try:
         symbols, footprints = list_libraries(kicad_lib_dir)
-        
+
         if symbols:
             click.echo("\nAvailable Symbol Libraries:")
             for symbol in sorted(symbols):
                 click.echo(f"  - {symbol}")
         else:
             click.echo("No symbol libraries found")
-        
+
         if footprints:
             click.echo("\nAvailable Footprint Libraries:")
             for footprint in sorted(footprints):
@@ -45,4 +45,4 @@ def list_cmd(kicad_lib_dir):
             click.echo("No footprint libraries found")
     except Exception as e:
         click.echo(f"Error listing libraries: {e}", err=True)
-        sys.exit(1) 
+        sys.exit(1)
