@@ -243,7 +243,7 @@ def create_template_metadata(
             },
             "directory_name": {
                 "description": "Directory/repository name (used for folder structure)",
-                "default": "%{project_name|lower|replace(' ', '-')}",
+                "default": "%{project_name.lower.replace(' ', '-')}",
             },
             "project_filename": {
                 "description": "Main KiCad project filename (without extension)",
@@ -261,7 +261,7 @@ def create_template_metadata(
         if not any(k.lower() == "directory_name" for k in variables.keys()):
             variables["directory_name"] = {
                 "description": "Directory/repository name (used for folder structure)",
-                "default": "%{project_name|lower|replace(' ', '-')}",
+                "default": "%{project_name.lower.replace(' ', '-')}",
             }
 
         if not any(k.lower() == "project_filename" for k in variables.keys()):
@@ -830,10 +830,10 @@ def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
 
     Uses %{variable_name} syntax instead of {{variable_name}} to avoid Windows filename restrictions.
     Supports transformations like:
-    - %{project_name|lower} - converts to lowercase
-    - %{project_name|upper} - converts to uppercase
-    - %{project_name|replace(' ', '-')} - replaces spaces with dashes
-    - %{project_name|replace(' ', '_')|lower} - chain transformations
+    - %{project_name.lower} - converts to lowercase
+    - %{project_name.upper} - converts to uppercase
+    - %{project_name.replace(' ', '-')} - replaces spaces with dashes
+    - %{project_name.replace(' ', '_').lower} - chain transformations
 
     Args:
         filename: The filename to render
@@ -884,11 +884,11 @@ def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
         return result
 
     def replacer(match):
-        """Replace a %{variable|transform1|transform2} pattern with the transformed value."""
+        """Replace a %{variable.transform1.transform2} pattern with the transformed value."""
         var_expr = match.group(1)
 
-        # Split by pipe to separate variable name from transformations
-        parts = var_expr.split("|")
+        # Split by dot to separate variable name from transformations
+        parts = var_expr.split(".")
         var_name = parts[0].strip()
         transformations = parts[1:] if len(parts) > 1 else []
 

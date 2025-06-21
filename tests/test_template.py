@@ -69,35 +69,35 @@ class TestTemplateUtils:
 
     def test_render_filename_custom_lower(self):
         """Test custom filename rendering with lower transformation."""
-        filename = "%{project_name|lower}.kicad_pro"
+        filename = "%{project_name.lower}.kicad_pro"
         variables = {"project_name": "MyProject"}
         result = render_filename_custom(filename, variables)
         assert result == "myproject.kicad_pro"
 
     def test_render_filename_custom_upper(self):
         """Test custom filename rendering with upper transformation."""
-        filename = "%{project_name|upper}.kicad_pro"
+        filename = "%{project_name.upper}.kicad_pro"
         variables = {"project_name": "MyProject"}
         result = render_filename_custom(filename, variables)
         assert result == "MYPROJECT.kicad_pro"
 
     def test_render_filename_custom_replace(self):
         """Test custom filename rendering with replace transformation."""
-        filename = "%{project_name|replace(' ', '-')}.kicad_pro"
+        filename = "%{project_name.replace(' ', '-')}.kicad_pro"
         variables = {"project_name": "My Project"}
         result = render_filename_custom(filename, variables)
         assert result == "My-Project.kicad_pro"
 
     def test_render_filename_custom_chained(self):
         """Test custom filename rendering with chained transformations."""
-        filename = "%{project_name|replace(' ', '-')|lower}.kicad_pro"
+        filename = "%{project_name.replace(' ', '-').lower}.kicad_pro"
         variables = {"project_name": "My Project"}
         result = render_filename_custom(filename, variables)
         assert result == "my-project.kicad_pro"
 
     def test_render_filename_custom_replace_quotes(self):
         """Test custom filename rendering with quoted replace arguments."""
-        filename = "%{project_name|replace(' ', '_')}.kicad_pro"
+        filename = "%{project_name.replace(' ', '_')}.kicad_pro"
         variables = {"project_name": "My Project"}
         result = render_filename_custom(filename, variables)
         assert result == "My_Project.kicad_pro"
@@ -221,7 +221,7 @@ class TestTemplateCreation:
                 },
                 "directory_name": {
                     "description": "Directory name",
-                    "default": "{{ project_name|lower|replace(' ', '-') }}",
+                    "default": "{{ project_name.lower.replace(' ', '-') }}",
                 },
             },
         }

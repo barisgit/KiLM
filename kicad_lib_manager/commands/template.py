@@ -471,9 +471,9 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                     click.echo()
                     click.echo("New syntax examples:", err=True)
                     click.echo("  - %{project_name}.kicad_pro", err=True)
-                    click.echo("  - %{project_name|lower}.kicad_sch", err=True)
+                    click.echo("  - %{project_name.lower}.kicad_sch", err=True)
                     click.echo(
-                        "  - %{project_name|replace(' ', '-')}.kicad_pcb", err=True
+                        "  - %{project_name.replace(' ', '-')}.kicad_pcb", err=True
                     )
                     click.echo()
 
@@ -927,9 +927,9 @@ def make(
         click.echo("\n💡 Filename Templating:")
         click.echo("For Windows compatibility, use %{variable} syntax in filenames:")
         click.echo("  - %{project_name}.kicad_pro")
-        click.echo("  - %{project_name|lower}.kicad_sch")
-        click.echo("  - %{project_name|replace(' ', '-')}.kicad_pcb")
-        click.echo("  - %{project_name|upper|replace(' ', '_')}.md")
+        click.echo("  - %{project_name.lower}.kicad_sch")
+        click.echo("  - %{project_name.replace(' ', '-')}.kicad_pcb")
+        click.echo("  - %{project_name.upper.replace(' ', '_')}.md")
         click.echo(
             "(Old {{variable}} syntax still works but may cause issues on Windows)"
         )
