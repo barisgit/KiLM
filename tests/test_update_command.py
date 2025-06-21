@@ -186,11 +186,9 @@ def test_check_for_library_changes():
     git_output = "symbols/newlib.kicad_sym | 120 ++++++++++"
 
     # Mock file existence with a patch
-    with (
-        patch.object(Path, "exists", return_value=True),
-        patch.object(Path, "is_dir", return_value=True),
-        patch.object(Path, "glob") as mock_glob,
-    ):
+    with patch.object(Path, "exists", return_value=True), patch.object(
+        Path, "is_dir", return_value=True
+    ), patch.object(Path, "glob") as mock_glob:
         # Setup mock glob to return different files based on pattern
         def mock_glob_func(pattern):
             if "**/*.kicad_sym" in pattern:

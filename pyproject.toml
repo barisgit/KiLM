@@ -8,3 +8,7 @@ target-version = ['py37']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"] 
+
+[tool.ruff]
+# or [tool.ruff.lint]
+target-version = "py38"
