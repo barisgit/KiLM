@@ -1,0 +1,166 @@
+---
+title: config
+description: View and manage KiLM configuration settings and libraries.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+The `kilm config` command group allows you to inspect and manage the libraries registered in your KiLM configuration (`config.yaml`) and control settings like the default library.
+
+## Subcommands
+
+<Tabs>
+<TabItem label="list">
+
+Lists the configured libraries.
+
+#### Usage
+
+```bash
+kilm config list [OPTIONS]
+```
+
+#### Options
+
+- `--type [github|cloud|all]`:
+  Filters the libraries shown by type.
+  - `github`: Shows symbol/footprint/template libraries.
+  - `cloud`: Shows 3D model libraries.
+  - `all`: Shows all types (default).
+    _Example:_ `kilm config list --type github`
+
+- `-v, --verbose`:
+  Displays more detailed information about each library, reading from both `config.yaml` and the library's metadata file (`kilm.yaml` or `.kilm_cloud_metadata`). Shows path, description, version, environment variable, capabilities/model count, etc.
+  _Example:_ `kilm config list --verbose`
+
+- `--help`:
+  Show the help message and exit.
+
+#### Examples
+
+**List all configured libraries (basic view):**
+
+```bash
+kilm config list
+```
+
+**List only symbol/footprint libraries:**
+
+```bash
+kilm config list --type github
+```
+
+**List all libraries with detailed information:**
+
+```bash
+kilm config list --verbose
+```
+
+**List only 3D model libraries with details:**
+
+```bash
+kilm config list --type cloud --verbose
+```
+
+</TabItem>
+<TabItem label="set-default">
+
+Sets a specific registered library as the default ("current") library used by KiLM.
+
+The `current_library` setting in `config.yaml` determines which library path is used by default in commands like `status` or `setup` (when not using `--all-libraries` or specific library flags).
+
+#### Usage
+
+```bash
+kilm config set-default [LIBRARY_NAME] [OPTIONS]
+```
+
+#### Arguments
+
+- `LIBRARY_NAME`: The name (as shown in `kilm config list`) of the library to set as default. If omitted, you will be prompted to choose from a list.
+
+#### Options
+
+- `--type [github|cloud]`:
+  Specifies the type of library to choose from when prompting (if `LIBRARY_NAME` is omitted) or to disambiguate if names clash. Default: `github`.
+  _Example:_ `kilm config set-default --type cloud` (prompts for a cloud library)
+
+- `--help`:
+  Show the help message and exit.
+
+#### Examples
+
+**Set a specific GitHub library as default:**
+
+```bash
+kilm config set-default my-company-library
+```
+
+**Set a specific Cloud (3D) library as default:**
+
+```bash
+kilm config set-default shared-3d-models --type cloud
+```
+
+**Interactively select a GitHub library to be default:**
+
+```bash
+kilm config set-default
+```
+
+**Interactively select a Cloud library to be default:**
+
+```bash
+kilm config set-default --type cloud
+```
+
+</TabItem>
+<TabItem label="remove">
+
+Removes a registered library from the KiLM configuration (`config.yaml`). This does _not_ delete the library files or its metadata file, only the entry in KiLM's central config.
+
+#### Usage
+
+```bash
+kilm config remove LIBRARY_NAME [OPTIONS]
+```
+
+#### Arguments
+
+- `LIBRARY_NAME`: **Required.** The name (as shown in `kilm config list`) of the library to remove from the configuration.
+
+#### Options
+
+- `--type [github|cloud|all]`:
+  Specifies the type of the library entry to remove. If a name exists for both types, this is needed for disambiguation. `all` removes entries with this name regardless of type. Default: `all`.
+  _Example:_ `kilm config remove obsolete-lib --type github`
+
+- `--force`:
+  Remove the library entry without asking for confirmation. Default: `False` (confirmation required).
+  _Example:_ `kilm config remove old-project-lib --force`
+
+- `--help`:
+  Show the help message and exit.
+
+#### Examples
+
+**Remove a library (will ask for confirmation):**
+
+```bash
+kilm config remove temp-test-library
+```
+
+**Remove only the GitHub entry for a library:**
+
+```bash
+kilm config remove shared-lib --type github
+```
+
+**Force removal without confirmation:**
+
+```bash
+kilm config remove unused-3d-models --type cloud --force
+```
+
+</TabItem>
+</Tabs>
