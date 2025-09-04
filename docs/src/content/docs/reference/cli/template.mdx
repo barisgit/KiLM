@@ -3,7 +3,7 @@ title: template
 description: Manage KiCad project templates.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem } from "@astrojs/starlight/components";
 
 The `kilm template` command group provides tools for creating, managing, and using KiCad project templates. Templates allow you to standardize the starting structure for new projects.
 
@@ -31,16 +31,14 @@ kilm template make <template_name> [project_path] [OPTIONS]
 - `--use-case TEXT`: Describe the intended use case for this template.
 - `--variable TEXT`: Define a variable for the template (key=value pair). Can be used multiple times. These variables can be used within template filenames using `%{variable}` syntax and within file content using Jinja2 `{{variable}}` syntax.
 - `--exclude TEXT`: Glob pattern (like `.gitignore`) to exclude specific files or directories from the template. Can be used multiple times.
-- `--output-directory DIRECTORY`: 
+- `--output-directory DIRECTORY`:
   Specifies the directory where the `templates/<template_name>` structure will be created. Defaults to the `templates` directory within the KiLM library containing the current working directory.
-  *Example:* `kilm template make my-tmpl --output-directory /path/to/central/templates/dir`
-{/* - `--extends TEXT`: 
-  Specify the name of a parent template. This template will inherit variables and potentially structure from the parent (feature details TBD). */}
-- `--non-interactive`: 
+  _Example:_ `kilm template make my-tmpl --output-directory /path/to/central/templates/dir`
+- `--non-interactive`:
   Create the template without interactive prompts for configuration or variable detection. Default: `False` (interactive).
-- `--dry-run`: 
+- `--dry-run`:
   Preview template creation without actually creating files.
-- `--force`: 
+- `--force`:
   Overwrite the template directory if it already exists. Default: `False`.
 - `--help`: Show help message.
 
@@ -57,12 +55,14 @@ kilm template make <template_name> [project_path] [OPTIONS]
 #### Examples
 
 **Create template 'basic-mcu' from current directory (interactive):**
+
 ```bash
 cd /path/to/my-base-project
 kilm template make basic-mcu
 ```
 
 **Create template from specific path with variables, excluding backups:**
+
 ```bash
 kilm template make advanced-fpga path/to/fpga-project \
     --description "Advanced FPGA project setup" \
@@ -102,9 +102,9 @@ kilm template create <project_name_or_path> [output_path] [OPTIONS]
 3.  **Determines Variables:**
     - Combines default variables from `metadata.yaml` with any values provided via `--set-var`.
     - **Interactively prompts** for any remaining variables sequentially.
-    - **Crucially:** When prompting for a variable, its default value is calculated *just-in-time* using the values of variables already entered in the current session. This allows defaults to depend on previous inputs (e.g., the default `directory_name` can be based on the entered `project_name`).
+    - **Crucially:** When prompting for a variable, its default value is calculated _just-in-time_ using the values of variables already entered in the current session. This allows defaults to depend on previous inputs (e.g., the default `directory_name` can be based on the entered `project_name`).
 4.  **Copies and Renders:** Copies files from the template's `template/` directory to the output path.
-5.  **Processes Templates:** 
+5.  **Processes Templates:**
     - Renders filenames using Windows-compatible `%{variable}` syntax (with fallback support for legacy `{{variable}}` syntax)
     - Renders file content using Jinja2 `{{variable}}` syntax for `.jinja2` files
 6.  **(Optional) Runs Hooks:** Executes the `hooks/post_create.py` script if it exists and `--skip-hooks` was not used.
@@ -112,11 +112,13 @@ kilm template create <project_name_or_path> [output_path] [OPTIONS]
 #### Examples
 
 **Create project 'MyNewBoard' using 'basic-mcu' template (will prompt for template selection if ambiguous):**
+
 ```bash
 kilm template create MyNewBoard
 ```
 
 **Create project in specific dir, specifying template, setting variables:**
+
 ```bash
 kilm template create SensorModule projects/sensor --template advanced-fpga \
     --set-var board_rev=2.0 \
@@ -124,6 +126,7 @@ kilm template create SensorModule projects/sensor --template advanced-fpga \
 ```
 
 **Create project using a path:**
+
 ```bash
 # Creates project 'MyBoard' inside './new_projects/'
 kilm template create new_projects/MyBoard --template basic-mcu
@@ -150,16 +153,19 @@ kilm template list [OPTIONS]
 #### Examples
 
 **List all available templates:**
+
 ```bash
 kilm template list
 ```
 
 **List templates with details:**
+
 ```bash
 kilm template list --verbose
 ```
 
 **List templates from 'my-main-lib' in JSON:**
+
 ```bash
 kilm template list --library my-main-lib --json
 ```
@@ -203,16 +209,19 @@ your-kilm-library/
 KiLM supports a Windows-compatible filename templating syntax using `%{variable}` instead of `{{variable}}`:
 
 **Basic usage:**
+
 - `%{project_name}.kicad_pro` → `MyProject.kicad_pro`
 - `%{author}.md` → `JohnDoe.md`
 
 **With transformations:**
+
 - `%{project_name.lower}` → converts to lowercase
-- `%{project_name.upper}` → converts to uppercase  
+- `%{project_name.upper}` → converts to uppercase
 - `%{project_name.replace(' ', '-')}` → replaces spaces with dashes
 - `%{project_name.replace(' ', '_').lower}` → chain transformations
 
 **Examples:**
+
 - `%{project_name.lower}.kicad_sch` → `myproject.kicad_sch`
 - `%{project_name.replace(' ', '-')}.kicad_pcb` → `my-project.kicad_pcb`
 - `%{author.upper.replace(' ', '_')}.md` → `JOHN_DOE.md`
@@ -273,9 +282,10 @@ This project template relies on **KiLM** for managing common, shared KiCad libra
 ```
 
 :::tip[Syntax Differences]
-- **File content** (inside `.jinja2` files): Use Jinja2 syntax `{{ variable_name }}` 
+
+- **File content** (inside `.jinja2` files): Use Jinja2 syntax `{{ variable_name }}`
 - **Filenames**: Use Windows-compatible syntax `%{variable_name}` for new templates
 - **Legacy filenames**: Old `{{ variable_name }}` syntax in filenames still works but may cause issues on Windows
-:::
+  :::
 
-When a user runs `kilm template create MyProject Controller --template default-4layer` and provides values for `author`, `author_position`, and `version`, the resulting `README.md` in their new project directory will have the `{{ ... }}` placeholders replaced with the actual values. 
+When a user runs `kilm template create MyProject Controller --template default-4layer` and provides values for `author`, `author_position`, and `version`, the resulting `README.md` in their new project directory will have the `{{ ... }}` placeholders replaced with the actual values.

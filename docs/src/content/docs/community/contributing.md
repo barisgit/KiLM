@@ -9,12 +9,12 @@ Contributions to KiLM are welcome! Whether it's reporting bugs, suggesting featu
 
 - **Search Existing Issues:** Before creating a new issue, please check if a similar one already exists on the [GitHub Issues page](https://github.com/barisgit/kilm/issues).
 - **Provide Details:** If creating a new issue, please include:
-    - KiLM version (`kilm --version`)
-    - KiCad version
-    - Operating System
-    - Clear description of the bug or feature request
-    - Steps to reproduce the issue (for bugs)
-    - Any relevant error messages or logs (use `--verbose` flag if applicable)
+  - KiLM version (`kilm --version`)
+  - KiCad version
+  - Operating System
+  - Clear description of the bug or feature request
+  - Steps to reproduce the issue (for bugs)
+  - Any relevant error messages or logs (use `--verbose` flag if applicable)
 
 ## Submitting Changes (Pull Requests)
 
@@ -58,4 +58,4 @@ Contributions to KiLM are welcome! Whether it's reporting bugs, suggesting featu
 - Use [Black](https://github.com/psf/black) for code formatting.
 - Write clear and concise code with comments where necessary.
 
-Thank you for contributing! 
+Thank you for contributing!

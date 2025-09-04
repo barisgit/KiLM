@@ -19,32 +19,32 @@ kilm add-3d [OPTIONS]
 
 ## Options
 
-- `--directory DIRECTORY`: 
-  Specifies the path to the directory containing the 3D models. 
-  *Default:* Uses the current working directory if not specified.
-  *Example:* `kilm add-3d --directory ~/kicad/libraries/3d-models`
+- `--directory DIRECTORY`:
+  Specifies the path to the directory containing the 3D models.
+  _Default:_ Uses the current working directory if not specified.
+  _Example:_ `kilm add-3d --directory ~/kicad/libraries/3d-models`
 
-- `--name TEXT`: 
+- `--name TEXT`:
   Sets a custom name for this 3D library entry. If not provided, a name is generated from the directory name.
-  *Example:* `kilm add-3d --directory ... --name standard-3d-lib`
+  _Example:_ `kilm add-3d --directory ... --name standard-3d-lib`
 
-- `--description TEXT`: 
+- `--description TEXT`:
   Adds an optional description for this 3D library to the metadata file.
-  *Example:* `kilm add-3d --directory ... --name ... --description "My custom collection of STEP models"`
+  _Example:_ `kilm add-3d --directory ... --name ... --description "My custom collection of STEP models"`
 
-- `--env-var TEXT`: 
+- `--env-var TEXT`:
   Specifies a custom KiCad environment variable name (e.g., `MY_CUSTOM_3D`) to associate with this library's path. If not provided (and `--no-env-var` isn't used), a name is automatically generated (e.g., `KICAD_3D_STANDARD_3D_LIB`). This variable will be set in KiCad when you run `kilm setup`.
-  *Example:* `kilm add-3d --directory ... --name ... --env-var KICAD_USER_3DMOD`
+  _Example:_ `kilm add-3d --directory ... --name ... --env-var KICAD_USER_3DMOD`
 
-- `--no-env-var`: 
+- `--no-env-var`:
   Prevents an environment variable from being assigned to this library in the metadata. Default: `False`.
-  *Example:* `kilm add-3d --no-env-var`
+  _Example:_ `kilm add-3d --no-env-var`
 
-- `--force`: 
+- `--force`:
   If `.kilm_cloud_metadata` already exists in the target directory, overwrite it with new metadata based on options or defaults. Without `--force`, existing metadata is updated only with explicitly provided options. Default: `False`.
-  *Example:* `kilm add-3d --directory ... --force`
+  _Example:_ `kilm add-3d --directory ... --force`
 
-- `--help`: 
+- `--help`:
   Show the help message and exit.
 
 ## Behavior
@@ -77,4 +77,4 @@ cd ~/my_project_3d_models
 kilm add-3d --name my-project-models --no-env-var
 ```
 
-**Note:** After adding 3D libraries, you usually need to run [`kilm setup`](/reference/cli/setup/) to create or update the associated environment variables (like `KICAD_OFFICIAL_3D` in the example) in KiCad's configuration. 
+**Note:** After adding 3D libraries, you usually need to run [`kilm setup`](/reference/cli/setup/) to create or update the associated environment variables (like `KICAD_OFFICIAL_3D` in the example) in KiCad's configuration.

@@ -15,19 +15,19 @@ kilm update [OPTIONS]
 
 ## Options
 
-- `--dry-run`: 
+- `--dry-run`:
   Show which libraries are detected as Git repositories and would be updated, but do not actually run `git pull`.
-  *Example:* `kilm update --dry-run`
+  _Example:_ `kilm update --dry-run`
 
-- `--verbose`: 
+- `--verbose`:
   Show detailed output during the update process, including the full output from the `git pull` commands.
-  *Example:* `kilm update --verbose`
+  _Example:_ `kilm update --verbose`
 
-- `--auto-setup`: 
+- `--auto-setup`:
   If the `git pull` operation results in changes that likely require updating KiCad's configuration (e.g., new symbol or footprint libraries detected), automatically run `kilm setup` after the updates are complete. Default: `False`.
-  *Example:* `kilm update --auto-setup`
+  _Example:_ `kilm update --auto-setup`
 
-- `--help`: 
+- `--help`:
   Show the help message and exit.
 
 ## Behavior
@@ -42,23 +42,27 @@ kilm update [OPTIONS]
 ## Examples
 
 **Update all Git-based libraries:**
+
 ```bash
 kilm update
 ```
 
 **Preview which libraries would be updated:**
+
 ```bash
 kilm update --dry-run
 ```
 
 **Update libraries with detailed output:**
+
 ```bash
 kilm update --verbose
 ```
 
 **Update libraries and automatically run setup if needed:**
+
 ```bash
 kilm update --auto-setup
 ```
 
-**Note:** If `git pull` fails (e.g., due to local changes or merge conflicts), you will need to resolve the issues manually within the affected repository directory using standard Git commands before `kilm update` can succeed for that library. 
+**Note:** If `git pull` fails (e.g., due to local changes or merge conflicts), you will need to resolve the issues manually within the affected repository directory using standard Git commands before `kilm update` can succeed for that library.

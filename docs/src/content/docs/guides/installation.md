@@ -67,4 +67,4 @@ cd kilm
 pip install -e .
 ```
 
-After installation, you should be able to run `kilm --version` to verify it's installed correctly. 
+After installation, you should be able to run `kilm --version` to verify it's installed correctly.

@@ -72,4 +72,4 @@ black .
 
 ## Next Steps
 
-Now you're ready to start developing! See the [Contributing guide](/community/contributing/) for how to submit your changes. 
+Now you're ready to start developing! See the [Contributing guide](/community/contributing/) for how to submit your changes.

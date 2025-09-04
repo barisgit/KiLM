@@ -29,9 +29,9 @@ footprints:
 
 **Key Points:**
 
-- **Keys are Logical Names:** The keys under `symbols` and `footprints` (`LogicalLibraryName1`, `AnotherSymbolLib`, etc.) must match the actual *logical* names of the libraries as defined in KiCad's library tables (`sym-lib-table` or `fp-lib-table`). These logical names may differ from the actual filenames.
+- **Keys are Logical Names:** The keys under `symbols` and `footprints` (`LogicalLibraryName1`, `AnotherSymbolLib`, etc.) must match the actual _logical_ names of the libraries as defined in KiCad's library tables (`sym-lib-table` or `fp-lib-table`). These logical names may differ from the actual filenames.
 - **Matching:** KiLM uses these logical names to find the corresponding library entry in KiCad's `sym-lib-table` or `fp-lib-table` and sets the description field.
 - **Location:** The `library_descriptions.yaml` file must be in the root of the library directory managed by `kilm init`.
 - **Setup Required:** These descriptions are applied only when you run `kilm setup`.
 
-This provides a way to keep your library descriptions version-controlled alongside your library files. 
+This provides a way to keep your library descriptions version-controlled alongside your library files.

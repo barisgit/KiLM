@@ -26,49 +26,49 @@ kilm setup [OPTIONS]
 
 ## Options
 
-- `--kicad-lib-dir TEXT`: 
+- `--kicad-lib-dir TEXT`:
   Directly specify the path for the primary symbol/footprint library directory. This path might be used to set a default environment variable like `KICAD_USER_LIB` if not otherwise specified by library metadata. Overrides environment variables (`KICAD_USER_LIB`).
-  *Example:* `kilm setup --kicad-lib-dir /path/to/my/symbols`
+  _Example:_ `kilm setup --kicad-lib-dir /path/to/my/symbols`
 
-- `--kicad-3d-dir TEXT`: 
+- `--kicad-3d-dir TEXT`:
   Directly specify the path for the primary 3D models directory. This path might be used to set a default environment variable like `KICAD_3D_LIB`. Overrides environment variables (`KICAD_3D_LIB`).
-  *Example:* `kilm setup --kicad-3d-dir /path/to/my/3dmodels`
+  _Example:_ `kilm setup --kicad-3d-dir /path/to/my/3dmodels`
 
-- `--symbol-lib-dirs TEXT`: 
-  Specify a comma-separated list of library *names* (as defined in KiLM config) to set up. Only these specific symbol/footprint libraries will be configured. This takes precedence over the default behavior and `--all-libraries`.
-  *Example:* `kilm setup --symbol-lib-dirs "main-lib,project-lib"`
+- `--symbol-lib-dirs TEXT`:
+  Specify a comma-separated list of library _names_ (as defined in KiLM config) to set up. Only these specific symbol/footprint libraries will be configured. This takes precedence over the default behavior and `--all-libraries`.
+  _Example:_ `kilm setup --symbol-lib-dirs "main-lib,project-lib"`
 
-- `--threed-lib-dirs TEXT`: 
-  Specify a comma-separated list of 3D library *names* (as defined in KiLM config) to set up. Only the environment variables for these specific 3D libraries will be configured. This takes precedence over the default behavior and `--all-libraries`.
-  *Example:* `kilm setup --threed-lib-dirs "my-3d-models,official-3d"`
+- `--threed-lib-dirs TEXT`:
+  Specify a comma-separated list of 3D library _names_ (as defined in KiLM config) to set up. Only the environment variables for these specific 3D libraries will be configured. This takes precedence over the default behavior and `--all-libraries`.
+  _Example:_ `kilm setup --threed-lib-dirs "my-3d-models,official-3d"`
 
-- `--all-libraries`: 
-  Configure *all* libraries (both symbol/footprint and 3D) registered in KiLM's `config.yaml`. Without this flag, only the *current* symbol/footprint library and the *current* 3D library (as defined in `config.yaml` or derived) are configured by default.
-  *Example:* `kilm setup --all-libraries`
+- `--all-libraries`:
+  Configure _all_ libraries (both symbol/footprint and 3D) registered in KiLM's `config.yaml`. Without this flag, only the _current_ symbol/footprint library and the _current_ 3D library (as defined in `config.yaml` or derived) are configured by default.
+  _Example:_ `kilm setup --all-libraries`
 
-- `--max-backups INTEGER`: 
+- `--max-backups INTEGER`:
   Maximum number of timestamped backups KiLM should keep for each KiCad configuration file it modifies. Default: `5`.
-  *Example:* `kilm setup --max-backups 10`
+  _Example:_ `kilm setup --max-backups 10`
 
-- `--pin-libraries / --no-pin-libraries`: 
+- `--pin-libraries / --no-pin-libraries`:
   Default: `--pin-libraries`.
   Controls whether the configured libraries should be added to KiCad's "Pinned Libraries" list for quick access in the managers.
-  *Example:* `kilm setup --no-pin-libraries`
+  _Example:_ `kilm setup --no-pin-libraries`
 
-- `--dry-run`: 
+- `--dry-run`:
   Show the changes KiLM would make to KiCad's configuration files without actually modifying them. Output is printed to the terminal.
-  *Example:* `kilm setup --dry-run`
+  _Example:_ `kilm setup --dry-run`
 
-- `-v, --verbose`: 
+- `-v, --verbose`:
   Show detailed output during the setup process, useful for debugging.
-  *Example:* `kilm setup --verbose`
+  _Example:_ `kilm setup --verbose`
 
-- `--help`: 
+- `--help`:
   Show this help message and exit.
 
 ## Behavior Details
 
-- **Library Selection:** By default (without `--all-libraries`), `setup` configures only the *current* symbol/footprint library and the *current* 3D model library registered in KiLM. Use `--all-libraries` to configure all registered libraries, or `--symbol-lib-dirs` / `--threed-lib-dirs` to configure specific named libraries.
+- **Library Selection:** By default (without `--all-libraries`), `setup` configures only the _current_ symbol/footprint library and the _current_ 3D model library registered in KiLM. Use `--all-libraries` to configure all registered libraries, or `--symbol-lib-dirs` / `--threed-lib-dirs` to configure specific named libraries.
 - **Environment Variables:** KiLM attempts to read metadata (e.g., `kilm.yaml` or `.kilm_cloud_metadata`) to find the correct environment variable name (like `KICAD_COMPANY_LIB`) associated with each library path. If specific `--kicad-lib-dir` or `--kicad-3d-dir` options are given, they might influence default variables like `KICAD_USER_LIB` or `KICAD_3D_LIB`.
 - **Backups:** Backups are crucial for recovery if KiCad's configuration gets corrupted. They are stored in the same directory as the KiCad configuration files and are named with a timestamp.
 

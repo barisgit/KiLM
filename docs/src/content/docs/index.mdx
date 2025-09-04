@@ -18,8 +18,8 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import BadgeData from '../../components/BadgeData.astro';
+import { Card, CardGrid } from "@astrojs/starlight/components";
+import BadgeData from "../../components/BadgeData.astro";
 
 <BadgeData />
 
@@ -28,23 +28,48 @@ import BadgeData from '../../components/BadgeData.astro';
 
 ## ✨ What can you do with KiLM?
 
-**KiLM** centralizes how you handle symbol, footprint, and 3D model libraries across projects and workstations. 
+**KiLM** centralizes how you handle symbol, footprint, and 3D model libraries across projects and workstations.
 It helps maintain consistency in your designs with a standardized approach to library management.
 
 <div className="mt-6 flex flex-wrap gap-3">
-  <a href="https://pypi.org/project/kilm/" className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10">
-    v<span id="pypi-version" className="text-[#60efff] font-semibold mx-1">Latest</span>
+  <a
+    href="https://pypi.org/project/kilm/"
+    className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
+  >
+    v
+    <span id="pypi-version" className="text-[#60efff] font-semibold mx-1">
+      Latest
+    </span>
   </a>
-  <a href="https://pypi.org/project/kilm/" className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10">
-    <span className="mr-2">🐍</span> Python <span id="python-versions" className="ml-1 font-semibold">3.6+</span>
+  <a
+    href="https://pypi.org/project/kilm/"
+    className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
+  >
+    <span className="mr-2">🐍</span> Python{" "}
+    <span id="python-versions" className="ml-1 font-semibold">
+      3.6+
+    </span>
   </a>
-  <a href="https://pepy.tech/projects/kilm" className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10">
-    <span className="mr-2">📊</span> <span id="pypi-downloads" className="text-[#60efff] font-semibold mr-1">4K+</span> Downloads
+  <a
+    href="https://pepy.tech/projects/kilm"
+    className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
+  >
+    <span className="mr-2">📊</span>{" "}
+    <span id="pypi-downloads" className="text-[#60efff] font-semibold mr-1">
+      4K+
+    </span>{" "}
+    Downloads
   </a>
-  <a href="https://opensource.org/licenses/MIT" className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10">
+  <a
+    href="https://opensource.org/licenses/MIT"
+    className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
+  >
     <span className="mr-2">📄</span> MIT License
   </a>
-  <a href="https://kilm.aristovnik.me" className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10">
+  <a
+    href="https://kilm.aristovnik.me"
+    className="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
+  >
     <span className="mr-2">📚</span> Documentation
   </a>
 </div>
@@ -75,13 +100,19 @@ Follow the [Getting Started tutorial](/guides/getting-started/) to learn the bas
   </div>
   <div className="text-[#f1f1f1] p-4 overflow-x-auto leading-relaxed">
     <div className="my-2 relative pl-5 text-[#e4e4e4]">
-      <span className="absolute left-0 text-[#63f2f1] font-bold">$</span>pip install kilm
+      <span className="absolute left-0 text-[#63f2f1] font-bold">$</span>pip
+      install kilm
     </div>
-    <div className="my-2 mb-4 text-[#a9b1d6] opacity-90">Successfully installed kilm-1.0.0</div>
+    <div className="my-2 mb-4 text-[#a9b1d6] opacity-90">
+      Successfully installed kilm-1.0.0
+    </div>
     <div className="my-2 relative pl-5 text-[#e4e4e4]">
-      <span className="absolute left-0 text-[#63f2f1] font-bold">$</span>kilm init
+      <span className="absolute left-0 text-[#63f2f1] font-bold">$</span>kilm
+      init
     </div>
-    <div className="my-2 mb-4 text-[#a9b1d6] opacity-90">Initializing new KiLM configuration...</div>
+    <div className="my-2 mb-4 text-[#a9b1d6] opacity-90">
+      Initializing new KiLM configuration...
+    </div>
   </div>
 </div>
 
@@ -95,33 +126,70 @@ Our [installation guide](/guides/installation/) has step-by-step instructions fo
   <div className="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4f39fa] to-[#da62c4] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
     <h3 className="mt-0 mb-4 font-semibold text-white/95">Key Features</h3>
-    <p className="mb-4 text-white/70 leading-relaxed flex-grow">Learn about KiLM's core capabilities and how they can improve your workflow.</p>
-    <a href="/guides/getting-started/" className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#4f39fa] mt-auto">
-      Explore Features<span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">→</span>
+    <p className="mb-4 text-white/70 leading-relaxed flex-grow">
+      Learn about KiLM's core capabilities and how they can improve your
+      workflow.
+    </p>
+    <a
+      href="/guides/getting-started/"
+      className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#4f39fa] mt-auto"
+    >
+      Explore Features
+      <span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
+        →
+      </span>
     </a>
   </div>
   <div className="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#00ff87] to-[#60efff] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 className="mt-0 mb-4 font-semibold text-white/95">Project Architecture</h3>
-    <p className="mb-4 text-white/70 leading-relaxed flex-grow">Understand how KiLM organizes and manages your libraries.</p>
-    <a href="/community/development/" className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#00ff87] mt-auto">
-      View Architecture<span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">→</span>
+    <h3 className="mt-0 mb-4 font-semibold text-white/95">
+      Project Architecture
+    </h3>
+    <p className="mb-4 text-white/70 leading-relaxed flex-grow">
+      Understand how KiLM organizes and manages your libraries.
+    </p>
+    <a
+      href="/community/development/"
+      className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#00ff87] mt-auto"
+    >
+      View Architecture
+      <span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
+        →
+      </span>
     </a>
   </div>
   <div className="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff7043] to-[#ffab40] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
     <h3 className="mt-0 mb-4 font-semibold text-white/95">Command Reference</h3>
-    <p className="mb-4 text-white/70 leading-relaxed flex-grow">Explore the complete list of commands and their options.</p>
-    <a href="/reference/cli/" className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ffab40] mt-auto">
-      View Commands<span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">→</span>
+    <p className="mb-4 text-white/70 leading-relaxed flex-grow">
+      Explore the complete list of commands and their options.
+    </p>
+    <a
+      href="/reference/cli/"
+      className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ffab40] mt-auto"
+    >
+      View Commands
+      <span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
+        →
+      </span>
     </a>
   </div>
   <div className="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#e91e63] to-[#ff4081] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 className="mt-0 mb-4 font-semibold text-white/95">Configuration Options</h3>
-    <p className="mb-4 text-white/70 leading-relaxed flex-grow">Learn how to customize KiLM to fit your specific needs.</p>
-    <a href="/guides/configuration/" className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ff4081] mt-auto">
-      View Config Options<span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">→</span>
+    <h3 className="mt-0 mb-4 font-semibold text-white/95">
+      Configuration Options
+    </h3>
+    <p className="mb-4 text-white/70 leading-relaxed flex-grow">
+      Learn how to customize KiLM to fit your specific needs.
+    </p>
+    <a
+      href="/guides/configuration/"
+      className="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ff4081] mt-auto"
+    >
+      View Config Options
+      <span className="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
+        →
+      </span>
     </a>
   </div>
 </div>
@@ -132,13 +200,25 @@ Our [installation guide](/guides/installation/) has step-by-step instructions fo
 ## 🔮 Extend
 
 <CardGrid>
-  <Card title="Add External Libraries" link="/reference/cli/add-3d/" icon="add-document">
+  <Card
+    title="Add External Libraries"
+    link="/reference/cli/add-3d/"
+    icon="add-document"
+  >
     Integrate third-party symbol, footprint, and 3D model libraries.
   </Card>
-  <Card title="Create Project Templates" link="/reference/cli/template/" icon="document">
+  <Card
+    title="Create Project Templates"
+    link="/reference/cli/template/"
+    icon="document"
+  >
     Standardize designs with reusable project templates.
   </Card>
-  <Card title="Set Environment Variables" link="/reference/cli/config/" icon="seti:config">
+  <Card
+    title="Set Environment Variables"
+    link="/reference/cli/config/"
+    icon="seti:config"
+  >
     Configure KiCad environment variables directly through KiLM.
   </Card>
   <Card title="Manage Pinned Libraries" link="/reference/cli/pin/" icon="pin">

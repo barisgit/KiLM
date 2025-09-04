@@ -13,7 +13,7 @@ kilm status [OPTIONS]
 
 ## Options
 
-- `--help`: 
+- `--help`:
   Show the help message and exit.
 
 ## Behavior
@@ -32,7 +32,8 @@ The command gathers and displays information about:
 kilm status
 ```
 
-*Expected Output (example structure):*
+_Expected Output (example structure):_
+
 ```text
 KILM Configuration:
   Configured Libraries:
@@ -76,4 +77,4 @@ Configured Footprint Libraries:
   - project-lib: ${PROJECT_LIB}/project-lib.pretty
 ```
 
-This command is useful for verifying that your `kilm setup` commands have applied correctly and for understanding the current state recognised by both KiLM and KiCad. 
+This command is useful for verifying that your `kilm setup` commands have applied correctly and for understanding the current state recognised by both KiLM and KiCad.

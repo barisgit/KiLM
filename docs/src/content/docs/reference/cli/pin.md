@@ -17,40 +17,40 @@ kilm pin [OPTIONS]
 
 ## Options
 
-- `--kicad-lib-dir TEXT`: 
+- `--kicad-lib-dir TEXT`:
   Specify the path to the KiCad library directory containing the libraries you want to pin.
   If not provided, KiLM will look for the `KICAD_USER_LIB` environment variable.
   This directory is scanned to find available libraries if `--all` is used or to validate specified library names.
-  *Default:* Uses `KICAD_USER_LIB` environment variable.
-  *Example:* `kilm pin --kicad-lib-dir /path/to/libs -s MyLib`
+  _Default:_ Uses `KICAD_USER_LIB` environment variable.
+  _Example:_ `kilm pin --kicad-lib-dir /path/to/libs -s MyLib`
 
-- `-s, --symbols TEXT`: 
+- `-s, --symbols TEXT`:
   Specify the name of a symbol library (`.kicad_sym` file, without extension) to pin. Use this option multiple times to pin several libraries.
-  *Example:* `kilm pin -s Device -s MyCustomSymbols`
+  _Example:_ `kilm pin -s Device -s MyCustomSymbols`
 
-- `-f, --footprints TEXT`: 
+- `-f, --footprints TEXT`:
   Specify the name of a footprint library (`.pretty` directory, without extension) to pin. Use this option multiple times to pin several libraries.
-  *Example:* `kilm pin -f Package_SO -f MyCustomFootprints`
+  _Example:_ `kilm pin -f Package_SO -f MyCustomFootprints`
 
-- `--all / --selected`: 
-  Determines which libraries to pin. 
-  - `--all` (Default): Pins *all* symbol and footprint libraries found within the directory specified by `--kicad-lib-dir`. Cannot be used if `-s` or `-f` are specified.
+- `--all / --selected`:
+  Determines which libraries to pin.
+  - `--all` (Default): Pins _all_ symbol and footprint libraries found within the directory specified by `--kicad-lib-dir`. Cannot be used if `-s` or `-f` are specified.
   - `--selected`: Pins only the libraries explicitly listed using `-s` or `-f`. This is implicitly active when `-s` or `-f` are used.
-  *Example (pin all):* `kilm pin --all`
+    _Example (pin all):_ `kilm pin --all`
 
-- `--dry-run`: 
+- `--dry-run`:
   Show which libraries would be added to the pinned list without actually modifying `kicad_common.json`.
-  *Example:* `kilm pin --all --dry-run`
+  _Example:_ `kilm pin --all --dry-run`
 
-- `--max-backups INTEGER`: 
+- `--max-backups INTEGER`:
   Maximum number of timestamped backups KiLM should keep for `kicad_common.json`. Default: `5`.
-  *Example:* `kilm pin --max-backups 3`
+  _Example:_ `kilm pin --max-backups 3`
 
-- `-v, --verbose`: 
+- `-v, --verbose`:
   Show detailed output during the pinning process, including listing libraries found and pinned.
-  *Example:* `kilm pin -s MyLib --verbose`
+  _Example:_ `kilm pin -s MyLib --verbose`
 
-- `--help`: 
+- `--help`:
   Show this help message and exit.
 
 ## Behavior
@@ -67,29 +67,34 @@ kilm pin [OPTIONS]
 ## Examples
 
 **Pin specific libraries:**
+
 ```bash
 kilm pin -s MySymbolLib -s AnotherLib -f MyFootprintLib
 ```
 
 **Pin all libraries found in the default directory:**
 (Assumes `KICAD_USER_LIB` is set)
+
 ```bash
-kilm pin --all 
+kilm pin --all
 # Or simply:
 kilm pin
 ```
 
 **Pin all libraries in a specific directory:**
+
 ```bash
 kilm pin --kicad-lib-dir /path/to/company/libs --all
 ```
 
 **Preview pinning all libraries:**
+
 ```bash
 kilm pin --all --dry-run
 ```
 
 **Pin specific libraries with verbose output:**
+
 ```bash
 kilm pin -s Device -f Resistor_SMD -v
-``` 
+```

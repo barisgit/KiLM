@@ -17,31 +17,31 @@ kilm unpin [OPTIONS]
 
 ## Options
 
-- `-s, --symbols TEXT`: 
+- `-s, --symbols TEXT`:
   Specify the name of a symbol library currently in the pinned list to remove. Use this option multiple times to unpin several libraries.
-  *Example:* `kilm unpin -s Device -s MyCustomSymbols`
+  _Example:_ `kilm unpin -s Device -s MyCustomSymbols`
 
-- `-f, --footprints TEXT`: 
+- `-f, --footprints TEXT`:
   Specify the name of a footprint library currently in the pinned list to remove. Use this option multiple times to unpin several libraries.
-  *Example:* `kilm unpin -f Package_SO -f MyCustomFootprints`
+  _Example:_ `kilm unpin -f Package_SO -f MyCustomFootprints`
 
-- `--all`: 
-  Unpin *all* currently pinned symbol and footprint libraries. Cannot be used if `-s` or `-f` are specified.
-  *Example:* `kilm unpin --all`
+- `--all`:
+  Unpin _all_ currently pinned symbol and footprint libraries. Cannot be used if `-s` or `-f` are specified.
+  _Example:_ `kilm unpin --all`
 
-- `--dry-run`: 
+- `--dry-run`:
   Show which libraries would be removed from the pinned list without actually modifying `kicad_common.json`.
-  *Example:* `kilm unpin --all --dry-run`
+  _Example:_ `kilm unpin --all --dry-run`
 
-- `--max-backups INTEGER`: 
+- `--max-backups INTEGER`:
   Maximum number of timestamped backups KiLM should keep for `kicad_common.json`. Default: `5`.
-  *Example:* `kilm unpin --max-backups 3`
+  _Example:_ `kilm unpin --max-backups 3`
 
-- `-v, --verbose`: 
+- `-v, --verbose`:
   Show detailed output during the unpinning process.
-  *Example:* `kilm unpin -s MyLib --verbose`
+  _Example:_ `kilm unpin -s MyLib --verbose`
 
-- `--help`: 
+- `--help`:
   Show this help message and exit.
 
 ## Behavior
@@ -58,21 +58,25 @@ kilm unpin [OPTIONS]
 ## Examples
 
 **Unpin specific libraries:**
+
 ```bash
 kilm unpin -s ObsoleteSymLib -f OldFootprintLib
 ```
 
 **Unpin all libraries:**
+
 ```bash
 kilm unpin --all
 ```
 
 **Preview unpinning specific libraries:**
+
 ```bash
 kilm unpin -s Device -f Package_SO --dry-run
 ```
 
 **Unpin all libraries with verbose output:**
+
 ```bash
 kilm unpin --all -v
-``` 
+```

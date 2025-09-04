@@ -15,7 +15,7 @@ It performs several actions:
 
 ## Usage
 
-Run this command from *within* the directory you want to initialize:
+Run this command from _within_ the directory you want to initialize:
 
 ```bash
 cd /path/to/your-library
@@ -24,31 +24,31 @@ kilm init [OPTIONS]
 
 ## Options
 
-- `--name TEXT`: 
+- `--name TEXT`:
   Sets a custom name for the library collection. If not provided, a name is generated from the current directory name.
-  *Example:* `kilm init --name my-custom-library`
+  _Example:_ `kilm init --name my-custom-library`
 
-- `--description TEXT`: 
+- `--description TEXT`:
   Adds a description to the library metadata (`kilm.yaml`).
-  *Example:* `kilm init --description "My collection of custom components"`
+  _Example:_ `kilm init --description "My collection of custom components"`
 
-- `--env-var TEXT`: 
+- `--env-var TEXT`:
   Specifies a custom KiCad environment variable name (e.g., `MY_CUSTOM_LIB`) to associate with this library's path. If not provided (and `--no-env-var` isn't used), a name is automatically generated (e.g., `KICAD_LIB_MY_CUSTOM_LIBRARY`). This variable will be set in KiCad when you run `kilm setup`.
-  *Example:* `kilm init --env-var MY_LIB_PATH`
+  _Example:_ `kilm init --env-var MY_LIB_PATH`
 
-- `--no-env-var`: 
+- `--no-env-var`:
   Prevents an environment variable from being assigned to this library in the metadata. Default: `False`.
-  *Example:* `kilm init --no-env-var`
+  _Example:_ `kilm init --no-env-var`
 
-- `--set-current / --no-set-current`: 
+- `--set-current / --no-set-current`:
   Controls whether this library should be set as the `current_library` in the main `config.yaml`. Default: `--set-current`.
-  *Example:* `kilm init --no-set-current`
+  _Example:_ `kilm init --no-set-current`
 
-- `--force`: 
+- `--force`:
   If `kilm.yaml` already exists, overwrite it with new metadata based on options or defaults. Without `--force`, existing metadata is updated only with explicitly provided options. Default: `False`.
-  *Example:* `kilm init --force`
+  _Example:_ `kilm init --force`
 
-- `--help`: 
+- `--help`:
   Show the help message and exit.
 
 ## Behavior Summary
@@ -69,7 +69,7 @@ kilm init
 ```
 
 **Initialization with Options:**
-Initialize with a specific name, description, and environment variable, and *don't* set it as the current library.
+Initialize with a specific name, description, and environment variable, and _don't_ set it as the current library.
 
 ```bash
 cd /path/to/another-kicad-library
@@ -84,4 +84,4 @@ cd /path/to/existing-library
 kilm init --force
 ```
 
-**Note:** Running `kilm init` registers the library with KiLM and prepares the directory. You still need to run [`kilm setup`](/reference/cli/setup/) afterwards to make KiCad aware of this library by updating KiCad's configuration files. 
+**Note:** Running `kilm init` registers the library with KiLM and prepares the directory. You still need to run [`kilm setup`](/reference/cli/setup/) afterwards to make KiCad aware of this library by updating KiCad's configuration files.

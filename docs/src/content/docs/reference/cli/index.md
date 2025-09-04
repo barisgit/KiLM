@@ -21,4 +21,4 @@ Each command focuses on a specific task. Below is a list of available commands. 
 - [`update`](/reference/cli/update/): Update Git-based libraries using `git pull`.
 - [`add-hook`](/reference/cli/add-hook/): Add a Git post-merge hook to automatically run `kilm update`.
 
-Use the sidebar navigation or the links above to explore each command in detail. 
+Use the sidebar navigation or the links above to explore each command in detail.
