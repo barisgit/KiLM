@@ -1,0 +1,123 @@
+---
+// BadgeData.astro
+---
+
+<script>
+  // Function to safely fetch data and handle errors
+  async function fetchWithTimeout(url: string, headers = {}, timeout = 5000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: headers,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      console.error(`Fetch error for ${url}:`, error);
+      return null;
+    }
+  }
+
+  // Update the PyPI version
+  async function updatePyPIVersion() {
+    try {
+      const element = document.getElementById("pypi-version");
+      if (!element) return;
+
+      console.log("Fetching PyPI version...");
+      const response = await fetchWithTimeout(
+        "https://pypi.org/pypi/kilm/json"
+      );
+      if (response) {
+        const data = JSON.parse(response);
+        console.log("PyPI version data:", data.info.version);
+        element.textContent = data.info.version;
+      }
+    } catch (error) {
+      console.error("Error updating PyPI version:", error);
+    }
+  }
+
+  // Update the Python versions
+  async function updatePythonVersions() {
+    try {
+      const element = document.getElementById("python-versions");
+      if (!element) return;
+
+      const response = await fetchWithTimeout(
+        "https://pypi.org/pypi/kilm/json"
+      );
+      if (response) {
+        const data = JSON.parse(response);
+        if (data.info && data.info.requires_python) {
+          element.textContent = data.info.requires_python;
+        }
+      }
+    } catch (error) {
+      console.error("Error updating Python versions:", error);
+    }
+  }
+
+  // Update the download count using pypistats.org API
+  async function updateDownloadCount() {
+    try {
+      const element = document.getElementById("pypi-downloads");
+      if (!element) {
+        console.error("Download count element not found");
+        return;
+      }
+
+      console.log("Fetching download count from pypistats.org...");
+
+      // Use pypistats.org API - no authentication needed
+      const response = await fetchWithTimeout(
+        "https://pypistats.org/api/packages/kilm/recent"
+      );
+
+      if (response) {
+        try {
+          const data = JSON.parse(response);
+          console.log("Download data from pypistats:", data);
+
+          if (data && data.data && data.data.last_month) {
+            const downloads = data.data.last_month;
+            console.log("Monthly download count:", downloads);
+
+            // Format download count
+            if (downloads >= 1000000) {
+              element.textContent = Math.floor(downloads / 1000000) + "M+";
+            } else if (downloads >= 1000) {
+              element.textContent = Math.floor(downloads / 1000) + "K+";
+            } else {
+              element.textContent = downloads + "+";
+            }
+            return;
+          }
+        } catch (error) {
+          console.error("Error parsing pypistats response:", error);
+        }
+      }
+
+      // Fallback
+      console.log("Using static download count");
+    } catch (error) {
+      console.error("Error updating download count:", error);
+    }
+  }
+
+  // Run the updates when DOM is loaded
+  document.addEventListener("DOMContentLoaded", () => {
+    console.log("DOM loaded, updating badges...");
+    updatePyPIVersion();
+    updatePythonVersions();
+    updateDownloadCount();
+  });
+</script>

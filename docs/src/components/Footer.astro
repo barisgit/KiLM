@@ -1,0 +1,37 @@
+---
+import Default from "@astrojs/starlight/components/Footer.astro";
+---
+
+<div>
+  <Default>
+    <slot />
+  </Default>
+  <div class="site-footer">
+    <p>
+      <a href="https://aristovnik.me" target="_blank" rel="noopener noreferrer"
+        >Made by <span class="author-name">Blaž Aristovnik</span></a
+      >
+    </p>
+  </div>
+</div>
+
+<style>
+  .site-footer {
+    margin-top: 1rem;
+    padding: 0 1rem 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+  }
+  .site-footer a {
+    color: var(--sl-color-gray-3);
+    text-decoration: none;
+  }
+  .site-footer a:hover {
+    text-decoration: underline;
+  }
+  .author-name {
+    font-weight: bold;
+    color: var(--sl-color-gray-2);
+  }
+</style>

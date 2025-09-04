@@ -1,0 +1,66 @@
+---
+title: Automatic Updates
+description: Keeping libraries updated automatically using Git hooks.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+> **Note:** This guide primarily describes features beneficial for **Consumers** – those using libraries managed by a Creator. The setup of the hook itself might be done by a Creator or an advanced Consumer.
+
+KiLM provides a helper command [`kilm add-hook`](/reference/cli/add-hook/) to easily create a basic `post-merge` Git hook that runs `kilm update`.
+
+## Using `kilm add-hook` (Recommended)
+
+Navigate to the root of your Git repository containing your KiCad libraries and run:
+
+```bash
+kilm add-hook
+```
+
+This creates a `.git/hooks/post-merge` script that automatically executes `kilm update` every time you successfully run `git pull` or `git merge` in that repository.
+
+## Manual Hook Setup (Alternative)
+
+If you prefer manual setup or want to customize the hook script further, you can follow these steps:
+
+1.  **Create Hook Directory (if needed):**
+    Make sure the hooks directory exists in your repository:
+    ```bash
+    mkdir -p .git/hooks
+    ```
+
+2.  **Create Hook Script:**
+    Create a file named `.git/hooks/post-merge`.
+
+3.  **Add Script Content:**
+    Add the commands you want to run. 
+
+    *Example 1: Only update libraries (similar to `kilm add-hook`)*
+    ```bash
+    #!/bin/bash
+    echo "Updating KiCad libraries via KiLM..."
+    kilm update
+    echo "KiLM update hook finished."
+    ```
+
+    *Example 2: Update libraries and run `kilm setup` (use with caution)*
+    This will attempt to reconfigure KiCad after every pull, which might be desirable but could also have unintended consequences if the pull introduces breaking changes or removes libraries unexpectedly.
+
+    ```bash
+    #!/bin/bash
+    echo "Updating KiCad libraries and running setup via KiLM..."
+    kilm update
+    # Add this line to also run setup:
+    kilm setup
+    echo "KiLM update and setup hook finished."
+    ```
+
+    *Note: You can also manually run `git pull` in library directories and `kilm setup` in your terminal.*
+
+4.  **Make Executable:**
+    Make the script executable:
+    ```bash
+    chmod +x .git/hooks/post-merge
+    ```
+
+Now, after a `git pull` or `git merge`, the commands in your `post-merge` script will execute automatically. 

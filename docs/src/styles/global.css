@@ -1,0 +1,108 @@
+@layer base, starlight, theme, components, utilities;
+
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  /* Your preferred text font. Starlight uses a system font stack by default. */
+  --font-sans: "Atkinson Hyperlegible";
+  /* Your preferred code font. Starlight uses system monospace fonts by default. */
+  --font-mono: "IBM Plex Mono";
+  /* Generated accent color palettes. */
+  --color-accent-200: #ddc884;
+  --color-accent-600: #816900;
+  --color-accent-900: #3e3100;
+  --color-accent-950: #2d2300;
+  /* Generated gray color palettes - darker variants */
+  --color-gray-100: #e8eaed;
+  --color-gray-200: #d4d7dc;
+  --color-gray-300: #9ca3af;
+  --color-gray-400: #6b7280;
+  --color-gray-500: #4b5563;
+  --color-gray-600: #374151;
+  --color-gray-700: #1f2937;
+  --color-gray-800: #111827;
+  --color-gray-900: #0f172a;
+  --color-gray-950: #020617;
+
+  /* Dark mode Starlight theme variables - using darker grays */
+  --sl-color-accent-low: var(--color-accent-950);
+  --sl-color-accent: var(--color-accent-600);
+  --sl-color-accent-high: var(--color-accent-200);
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: var(--color-gray-100);
+  --sl-color-gray-2: var(--color-gray-200);
+  --sl-color-gray-3: var(--color-gray-300);
+  --sl-color-gray-4: var(--color-gray-400);
+  --sl-color-gray-5: var(--color-gray-500);
+  --sl-color-gray-6: var(--color-gray-600);
+  --sl-color-black: var(--color-gray-950);
+
+  /* Light mode Starlight theme variables */
+  --sl-color-accent-low-light: var(--color-accent-200);
+  --sl-color-accent-light: var(--color-accent-600);
+  --sl-color-accent-high-light: var(--color-accent-900);
+  --sl-color-white-light: var(--color-gray-900);
+  --sl-color-gray-1-light: var(--color-gray-800);
+  --sl-color-gray-2-light: var(--color-gray-700);
+  --sl-color-gray-3-light: var(--color-gray-500);
+  --sl-color-gray-4-light: var(--color-gray-400);
+  --sl-color-gray-5-light: var(--color-gray-300);
+  --sl-color-gray-6-light: var(--color-gray-200);
+  --sl-color-gray-7-light: var(--color-gray-100);
+  --sl-color-black-light: #ffffff;
+
+  /* Custom darker background colors */
+  --custom-bg-primary: #0a0e1a;
+  --custom-bg-secondary: #0f1419;
+  --custom-bg-tertiary: #151b26;
+}
+
+/* Custom animations for gradients */
+@layer utilities {
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-gradient {
+    animation: gradient 15s ease infinite;
+  }
+}
+
+body {
+  @apply bg-gray-100 dark:bg-[var(--custom-bg-primary)];
+}
+
+.header {
+  @apply bg-gray-100 dark:bg-[var(--custom-bg-secondary)];
+}
+
+.sidebar-content {
+  @apply bg-gray-100 dark:bg-[var(--custom-bg-tertiary)];
+}
+
+/* Additional dark theme enhancements */
+:root[data-theme="dark"] {
+  --sl-color-bg: var(--custom-bg-primary);
+  --sl-color-bg-nav: var(--custom-bg-secondary);
+  --sl-color-bg-sidebar: var(--custom-bg-tertiary);
+}
+
+/* Content area dark background */
+main {
+  @apply dark:bg-[var(--custom-bg-primary)];
+}
+
+/* Article content dark background */
+article {
+  @apply dark:bg-[var(--custom-bg-primary)];
+}
