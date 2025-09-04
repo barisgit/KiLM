@@ -3,6 +3,8 @@ title: unpin
 description: Remove libraries from KiCad's pinned (favorite) list.
 ---
 
+import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
+
 The `kilm unpin` command removes specified symbol and/or footprint libraries from KiCad's "Pinned Libraries" list.
 
 It operates by modifying the `pinned_symbol_libs` and `pinned_fp_libs` arrays within KiCad's `kicad_common.json` configuration file.

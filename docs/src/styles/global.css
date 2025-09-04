@@ -59,22 +59,20 @@
   --custom-bg-tertiary: #151b26;
 }
 
-/* Custom animations for gradients */
+/* Aurora background shimmer (single tasteful animation) */
 @layer utilities {
-  @keyframes gradient {
-    0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
-    }
+  @keyframes auroraShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
-
-  .animate-gradient {
-    animation: gradient 15s ease infinite;
+  .aurora-bg {
+    background-image:
+      radial-gradient(60% 80% at 10% 0%, rgba(56,189,248,0.18), transparent 60%),
+      radial-gradient(50% 70% at 90% 10%, rgba(168,85,247,0.16), transparent 60%),
+      radial-gradient(40% 60% at 30% 10%, rgba(245,158,11,0.12), transparent 60%);
+    background-size: 200% 200%;
+    animation: auroraShift 22s ease-in-out infinite;
   }
 }
 
@@ -105,4 +103,48 @@ main {
 /* Article content dark background */
 article {
   @apply dark:bg-[var(--custom-bg-primary)];
+}
+
+/* Homepage accents */
+@layer components {
+  /* Subtle glow under the hero area */
+  .sl-hero {
+    position: relative;
+  }
+  .sl-hero::after {
+    content: "";
+    position: absolute;
+    inset: -20px 0 auto 0;
+    height: 160px;
+    z-index: -1;
+    filter: blur(48px);
+    opacity: 0.35;
+    background:
+      radial-gradient(50% 60% at 15% 0%, rgba(56,189,248,0.22), transparent 70%),
+      radial-gradient(40% 60% at 85% 0%, rgba(168,85,247,0.18), transparent 70%);
+  }
+  /* Use default Starlight code block styling; removed terminal-panel overrides */
+  /* Cards: neutral by default; accent only on hover */
+  .sl-card {
+    @apply transition-all duration-200 border border-white/10 bg-white/5 backdrop-blur-sm;
+  }
+  .sl-card:hover {
+    @apply -translate-y-0.5 shadow-lg ring-1 ring-white/15 bg-white/10;
+  }
+  /* CTA button inside cards (non-link visual affordance) */
+  .sl-card .card-cta {
+    @apply mt-3 inline-flex items-center gap-1 text-sm font-medium px-2.5 py-1.5 rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors transition-transform duration-150;
+  }
+  .sl-card:hover .card-cta {
+    @apply border-white/25 bg-white/10 text-white;
+  }
+  .sl-card .card-cta .arrow {
+    @apply transition-transform duration-150;
+  }
+  .sl-card:hover .card-cta .arrow {
+    @apply translate-x-0.5;
+  }
+  .sl-card .card-cta:focus-visible {
+    @apply outline-none ring-2 ring-white/30;
+  }
 }

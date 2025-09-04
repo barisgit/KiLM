@@ -5,7 +5,7 @@
 
 This repository contains the documentation for [KiLM (KiCad Library Manager)](https://github.com/barisgit/KiLM), a command-line tool for managing KiCad libraries across projects and workstations.
 
-## 📚 Documentation Structure
+## Documentation Structure
 
 The documentation is organized into the following sections:
 
@@ -13,7 +13,7 @@ The documentation is organized into the following sections:
 - **Reference**: Detailed command and API references
 - **Community**: Information about contributing and development
 
-## 🧞 Commands
+## Commands
 
 All commands are run from the root of the project, from a terminal:
 
@@ -24,10 +24,10 @@ All commands are run from the root of the project, from a terminal:
 | `pnpm build`   | Build your production site to `./dist/`      |
 | `pnpm preview` | Preview your build locally, before deploying |
 
-## 🛠️ Project Structure
+## Project Structure
 
 ```
-.
+docs/
 ├── public/               # Static assets
 ├── src/
 │   ├── assets/           # Images and other assets
@@ -38,10 +38,11 @@ All commands are run from the root of the project, from a terminal:
 │   │   │   └── community/ # Contributing guidelines
 │   └── content.config.ts # Content collection config
 ├── astro.config.mjs      # Astro configuration
-└── package.json
+├── package.json
+└── README.md            # This file
 ```
 
-## 🔗 Links
+## Links
 
 - [KiLM Documentation Website](https://kilm.aristovnik.me)
 - [Starlight Documentation](https://starlight.astro.build/)

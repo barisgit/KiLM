@@ -1,63 +1,102 @@
 ---
 title: Configuration
-description: Understanding KiLM configuration files.
+description: Understanding KiLM configuration files and KiCad integration.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-<Aside type="note">
-  **Note:** Both **Creators** and **Consumers** may need to understand the
-  configuration, but **Creators** are more likely to directly manage the library
-  entries within `config.yaml`.
-</Aside>
+KiLM uses configuration files to manage library paths, environment variables, and KiCad integration settings.
 
-KiLM stores its main configuration file, `config.yaml`, in a standard user configuration directory:
+## Configuration File Locations
 
-- **Linux/macOS**: `~/.config/kicad-lib-manager/config.yaml` (following XDG Base Directory specification)
-- **Windows**: Typically `C:\Users\<YourUsername>\.config\kicad-lib-manager\config.yaml` (derived from `Path.home()`)
+### KiLM Configuration
 
-## Main Configuration File (`config.yaml`)
+KiLM stores its main configuration in standard user directories:
 
-The primary configuration file, `config.yaml`, is located within the configuration directory mentioned above. This file stores information about:
+- **Linux/macOS**: `~/.config/kicad-lib-manager/config.yaml`
+- **Windows**: `%USERPROFILE%\.config\kicad-lib-manager\config.yaml`
 
-- **Registered Libraries (`libraries`):** A list containing details about the libraries managed by KiLM. Each library entry includes:
-  - `name`: A unique identifier for the library.
-  - `path`: The absolute path to the library's directory.
-  - `type`: Specifies the kind of library. Common types include:
-    - `github`: Typically used for standard symbol and footprint libraries, often managed via Git.
-    - `cloud`: Used for 3D model libraries.
-- **Current Library (`current_library`):** The path to the library currently considered "active" by KiLM. This path is used by commands like `status` and others. It can be set using the `kilm config set-default` command.
-- **Maximum Backups (`max_backups`):** An integer defining the maximum number of timestamped backups KiLM should keep when modifying KiCad's native configuration files.
+### KiCad Configuration
 
-This file is automatically managed by KiLM when you use commands like `init`, `add-3d`, `config set-default`, etc. Manual editing is usually not required but possible if needed.
+KiLM automatically detects and modifies KiCad's configuration files:
 
-Example structure:
+- **Library Tables**: `sym-lib-table` (symbols) and `fp-lib-table` (footprints)  
+- **Environment Variables**: `kicad_common.json`
+- **Platform-specific paths**:
+  - Linux: `~/.config/kicad/`
+  - macOS: `~/Library/Preferences/kicad/`
+  - Windows: `%APPDATA%\kicad\`
+
+## KiLM Configuration (`config.yaml`)
+
+The `config.yaml` file manages KiLM's global settings and library registry:
+
+### Configuration Structure
+
+- **`libraries`**: Array of registered library entries
+  - `name`: Unique identifier for the library
+  - `path`: Absolute path to the library directory
+  - `type`: Library type (`github`, `cloud`, etc.)
+- **`current_library`**: Path to the active library (used by `kilm status`)
+- **`max_backups`**: Number of backup files to retain (default: 5)
+
+### Example Configuration
 
 ```yaml
-current_library: /path/to/your/main-kicad-library
+current_library: /home/user/kicad-libraries/company-lib
 libraries:
-  - name: my-company-kicad-library
-    path: /path/to/your/main-kicad-library
+  - name: company-symbols-footprints
+    path: /home/user/kicad-libraries/company-lib
     type: github
   - name: shared-3d-models
-    path: /path/to/shared/3d-models
+    path: /mnt/shared/kicad/3d-models
     type: cloud
-  - name: my-company-another-library
-    path: /path/to/your/other-kicad-library
+  - name: personal-components
+    path: /home/user/personal-kicad-lib
     type: github
 max_backups: 5
 ```
 
-## KiCad Configuration Files
-
-KiLM interacts directly with KiCad's own configuration files to add libraries, set environment variables, and manage pinned libraries. KiLM automatically detects the location of these files (usually within KiCad's user settings directory).
-
-<Aside type="caution">
-  **Important:** KiLM creates timestamped backups of KiCad's configuration files
-  (e.g., `fp-lib-table.backup.YYYYMMDD_HHMMSS`,
-  `sym-lib-table.backup.YYYYMMDD_HHMMSS`,
-  `kicad_common.json.backup.YYYYMMDD_HHMMSS`) in the *same* directory as the
-  original files *before* making any changes. The number of backups retained is
-  controlled by the `max_backups` setting in `config.yaml`. This allows you to
-  easily revert if something goes wrong.
+<Aside type="note">
+This configuration is automatically managed by KiLM commands. Manual editing is rarely necessary.
 </Aside>
+
+## Library Metadata (`kilm.yaml`)
+
+Each library directory can contain a `kilm.yaml` file with metadata:
+
+```yaml
+name: company-library
+description: Main component library for ACME Corp
+env_var: ACME_LIB_PATH
+version: "1.0.0"
+```
+
+This file is created by `kilm init` and used to share library information across teams.
+
+- **Backup files**: `*.backup.YYYYMMDD_HHMMSS` format
+- **Location**: Same directory as original KiCad config files  
+- **Retention**: Controlled by `max_backups` setting
+- **Files backed up**:
+  - `sym-lib-table` (symbol library table)
+  - `fp-lib-table` (footprint library table)  
+  - `kicad_common.json` (environment variables)
+
+<Aside type="tip">
+If KiLM changes cause issues, you can manually restore from backup files or use `kilm config restore` (if available in your version).
+</Aside>
+
+## Configuration Commands
+
+Common configuration management commands:
+
+```bash
+# View current configuration
+kilm status
+
+# Set default library
+kilm config set-default /path/to/library
+
+# View configuration file location
+kilm config --help
+```

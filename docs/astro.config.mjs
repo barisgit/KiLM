@@ -3,6 +3,7 @@ import { defineConfig, passthroughImageService } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 import tailwindcss from "@tailwindcss/vite";
+import starlightSiteGraph from "starlight-site-graph";
 
 // https://astro.build/config
 export default defineConfig({
@@ -14,6 +15,7 @@ export default defineConfig({
 
   integrations: [
     starlight({
+      // plugins: [starlightSiteGraph()],
       title: "KiLM",
       customCss: [
         // Path to your custom CSS file (relative to src)
@@ -48,7 +50,7 @@ export default defineConfig({
         {
           label: "Command Reference",
           items: [
-            { label: "Overview", link: "/reference/cli/" }, // Optional: Add an overview page
+            { label: "Overview", link: "/reference/cli/" },
             { label: "init", link: "/reference/cli/init/" },
             { label: "add-3d", link: "/reference/cli/add-3d/" },
             { label: "config", link: "/reference/cli/config/" },
