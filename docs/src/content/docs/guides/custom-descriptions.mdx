@@ -18,18 +18,18 @@ The expected format for this file is:
 ```yaml
 # Symbol library descriptions
 symbols:
-  LogicalLibraryName1: "This is the description for Symbol Library 1 that will appear in KiCad."
-  AnotherSymbolLib: "Contains specialized analog components."
+  "KiCad-Connector": "This is the description for the KiCad Connector library that will appear in KiCad."
+  "KiCad-Analog": "Contains specialized analog components and basic analog parts."
 
 # Footprint library descriptions
 footprints:
-  LogicalLibraryName1: "Description for Footprint Library 1 (can be different from symbol desc)."
-  MyCustomFootprints: "Footprints for custom breakout boards."
+  "KiCad-Connector": "Description for the KiCad Connector footprint library (can be different from symbol desc)."
+  "Custom-Breakouts": "Footprints for custom breakout boards and development modules."
 ```
 
 **Key Points:**
 
-- **Keys are Logical Names:** The keys under `symbols` and `footprints` (`LogicalLibraryName1`, `AnotherSymbolLib`, etc.) must match the actual *logical* names of the libraries within your KiCad library directory (usually the filenames without the `.kicad_sym` or `.pretty` extension).
+- **Keys are Logical Names:** The keys under `symbols` and `footprints` (`LogicalLibraryName1`, `AnotherSymbolLib`, etc.) must match the actual *logical* names of the libraries as defined in KiCad's library tables (`sym-lib-table` or `fp-lib-table`). These logical names may differ from the actual filenames.
 - **Matching:** KiLM uses these logical names to find the corresponding library entry in KiCad's `sym-lib-table` or `fp-lib-table` and sets the description field.
 - **Location:** The `library_descriptions.yaml` file must be in the root of the library directory managed by `kilm init`.
 - **Setup Required:** These descriptions are applied only when you run `kilm setup`.

@@ -28,11 +28,20 @@ kilm add-hook [OPTIONS]
 
 ## Behavior
 
-1.  **Locates Git Directory:** Finds the `.git/hooks` directory within the specified repository path.
+1.  **Detects Active Hooks Directory:** 
+    - Queries `git config core.hooksPath` for custom hooks directory
+    - Falls back to `.git/hooks` (standard location)
+    - Handles Git worktrees where hooks live in the linked location
 2.  **Checks Existing Hook:** Looks for an existing file named `post-merge`.
-3.  **Writes Hook Script:** Creates or overwrites the `.git/hooks/post-merge` file with a script similar to this:
+3.  **Creates Safe Backup:** If a hook exists, creates a timestamped backup before modification.
+4.  **Intelligent Content Management:** 
+    - If KiLM content already exists, updates the managed section
+    - If other content exists, merges KiLM content with clear markers
+    - Preserves existing user logic while adding KiLM functionality
+5.  **Writes Hook Script:** Creates or updates the hook file with content similar to this:
     ```bash
     #!/bin/sh
+    # BEGIN KiLM-managed section
     # KiCad Library Manager auto-update hook
     # Added by kilm add-hook command
 
@@ -43,8 +52,9 @@ kilm add-hook [OPTIONS]
     # kilm setup
 
     echo "KiCad libraries update complete."
+    # END KiLM-managed section
     ```
-4.  **Makes Executable:** Sets the execute permission (`chmod +x`) on the `post-merge` script.
+6.  **Sets Permissions:** Ensures the hook has executable permissions (`chmod +x`).
 
 ## Examples
 
@@ -59,13 +69,28 @@ kilm add-hook
 kilm add-hook --directory /path/to/another/repo --force
 ```
 
+## Advanced Features
+
+### Custom Hooks Directory
+If your repository uses `git config core.hooksPath` to specify a custom hooks directory, KiLM will automatically detect and use that location.
+
+### Git Worktree Support
+For repositories using Git worktrees, KiLM correctly identifies the main repository location and installs hooks in the appropriate hooks directory.
+
+### Safe Updates
+- **First Run:** Creates a new hook with KiLM content
+- **Subsequent Runs:** Updates only the KiLM-managed section, preserving other customizations
+- **Backup Protection:** Always creates timestamped backups before modifications
+- **Idempotent:** Safe to run multiple times without duplicating content
+
 ## Customization
 
-If you want the hook to do more, such as automatically running `kilm setup` after updating (which is potentially riskier as it modifies KiCad config automatically), you can manually edit the generated `.git/hooks/post-merge` script.
+If you want the hook to do more, such as automatically running `kilm setup` after updating (which is potentially riskier as it modifies KiCad config automatically), you can manually edit the generated hook script.
 
 **Example (Manual Edit for Auto-Setup):**
 ```bash
 #!/bin/sh
+# BEGIN KiLM-managed section
 # KiCad Library Manager auto-update hook
 # Added by kilm add-hook command
 
@@ -76,4 +101,5 @@ kilm update
 kilm setup
 
 echo "KiCad libraries update complete."
+# END KiLM-managed section
 ``` 

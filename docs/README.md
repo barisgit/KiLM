@@ -3,7 +3,7 @@
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
 [![Documentation](https://img.shields.io/badge/docs-website-brightgreen.svg)](https://kilm.aristovnik.me)
 
-This repository contains the documentation for [KiLM (KiCad Library Manager)](https://github.com/aharistovik/kilm), a command-line tool for managing KiCad libraries across projects and workstations.
+This repository contains the documentation for [KiLM (KiCad Library Manager)](https://github.com/barisgit/KiLM), a command-line tool for managing KiCad libraries across projects and workstations.
 
 ## 📚 Documentation Structure
 
