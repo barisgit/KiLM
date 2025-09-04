@@ -50,8 +50,7 @@ def add_hook(directory, force):
         click.echo(f"Using hooks directory: {hooks_dir}")
 
     except RuntimeError as e:
-        click.echo(f"Error: {e}", err=True)
-        return
+        raise click.ClickException(f"Error: {e}")
 
     # Check if post-merge hook already exists
     post_merge_hook = hooks_dir / "post-merge"
@@ -69,12 +68,12 @@ def add_hook(directory, force):
 
         # Read existing content for potential merging
         try:
-            existing_content = post_merge_hook.read_text()
+            existing_content = post_merge_hook.read_text(encoding="utf-8")
 
-            # Check if this is a KiLM-managed hook
-            if "KiLM-managed section" in existing_content:
-                click.echo("Detected existing KiLM-managed hook, updating...")
-                new_content = merge_hook_content(existing_content, create_kilm_hook_content())
+            if force:
+                # Force overwrite - don't merge, just replace
+                click.echo("Force overwrite requested, replacing existing hook...")
+                new_content = create_kilm_hook_content()
             else:
                 # Merge with existing content to preserve user logic
                 click.echo("Merging KiLM content with existing hook...")
@@ -112,4 +111,4 @@ def add_hook(directory, force):
         click.echo("the update behavior or automatically set up libraries.")
 
     except Exception as e:
-        click.echo(f"Error creating hook: {str(e)}", err=True)
+        raise click.ClickException(f"Error creating hook: {str(e)}")

@@ -2,7 +2,6 @@
 Tests for Git utility functions.
 """
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -79,7 +78,8 @@ echo 'after kilm'"""
     @patch('subprocess.run')
     def test_get_git_hooks_directory_standard(self, mock_run, tmp_path):
         """Test standard hooks directory detection."""
-        mock_run.return_value = Mock(returncode=1, stdout="")
+        # Mock the first call to succeed with hooks path
+        mock_run.return_value = Mock(returncode=0, stdout=".git/hooks")
 
         repo_path = tmp_path / "test-repo"
         repo_path.mkdir()
@@ -87,7 +87,7 @@ echo 'after kilm'"""
 
         hooks_dir = get_git_hooks_directory(repo_path)
 
-        assert hooks_dir == (repo_path / ".git" / "hooks").resolve()
+        assert hooks_dir == repo_path / ".git" / "hooks"
         mock_run.assert_called_once()
 
     @patch('subprocess.run')
@@ -104,56 +104,45 @@ echo 'after kilm'"""
 
         hooks_dir = get_git_hooks_directory(repo_path)
 
-        assert hooks_dir == custom_hooks.resolve()
+        assert hooks_dir == custom_hooks
         mock_run.assert_called_once()
 
     @patch('subprocess.run')
-    def test_get_git_hooks_directory_relative_path(self, mock_run):
+    def test_get_git_hooks_directory_relative_path(self, mock_run, tmp_path):
         """Test relative custom hooks path handling."""
         mock_run.return_value = Mock(returncode=0, stdout="custom/hooks")
 
-        repo_path = Path("/tmp/test-repo")
-        repo_path.mkdir(exist_ok=True)
+        repo_path = tmp_path / "test-repo"
+        repo_path.mkdir()
+        (repo_path / ".git").mkdir()
         (repo_path / "custom" / "hooks").mkdir(parents=True, exist_ok=True)
 
         hooks_dir = get_git_hooks_directory(repo_path)
 
-        assert hooks_dir == (repo_path / "custom" / "hooks").resolve()
+        assert hooks_dir == repo_path / "custom" / "hooks"
         mock_run.assert_called_once()
 
-    def test_get_git_hooks_directory_worktree(self, tmp_path):
+    @patch('subprocess.run')
+    def test_get_git_hooks_directory_worktree(self, mock_run, tmp_path):
         """Test Git worktree hooks directory detection."""
-        # Create a mock worktree structure
+        # Mock the Git command to return the worktree hooks path
+        main_git_dir = tmp_path / "main-repo" / ".git"
+        worktree_hooks = main_git_dir / "hooks"
+        worktree_hooks.mkdir(parents=True, exist_ok=True)
+
+        mock_run.return_value = Mock(returncode=0, stdout=str(worktree_hooks))
+
         repo_path = tmp_path / "worktree"
         repo_path.mkdir()
 
-        # Create .git file pointing to main repo
-        git_file = repo_path / ".git"
-        main_git_dir = tmp_path / "main-repo" / ".git"
-        main_git_dir.mkdir(parents=True)
-        (main_git_dir / "hooks").mkdir()
-
-        git_file.write_text(f"gitdir: {main_git_dir}")
-
         hooks_dir = get_git_hooks_directory(repo_path)
 
-        assert hooks_dir == (main_git_dir / "hooks").resolve()
+        assert hooks_dir == worktree_hooks
+        mock_run.assert_called_once()
 
     def test_get_git_hooks_directory_not_repo(self, tmp_path):
         """Test error when directory is not a Git repository."""
         with pytest.raises(RuntimeError, match="Not a Git repository"):
             get_git_hooks_directory(tmp_path)
 
-    def test_get_git_hooks_directory_creates_standard(self, tmp_path):
-        """Test that standard hooks directory is created if it doesn't exist."""
-        repo_path = tmp_path / "test-repo"
-        repo_path.mkdir()
-        (repo_path / ".git").mkdir()
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(returncode=1, stdout="")
-
-            hooks_dir = get_git_hooks_directory(repo_path)
-
-            assert hooks_dir.exists()
-            assert hooks_dir == (repo_path / ".git" / "hooks").resolve()

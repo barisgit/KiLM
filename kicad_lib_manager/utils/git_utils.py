@@ -13,9 +13,8 @@ def get_git_hooks_directory(repo_path: Path) -> Path:
     Get the active Git hooks directory for a repository.
 
     This function detects the correct hooks directory by:
-    1. Checking git config core.hooksPath (custom hooks directory)
-    2. Falling back to .git/hooks (standard location)
-    3. Handling Git worktrees where hooks live in the linked location
+    1. Using git rev-parse --git-path hooks (handles core.hooksPath, worktrees, and common dir)
+    2. Falling back to git rev-parse --git-common-dir + hooks
 
     Args:
         repo_path: Path to the Git repository
@@ -26,53 +25,35 @@ def get_git_hooks_directory(repo_path: Path) -> Path:
     Raises:
         RuntimeError: If the repository is not a valid Git repository
     """
-    if not (repo_path / ".git").exists():
-        raise RuntimeError(f"Not a Git repository: {repo_path}")
+    if not repo_path.exists():
+        raise RuntimeError(f"Repository path does not exist: {repo_path}")
 
-    # Check for custom hooks path via git config
+    # Ask Git for the effective hooks directory. Handles core.hooksPath, worktrees, and common dir.
     try:
-        result = subprocess.run(
-            ["git", "config", "core.hooksPath"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            check=False
+        rp = subprocess.run(
+            ["git", "-C", str(repo_path), "rev-parse", "--git-path", "hooks"],
+            capture_output=True, text=True, check=True
         )
-
-        if result.returncode == 0 and result.stdout.strip():
-            custom_hooks_path = Path(result.stdout.strip())
-
-            # If it's a relative path, make it relative to the repo
-            if not custom_hooks_path.is_absolute():
-                custom_hooks_path = repo_path / custom_hooks_path
-
-            if custom_hooks_path.exists():
-                return custom_hooks_path.resolve()
-    except (subprocess.SubprocessError, OSError):
-        pass
-
-    # Check if this is a worktree (has .git file instead of directory)
-    git_path = repo_path / ".git"
-    if git_path.is_file():
+        hooks_dir = Path(rp.stdout.strip())
+        if not hooks_dir.is_absolute():
+            hooks_dir = (repo_path / hooks_dir).resolve()
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        return hooks_dir
+    except subprocess.CalledProcessError as e:
+        # Fallback: resolve common dir then append hooks
         try:
-            with git_path.open() as f:
-                content = f.read().strip()
-                if content.startswith("gitdir: "):
-                    # This is a worktree, hooks are in the main repo
-                    worktree_git_dir = Path(content[8:])
-                    if worktree_git_dir.is_absolute():
-                        hooks_dir = worktree_git_dir / "hooks"
-                        if hooks_dir.exists():
-                            return hooks_dir.resolve()
-        except (OSError, UnicodeDecodeError):
-            pass
-
-    # Standard fallback to .git/hooks
-    standard_hooks = repo_path / ".git" / "hooks"
-    if not standard_hooks.exists():
-        standard_hooks.mkdir(parents=True, exist_ok=True)
-
-    return standard_hooks.resolve()
+            cd = subprocess.run(
+                ["git", "-C", str(repo_path), "rev-parse", "--git-common-dir"],
+                capture_output=True, text=True, check=True
+            )
+            common_dir = Path(cd.stdout.strip())
+            if not common_dir.is_absolute():
+                common_dir = (repo_path / common_dir).resolve()
+            hooks_dir = common_dir / "hooks"
+            hooks_dir.mkdir(parents=True, exist_ok=True)
+            return hooks_dir.resolve()
+        except subprocess.CalledProcessError:
+            raise RuntimeError(f"Not a Git repository: {repo_path}") from e
 
 
 def backup_existing_hook(hook_path: Path) -> Path:
@@ -89,7 +70,7 @@ def backup_existing_hook(hook_path: Path) -> Path:
     backup_path = hook_path.with_suffix(f".backup.{timestamp}")
 
     # Copy the file content
-    backup_path.write_text(hook_path.read_text())
+    backup_path.write_text(hook_path.read_text(encoding="utf-8"))
 
     # Preserve executable permissions
     if hook_path.stat().st_mode & 0o111:  # Check if executable
