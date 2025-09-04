@@ -9,16 +9,16 @@ from typing import Dict, List
 
 import click
 
-from ..config import Config, LibraryDict
-from ..library_manager import add_libraries, find_kicad_config
-from ..utils.backup import create_backup
-from ..utils.env_vars import (
+from ...config import Config, LibraryDict
+from ...library_manager import add_libraries, find_kicad_config
+from ...utils.backup import create_backup
+from ...utils.env_vars import (
     expand_user_path,
     find_environment_variables,
     update_kicad_env_vars,
     update_pinned_libraries,
 )
-from ..utils.metadata import read_cloud_metadata, read_github_metadata
+from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 
 def fix_invalid_uris(
@@ -39,7 +39,7 @@ def fix_invalid_uris(
     Returns:
         True if changes were made, False otherwise
     """
-    from ..utils.backup import create_backup
+    from ...utils.backup import create_backup
 
     # Get the library table paths
     sym_table = kicad_config / "sym-lib-table"
@@ -476,7 +476,7 @@ def setup(
 
             # Also list existing libraries to pin them all
             try:
-                from ..library_manager import list_libraries
+                from ...library_manager import list_libraries
 
                 existing_symbols, existing_footprints = list_libraries(kicad_lib_dir)
                 symbol_libs = existing_symbols

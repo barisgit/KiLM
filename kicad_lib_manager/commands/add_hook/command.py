@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from ..utils.git_utils import (
+from ...utils.git_utils import (
     backup_existing_hook,
     create_kilm_hook_content,
     get_git_hooks_directory,
@@ -50,7 +50,7 @@ def add_hook(directory, force):
         click.echo(f"Using hooks directory: {hooks_dir}")
 
     except RuntimeError as e:
-        raise click.ClickException(f"Error: {e}")
+        raise click.ClickException(f"Error: {e}") from e
 
     # Check if post-merge hook already exists
     post_merge_hook = hooks_dir / "post-merge"
@@ -111,4 +111,4 @@ def add_hook(directory, force):
         click.echo("the update behavior or automatically set up libraries.")
 
     except Exception as e:
-        raise click.ClickException(f"Error creating hook: {str(e)}")
+        raise click.ClickException(f"Error creating hook: {str(e)}") from e

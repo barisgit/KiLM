@@ -6,8 +6,8 @@ import sys
 
 import click
 
-from ..library_manager import list_libraries
-from ..utils.env_vars import expand_user_path, find_environment_variables
+from ...library_manager import list_libraries
+from ...utils.env_vars import expand_user_path, find_environment_variables
 
 
 @click.command()

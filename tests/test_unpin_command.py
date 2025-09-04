@@ -37,7 +37,7 @@ class TestUnpinCommand:
 
     def test_mutual_exclusivity_all_only(self):
         """Test that --all can be used without --symbols or --footprints."""
-        with patch('kicad_lib_manager.commands.unpin.find_kicad_config') as mock_find_config:
+        with patch('kicad_lib_manager.commands.unpin.command.find_kicad_config') as mock_find_config:
             mock_find_config.return_value = Path("/tmp/kicad")
 
             with patch('pathlib.Path.exists') as mock_exists:
@@ -53,7 +53,7 @@ class TestUnpinCommand:
 
     def test_mutual_exclusivity_symbols_only(self):
         """Test that --symbols can be used without --all."""
-        with patch('kicad_lib_manager.commands.unpin.find_kicad_config') as mock_find_config:
+        with patch('kicad_lib_manager.commands.unpin.command.find_kicad_config') as mock_find_config:
             mock_find_config.return_value = Path("/tmp/kicad")
 
             with patch('pathlib.Path.exists') as mock_exists:
@@ -69,7 +69,7 @@ class TestUnpinCommand:
 
     def test_mutual_exclusivity_footprints_only(self):
         """Test that --footprints can be used without --all."""
-        with patch('kicad_lib_manager.commands.unpin.find_kicad_config') as mock_find_config:
+        with patch('kicad_lib_manager.commands.unpin.command.find_kicad_config') as mock_find_config:
             mock_find_config.return_value = Path("/tmp/kicad")
 
             with patch('pathlib.Path.exists') as mock_exists:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from ..config import Config
+from ...config import Config
 
 
 @click.command()
@@ -154,7 +154,7 @@ def update(dry_run, verbose, auto_setup):
             click.echo("\nRunning 'kilm setup' to configure new libraries...")
             # Import at runtime to avoid circular imports
             try:
-                from .setup import setup as setup_cmd
+                from ...commands.setup import setup as setup_cmd
 
                 ctx = click.Context(setup_cmd)
                 setup_cmd.invoke(ctx)
@@ -175,7 +175,7 @@ def update(dry_run, verbose, auto_setup):
         )
         click.echo("Use 'kilm status' to check your current configuration.")
 
-
+# TODO: Should be in services or utils
 def check_for_library_changes(git_output, lib_path):
     """
     Check if git pull output and filesystem changes indicate new libraries that would require setup.

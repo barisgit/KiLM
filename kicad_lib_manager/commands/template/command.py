@@ -16,8 +16,8 @@ import pathspec
 import questionary
 import yaml
 
-from ..config import Config
-from ..utils.template import (
+from ...config import Config
+from ...utils.template import (
     HOOKS_DIR,
     POST_CREATE_HOOK,
     TEMPLATE_CONTENT_DIR,

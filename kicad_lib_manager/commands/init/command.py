@@ -8,8 +8,8 @@ from pathlib import Path
 
 import click
 
-from ..config import Config
-from ..utils.metadata import (
+from ...config import Config
+from ...utils.metadata import (
     GITHUB_METADATA_FILE,
     generate_env_var_name,
     get_default_github_metadata,

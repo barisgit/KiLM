@@ -8,8 +8,8 @@ from pathlib import Path
 import click
 import yaml
 
-from ..library_manager import find_kicad_config, list_configured_libraries
-from ..utils.metadata import read_cloud_metadata, read_github_metadata
+from ...library_manager import find_kicad_config, list_configured_libraries
+from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 
 @click.command()

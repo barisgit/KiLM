@@ -8,8 +8,8 @@ from pathlib import Path
 
 import click
 
-from ..config import Config
-from ..utils.metadata import (
+from ...config import Config
+from ...utils.metadata import (
     CLOUD_METADATA_FILE,
     GITHUB_METADATA_FILE,
     read_cloud_metadata,

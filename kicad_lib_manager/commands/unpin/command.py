@@ -7,8 +7,8 @@ import sys
 
 import click
 
-from ..library_manager import find_kicad_config
-from ..utils.backup import create_backup
+from ...library_manager import find_kicad_config
+from ...utils.backup import create_backup
 
 
 @click.command()
