@@ -7,6 +7,13 @@ from pathlib import Path
 
 import click
 
+from ..utils.git_utils import (
+    backup_existing_hook,
+    create_kilm_hook_content,
+    get_git_hooks_directory,
+    merge_hook_content,
+)
+
 
 @click.command()
 @click.option(
@@ -37,44 +44,52 @@ def add_hook(directory, force):
 
     click.echo(f"Adding Git hook to repository: {target_dir}")
 
-    # Check if this is a git repository
-    git_dir = target_dir / ".git"
-    if not git_dir.exists() or not git_dir.is_dir():
-        click.echo(f"Error: {target_dir} is not a git repository", err=True)
-        return
+    try:
+        # Get the active hooks directory (handles custom paths, worktrees, etc.)
+        hooks_dir = get_git_hooks_directory(target_dir)
+        click.echo(f"Using hooks directory: {hooks_dir}")
 
-    # Check if hooks directory exists, create if not
-    hooks_dir = git_dir / "hooks"
-    if not hooks_dir.exists():
-        hooks_dir.mkdir(parents=True, exist_ok=True)
-        click.echo(f"Created hooks directory: {hooks_dir}")
+    except RuntimeError as e:
+        raise click.ClickException(f"Error: {e}")
 
     # Check if post-merge hook already exists
     post_merge_hook = hooks_dir / "post-merge"
 
-    if post_merge_hook.exists() and not force:
-        click.echo(f"Post-merge hook already exists at {post_merge_hook}")
-        if not click.confirm("Overwrite existing hook?", default=False):
-            click.echo("Hook installation cancelled.")
-            return
+    if post_merge_hook.exists():
+        if not force:
+            click.echo(f"Post-merge hook already exists at {post_merge_hook}")
+            if not click.confirm("Overwrite existing hook?", default=False):
+                click.echo("Hook installation cancelled.")
+                return
 
-    # Create the post-merge hook script
-    hook_content = """#!/bin/sh
-# KiCad Library Manager auto-update hook
-# Added by kilm add-hook command
+        # Create backup of existing hook
+        backup_path = backup_existing_hook(post_merge_hook)
+        click.echo(f"Created backup of existing hook: {backup_path}")
 
-echo "Running KiCad Library Manager update..."
-kilm update
+        # Read existing content for potential merging
+        try:
+            existing_content = post_merge_hook.read_text(encoding="utf-8")
 
-# Uncomment to set up libraries automatically (use with caution)
-# kilm setup
+            if force:
+                # Force overwrite - don't merge, just replace
+                click.echo("Force overwrite requested, replacing existing hook...")
+                new_content = create_kilm_hook_content()
+            else:
+                # Merge with existing content to preserve user logic
+                click.echo("Merging KiLM content with existing hook...")
+                new_content = merge_hook_content(existing_content, create_kilm_hook_content())
 
-echo "KiCad libraries update complete."
-"""
+        except (OSError, UnicodeDecodeError):
+            click.echo("Warning: Could not read existing hook content, overwriting...")
+            new_content = create_kilm_hook_content()
+    else:
+        # No existing hook, create new one
+        new_content = create_kilm_hook_content()
 
     try:
+        # Write the hook content
         with post_merge_hook.open("w") as f:
-            f.write(hook_content)
+            f.write(new_content)
 
         # Make the hook executable
         post_merge_hook.chmod(0o755)
@@ -83,10 +98,17 @@ echo "KiCad libraries update complete."
         click.echo(
             "The hook will run 'kilm update' after every 'git pull' or 'git merge' operation."
         )
+
+        if post_merge_hook.exists() and "KiLM-managed section" in new_content:
+            click.echo(
+                "\nNote: The hook contains clear markers for KiLM-managed sections,"
+            )
+            click.echo("making future updates safe and idempotent.")
+
         click.echo(
             "\nNote: You may need to modify the hook script if you want to customize"
         )
         click.echo("the update behavior or automatically set up libraries.")
 
     except Exception as e:
-        click.echo(f"Error creating hook: {str(e)}", err=True)
+        raise click.ClickException(f"Error creating hook: {str(e)}")

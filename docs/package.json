@@ -1,0 +1,23 @@
+{
+  "name": "kilm-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.33.2",
+    "@astrojs/starlight-tailwind": "^4.0.0",
+    "@tailwindcss/vite": "^4.1.4",
+    "astro": "^5.6.1",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.1.4"
+  },
+  "devDependencies": {
+    "sharp": "^0.32.6"
+  }
+}

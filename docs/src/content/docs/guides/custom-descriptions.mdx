@@ -1,0 +1,37 @@
+---
+title: Custom Descriptions & Metadata
+description: Adding detailed descriptions and metadata to your libraries.
+---
+
+> **Note:** This guide is primarily aimed at **Creators** – those setting up and managing the shared KiCad libraries.
+
+While KiLM manages adding libraries to KiCad, KiCad itself displays a description for each library in its managers.
+
+KiLM allows you to define these descriptions centrally within your library repository by looking for a specific YAML file.
+
+## `library_descriptions.yaml`
+
+If you place a file named `library_descriptions.yaml` in the root of a library directory that you have initialized with `kilm init`, KiLM will read this file when running `kilm setup`.
+
+The expected format for this file is:
+
+```yaml
+# Symbol library descriptions
+symbols:
+  "KiCad-Connector": "This is the description for the KiCad Connector library that will appear in KiCad."
+  "KiCad-Analog": "Contains specialized analog components and basic analog parts."
+
+# Footprint library descriptions
+footprints:
+  "KiCad-Connector": "Description for the KiCad Connector footprint library (can be different from symbol desc)."
+  "Custom-Breakouts": "Footprints for custom breakout boards and development modules."
+```
+
+**Key Points:**
+
+- **Keys are Logical Names:** The keys under `symbols` and `footprints` (`LogicalLibraryName1`, `AnotherSymbolLib`, etc.) must match the actual _logical_ names of the libraries as defined in KiCad's library tables (`sym-lib-table` or `fp-lib-table`). These logical names may differ from the actual filenames.
+- **Matching:** KiLM uses these logical names to find the corresponding library entry in KiCad's `sym-lib-table` or `fp-lib-table` and sets the description field.
+- **Location:** The `library_descriptions.yaml` file must be in the root of the library directory managed by `kilm init`.
+- **Setup Required:** These descriptions are applied only when you run `kilm setup`.
+
+This provides a way to keep your library descriptions version-controlled alongside your library files.

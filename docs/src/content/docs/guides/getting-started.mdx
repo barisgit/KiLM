@@ -1,0 +1,173 @@
+---
+title: Getting Started
+description: A quick start guide to setting up and using KiLM for Creators and Consumers.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+This guide provides typical workflows for setting up and using KiLM, focusing on collaboration using Git.
+
+## Prerequisites
+
+- **KiCad:** Ensure you have KiCad installed.
+- **Git:** Ensure you have Git installed.
+- **Python:** Ensure you have Python installed.
+- **KiLM:** Ensure you have KiLM installed. [Install KiLM](/guides/installation/)
+
+## Understanding User Roles (Creator vs. Consumer)
+
+KiLM is designed for teams or individuals managing KiCad libraries. We can think of two main roles:
+
+- **Creator:** This person is responsible for setting up the central library structure (often in a Git repository), adding symbol/footprint libraries, configuring 3D models (which might be shared separately), defining custom metadata using KiLM, and potentially creating project templates. They establish the shared standard.
+- **Consumer:** This person primarily uses the libraries set up by the Creator. Their main goal is to easily configure their local KiCad installation to use the shared libraries and keep it updated.
+
+While one person might perform both roles, understanding this distinction helps clarify which commands are most relevant.
+
+## Typical Creator Workflow (Setting up a Shared Library)
+
+This workflow assumes the Creator is setting up a new library repository to be shared with Consumers via Git.
+
+<Steps>
+
+1.  **Create and Navigate to Library Directory:**
+    Create a new directory for your shared KiCad library. This will become the Git repository.
+
+    ```bash
+    mkdir my-shared-kicad-lib
+    cd my-shared-kicad-lib
+    git init # Initialize Git repository
+    ```
+
+2.  **Initialize KiLM with Metadata:**
+    Run `kilm init` _inside_ the library directory, providing all relevant metadata. This creates the `kilm.yaml` file which stores the canonical information for this library and gets committed to Git.
+
+    ```bash
+    # Example: Initialize with name, description, and environment variable
+    kilm init --name shared-company-lib \
+              --description "Main KiCad library for ACME Corp" \
+              --env-var ACME_LIB_PATH
+    ```
+
+    <Aside type="note" title="Why provide metadata here?">
+      Defining the name, description, and environment variable during `init`
+      ensures that all Consumers who later use this library will have consistent
+      metadata stored in their local KiLM configuration when they register
+      *their* copy.
+    </Aside>
+
+3.  **Add Library Content:**
+    Add your KiCad symbol (`.kicad_sym`), footprint (`.pretty`), and other library files into the appropriate subdirectories within `my-shared-kicad-lib`.
+
+4.  **Register Shared 3D Models (Optional but Recommended):**
+    If you have 3D models stored in a shared location (e.g., Google Drive, network share), register this location with KiLM using `kilm add-3d`. This adds the 3D library information to the _Creator's_ global KiLM config (`config.yaml`). Consumers will run a similar command later.
+
+    ```bash
+    # Example: Registering a shared 3D model directory
+    kilm add-3d --name shared-3d-models \
+                --directory /path/to/shared/google-drive/kicad-3d-models \
+                --env-var ACME_3D_MODELS
+    ```
+
+    <Aside type="tip" title="3D Model Storage">
+      Keeping 3D models separate from the main symbol/footprint library Git repo
+      is often practical, especially if they are large or managed differently.
+      KiLM supports this separation.
+    </Aside>
+
+5.  **Create Templates (Optional):**
+    If you want to provide standardized project starting points, use `kilm template make`.
+
+    ```bash
+    # Example: Create a template named 'standard-board' from an existing project
+    kilm template make standard-board /path/to/example/project --description "Standard ACME Board Template"
+    ```
+
+    Template files will be stored within the `templates/` directory in your library repository.
+
+6.  **Commit and Push:**
+    Add all the files (`kilm.yaml`, symbols, footprints, templates) to Git, commit, and push to the shared remote repository (e.g., GitHub, GitLab).
+
+    ```bash
+    git add .
+    git commit -m "Initial library setup with KiLM metadata and content"
+    git push origin main
+    ```
+
+7.  **Configure Creator's KiCad (Optional):**
+    The Creator can run `kilm setup` to configure their _own_ KiCad installation, just like a Consumer would.
+    ```bash
+    kilm setup
+    ```
+
+</Steps>
+
+## Typical Consumer Workflow (Using a Shared Library)
+
+This workflow assumes a Creator has already set up a shared library in a Git repository.
+
+<Steps>
+
+1.  **Clone the Library Repository:**
+    Get a local copy of the shared library.
+
+    ```bash
+    git clone <repository_url> my-shared-kicad-lib
+    cd my-shared-kicad-lib
+    ```
+
+2.  **Register Local Library Path with KiLM:**
+    Run `kilm init` _inside the cloned repository directory_. This reads the `kilm.yaml` (created by the Creator) and registers _this specific local path_ (`my-shared-kicad-lib`) in _your_ global KiLM configuration (`config.yaml`), linking it to the name and metadata defined by the Creator.
+
+    ```bash
+    kilm init
+    ```
+
+    <Aside type="caution" title="Why run `init` again?">
+      KiLM needs to know the exact location of the library *on your machine*.
+      Running `init` inside the cloned repo connects the library name (from
+      `kilm.yaml`) to your local path in your `config.yaml`.
+    </Aside>
+
+3.  **Register Local 3D Model Path:**
+    Run `kilm add-3d` pointing to the location where _you_ access the shared 3D models (e.g., your local Google Drive sync folder). Use the same `--name` and `--env-var` the Creator used (check documentation or ask the Creator).
+
+    ```bash
+    # Example: Pointing to your local path for the shared models
+    kilm add-3d --name shared-3d-models \
+                --directory /Users/myuser/GoogleDrive/kicad-3d-models
+    ```
+
+    <Aside type="caution" title="Why run `add-3d` again?">
+      Similar to `init`, KiLM needs to know the exact location of the 3D models
+      *on your machine*. This command links the 3D library name to your specific
+      local path in your `config.yaml`.
+    </Aside>
+
+4.  **Configure KiCad:**
+    Run `kilm setup` from anywhere in your terminal. This reads _your_ KiLM configuration (which now includes the local paths registered in steps 2 & 3) and updates _your_ KiCad's library tables and environment variables.
+
+    ```bash
+    kilm setup
+    ```
+
+    <Aside type="note" title="Why run `setup`?">
+      This command applies the configurations you just registered (linking
+      library names to your local paths) to KiCad's actual settings files
+      (`sym-lib-table`, `fp-lib-table`, `kicad_common.json`). **Remember to
+      restart KiCad** after running `setup`.
+    </Aside>
+
+5.  **Set Up Automatic Updates (Optional, Recommended):**
+    Navigate to the directory of a specific KiCad _project_ that uses the shared library (this project might also be a Git repo, potentially using the library repo as a submodule). Run `kilm add-hook` here.
+    ```bash
+    cd /path/to/my/kicad-project
+    kilm add-hook
+    ```
+    This sets up a Git hook _in the project repository_ so that after you run `git pull` _in this project_, it automatically runs `kilm setup` for you, ensuring KiCad stays synced if the library was updated.
+    <Aside type="tip" title="Hook Location">
+      The `add-hook` command installs the hook in the Git repository of the
+      *current directory*. It's typically run in your individual KiCad *project*
+      repositories, not usually in the shared library repository itself.
+    </Aside>
+
+</Steps>

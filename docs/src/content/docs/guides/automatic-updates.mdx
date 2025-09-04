@@ -1,0 +1,111 @@
+---
+title: Automatic Updates
+description: Keeping libraries updated automatically using Git hooks.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+> **Note:** This guide primarily describes features beneficial for **Consumers** – those using libraries managed by a Creator. The setup of the hook itself might be done by a Creator or an advanced Consumer.
+
+KiLM provides a helper command [`kilm add-hook`](/reference/cli/add-hook/) to easily create a basic `post-merge` Git hook that runs `kilm update`.
+
+## Using `kilm add-hook` (Recommended)
+
+Navigate to the root of your Git repository containing your KiCad libraries and run:
+
+```bash
+kilm add-hook
+```
+
+This creates a `.git/hooks/post-merge` script that automatically executes `kilm update` every time you successfully run `git pull` or `git merge` in that repository.
+
+<Aside type="tip" title="Enhanced Hook Management">
+  The `kilm add-hook` command now includes advanced features: - **Smart
+  Detection:** Automatically finds the correct hooks directory (supports custom
+  `core.hooksPath` and Git worktrees) - **Safe Updates:** Creates backups and
+  intelligently merges with existing hooks - **Idempotent:** Safe to run
+  multiple times without duplicating content - **Clear Markers:** Uses section
+  markers to identify KiLM-managed content
+</Aside>
+
+## Manual Hook Setup (Alternative)
+
+If you prefer manual setup or want to customize the hook script further, you can follow these steps:
+
+1.  **Create Hook Directory (if needed):**
+    Make sure the hooks directory exists in your repository:
+
+    ```bash
+    mkdir -p .git/hooks
+    ```
+
+2.  **Create Hook Script:**
+    Create a file named `.git/hooks/post-merge`.
+
+3.  **Add Script Content:**
+    Add the commands you want to run. For basic KiLM integration, use:
+
+    ```bash
+    #!/bin/sh
+    # BEGIN KiLM-managed section
+    # KiCad Library Manager auto-update hook
+    # Added manually
+
+    echo "Running KiCad Library Manager update..."
+    kilm update
+
+    # Uncomment to set up libraries automatically (use with caution)
+    # kilm setup
+
+    echo "KiCad libraries update complete."
+    # END KiLM-managed section
+    ```
+
+4.  **Make Executable:**
+    Set the execute permission:
+    ```bash
+    chmod +x .git/hooks/post-merge
+    ```
+
+## How It Works
+
+When you run `git pull` or `git merge`:
+
+1.  Git executes the `post-merge` hook automatically
+2.  The hook runs `kilm update` to check for library updates
+3.  If new versions are available, they are pulled from remote repositories
+4.  Your local KiCad libraries stay synchronized with the latest versions
+
+## Customization Options
+
+### Automatic Setup
+
+You can modify the hook to automatically run `kilm setup` after updates by uncommenting the `kilm setup` line. This is useful for automatically updating KiCad's configuration files, but use with caution as it modifies your KiCad setup.
+
+### Additional Commands
+
+Add any other commands you want to run after library updates, such as:
+
+- Notifications or logging
+- Additional validation steps
+- Integration with other tools
+
+## Troubleshooting
+
+### Hook Not Running
+
+- Ensure the hook file has execute permissions (`chmod +x .git/hooks/post-merge`)
+- Check that you're running `git pull` or `git merge` (not `git fetch`)
+- Verify the hook is in the correct repository's `.git/hooks` directory
+
+### Custom Hooks Directory
+
+If your repository uses `git config core.hooksPath`, KiLM will automatically detect and use that location. You can check your current hooks path with:
+
+```bash
+git config core.hooksPath
+```
+
+### Git Worktrees
+
+For repositories using Git worktrees, KiLM correctly identifies the main repository location and installs hooks in the appropriate hooks directory.
