@@ -2,10 +2,9 @@
 Utilities for backup management
 """
 
-import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def create_backup(file_path: Path, max_backups: int = 5) -> Path:
@@ -53,4 +52,4 @@ def manage_backup_history(file_path: Path, max_backups: int = 5) -> None:
     # Remove oldest backups if we have too many
     if len(backups) > max_backups:
         for old_backup in backups[:-max_backups]:
-            os.remove(old_backup)
+            old_backup.unlink()

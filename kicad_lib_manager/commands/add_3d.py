@@ -3,16 +3,17 @@ Add cloud-based 3D models directory command for KiCad Library Manager.
 """
 
 import sys
-import click
 from pathlib import Path
+
+import click
 
 from ..config import Config
 from ..utils.metadata import (
+    CLOUD_METADATA_FILE,
+    generate_env_var_name,
+    get_default_cloud_metadata,
     read_cloud_metadata,
     write_cloud_metadata,
-    get_default_cloud_metadata,
-    generate_env_var_name,
-    CLOUD_METADATA_FILE,
 )
 
 
@@ -67,10 +68,7 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
     If no directory is specified, the current directory will be used.
     """
     # Use current directory if not specified
-    if not directory:
-        directory = Path.cwd().resolve()
-    else:
-        directory = Path(directory).resolve()
+    directory = Path.cwd().resolve() if not directory else Path(directory).resolve()
 
     click.echo(f"Adding cloud-based 3D models directory: {directory}")
 
@@ -177,6 +175,8 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
     try:
         config = Config()
         # Add as a cloud-based 3D model library
+        if library_name is None:
+            library_name = metadata.get("name", directory.name)
         config.add_library(library_name, str(directory), "cloud")
 
         click.echo(f"3D models directory '{library_name}' added successfully!")

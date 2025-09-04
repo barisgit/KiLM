@@ -5,8 +5,9 @@ Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
 
 import re
 import subprocess
-import click
 from pathlib import Path
+
+import click
 
 from ..config import Config
 
@@ -146,7 +147,7 @@ def update(dry_run, verbose, auto_setup):
     # If libraries with changes were detected, suggest running setup
     if libraries_with_changes:
         click.echo("\nNew library content detected in:")
-        for lib_name, lib_path, changes in libraries_with_changes:
+        for lib_name, _lib_path, changes in libraries_with_changes:
             click.echo(f"  - {lib_name}: {', '.join(changes)}")
 
         if auto_setup:
@@ -201,27 +202,24 @@ def check_for_library_changes(git_output, lib_path):
     templates_path = lib_path / "templates"
 
     # Look for symbol libraries (.kicad_sym files)
-    if symbols_path.exists() and symbols_path.is_dir():
-        if any(
-            f.name.endswith(".kicad_sym") for f in symbols_path.glob("**/*.kicad_sym")
-        ):
-            changes.append("symbols")
+    if symbols_path.exists() and symbols_path.is_dir() and any(
+        f.name.endswith(".kicad_sym") for f in symbols_path.glob("**/*.kicad_sym")
+    ):
+        changes.append("symbols")
 
     # Look for footprint libraries (.pretty directories)
-    if footprints_path.exists() and footprints_path.is_dir():
-        if any(
-            f.is_dir() and f.name.endswith(".pretty")
-            for f in footprints_path.glob("**/*.pretty")
-        ):
-            changes.append("footprints")
+    if footprints_path.exists() and footprints_path.is_dir() and any(
+        f.is_dir() and f.name.endswith(".pretty")
+        for f in footprints_path.glob("**/*.pretty")
+    ):
+        changes.append("footprints")
 
     # Look for project templates (directories with metadata.yaml)
-    if templates_path.exists() and templates_path.is_dir():
-        if any(
-            (f / "metadata.yaml").exists()
-            for f in templates_path.glob("*")
-            if f.is_dir()
-        ):
-            changes.append("templates")
+    if templates_path.exists() and templates_path.is_dir() and any(
+        (f / "metadata.yaml").exists()
+        for f in templates_path.glob("*")
+        if f.is_dir()
+    ):
+        changes.append("templates")
 
     return changes

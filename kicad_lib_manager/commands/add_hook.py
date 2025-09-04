@@ -3,9 +3,9 @@ Add Hook command implementation for KiCad Library Manager.
 Adds a git post-merge hook to the current repository to automatically update KiCad libraries.
 """
 
-import os
-import click
 from pathlib import Path
+
+import click
 
 
 @click.command()
@@ -33,10 +33,7 @@ def add_hook(directory, force):
     changes from remote repositories.
     """
     # Determine target directory
-    if directory:
-        target_dir = Path(directory)
-    else:
-        target_dir = Path.cwd()
+    target_dir = Path(directory) if directory else Path.cwd()
 
     click.echo(f"Adding Git hook to repository: {target_dir}")
 
@@ -49,7 +46,7 @@ def add_hook(directory, force):
     # Check if hooks directory exists, create if not
     hooks_dir = git_dir / "hooks"
     if not hooks_dir.exists():
-        os.makedirs(hooks_dir, exist_ok=True)
+        hooks_dir.mkdir(parents=True, exist_ok=True)
         click.echo(f"Created hooks directory: {hooks_dir}")
 
     # Check if post-merge hook already exists
@@ -76,11 +73,11 @@ echo "KiCad libraries update complete."
 """
 
     try:
-        with open(post_merge_hook, "w") as f:
+        with post_merge_hook.open("w") as f:
             f.write(hook_content)
 
         # Make the hook executable
-        os.chmod(post_merge_hook, 0o755)
+        post_merge_hook.chmod(0o755)
 
         click.echo(f"Successfully installed post-merge hook at {post_merge_hook}")
         click.echo(

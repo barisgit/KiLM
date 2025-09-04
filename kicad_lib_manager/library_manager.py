@@ -4,14 +4,15 @@ Core functionality for managing KiCad libraries
 
 import os
 import platform
-import yaml
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Set, Tuple
+
+import yaml
 
 from .utils.env_vars import expand_user_path
 from .utils.file_ops import (
-    list_libraries,
     list_configured_libraries,
+    list_libraries,
     validate_lib_table,
 )
 
@@ -94,13 +95,17 @@ def get_library_description(lib_type: str, lib_name: str, kicad_lib_dir: str) ->
     # Check if YAML file exists
     if yaml_file.exists():
         try:
-            with open(yaml_file, "r") as f:
+            with yaml_file.open() as f:
                 data = yaml.safe_load(f)
 
-            if data and isinstance(data, dict):
-                if lib_type in data and isinstance(data[lib_type], dict):
-                    if lib_name in data[lib_type]:
-                        return data[lib_type][lib_name]
+            if (
+                data
+                and isinstance(data, dict)
+                and lib_type in data
+                and isinstance(data[lib_type], dict)
+                and lib_name in data[lib_type]
+            ):
+                return data[lib_type][lib_name]
         except Exception:
             pass
 
@@ -133,9 +138,8 @@ def format_uri(base_path: str, lib_name: str, lib_type: str) -> str:
         raise ValueError(f"Invalid library type: {lib_type}")
 
     # Validate ${...} format if present
-    if base_path.startswith("${"):
-        if not base_path.endswith("}"):
-            raise ValueError(f"Invalid environment variable format: {base_path}")
+    if base_path.startswith("${") and not base_path.endswith("}"):
+        raise ValueError(f"Invalid environment variable format: {base_path}")
 
     # Helper function to check if a path is absolute
     def is_absolute_path(path: str) -> bool:
@@ -343,7 +347,7 @@ def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> Non
     validate_lib_table(table_path, False)
 
     # Read existing content, ensuring UTF-8 encoding
-    with open(table_path, "r", encoding="utf-8") as f:
+    with table_path.open(encoding="utf-8") as f:
         content = f.read()
 
     # Find the last proper closing parenthesis of the table
@@ -397,5 +401,5 @@ def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> Non
         new_content += line + "\n"
 
     # Write updated content, ensuring UTF-8 encoding
-    with open(table_path, "w", encoding="utf-8") as f:
+    with table_path.open("w", encoding="utf-8") as f:
         f.write(new_content)

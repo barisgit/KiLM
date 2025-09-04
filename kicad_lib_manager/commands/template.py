@@ -3,32 +3,33 @@ Template commands implementation for KiCad Library Manager.
 Provides commands for creating KiCad projects from templates and creating templates from projects.
 """
 
-import os
-import sys
-import click
-import yaml
 import json
+import os
 import shutil
+import sys
 import traceback
 from pathlib import Path
+
+import click
 import jinja2
 import pathspec
 import questionary
+import yaml
 
 from ..config import Config
 from ..utils.template import (
-    TEMPLATES_DIR,
-    TEMPLATE_METADATA,
-    TEMPLATE_CONTENT_DIR,
     HOOKS_DIR,
     POST_CREATE_HOOK,
-    get_gitignore_spec,
-    find_potential_variables,
+    TEMPLATE_CONTENT_DIR,
+    TEMPLATE_METADATA,
+    TEMPLATES_DIR,
+    create_project_from_template,
     create_template_metadata,
     create_template_structure,
-    render_template_string,
     find_all_templates,
-    create_project_from_template,
+    find_potential_variables,
+    get_gitignore_spec,
+    render_template_string,
 )
 
 
@@ -132,7 +133,7 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
 
     # Use current directory if not specified
     if not directory:
-        directory = os.getcwd()
+        directory = str(Path.cwd())
 
     # Convert to Path objects
     project_dir = Path(directory)
@@ -197,7 +198,7 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
     # Load template metadata
     metadata_file = template_dir / TEMPLATE_METADATA
     try:
-        with open(metadata_file, "r") as f:
+        with metadata_file.open() as f:
             metadata = yaml.safe_load(f)
         if not metadata:  # Handle empty metadata file
             click.echo(
@@ -235,8 +236,6 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
         ):
             # If project_name is not an official template var, still use it if provided
             variables["project_name"] = name
-            # Optionally add a warning if it's not a defined variable?
-            # click.echo(f"Warning: 'project_name' used but not defined in template variables.", err=True)
 
     # Show template info
     click.echo()
@@ -381,8 +380,6 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                 directory_name_template, variables
             )
             final_project_dir = project_dir / dir_name_rendered
-            # Store the rendered value back into variables for consistency?
-            # variables["directory_name"] = dir_name_rendered
         except Exception as e:
             click.echo(
                 f"Warning: Could not render default directory_name '{directory_name_template}': {e}",
@@ -445,14 +442,14 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
             template_content_dir = template_dir / TEMPLATE_CONTENT_DIR
             if template_content_dir.exists():
                 old_syntax_files = []
-                for root, dirs, files in os.walk(template_content_dir):
+                for _root, _dirs, files in os.walk(template_content_dir):
                     for file in files:
                         if "{{" in file and "}}" in file:
                             old_syntax_files.append(file)
 
                 if old_syntax_files:
                     click.echo()
-                    click.echo("⚠️  Windows Compatibility Notice:", err=True)
+                    click.echo("WARNING: Windows Compatibility Notice:", err=True)
                     click.echo(
                         "This template uses the old {{variable}} syntax in filenames, which may not work on Windows.",
                         err=True,
@@ -574,38 +571,38 @@ def make(
     force,
 ):
     """Create a template from an existing project.
-    
+
     Creates a new KiCad project template from an existing project. If NAME
     is provided, it will be used as the template name. If SOURCE_DIRECTORY is
     provided, it will be used as the source project directory. Otherwise,
     the current directory will be used.
-    
+
     By default, the command runs in interactive mode, automatically identifying potential
     template variables and prompting for confirmation. Use --non-interactive to disable prompts.
-    
+
     Examples:
-    
+
     \b
     # Create a template named 'basic-project' from the current directory
     kilm template make basic-project
-    
+
     \b
     # Create a template from a specific directory
     kilm template make basic-project path/to/project
-    
+
     \b
     # Create a template with a description and use case
     kilm template make basic-project --description "Basic KiCad project" \\
         --use-case "Starting point for simple PCB designs"
-    
+
     \b
     # Create a template with variables
     kilm template make basic-project --variable "author=John Doe"
-    
+
     \b
     # Create a template without prompts
     kilm template make basic-project --non-interactive
-    
+
     \b
     # Create a template that extends another template
     kilm template make advanced-project --extends basic-project
@@ -631,19 +628,19 @@ def make(
     if interactive:
         # Ask for source directory if not specified
         if not source_directory:
-            default_dir = os.getcwd()
+            default_dir = str(Path.cwd())
             source_dir_input = click.prompt(
                 "Source project directory", default=default_dir
             )
             # Handle relative paths
-            if not os.path.isabs(source_dir_input):
-                source_directory = os.path.join(os.getcwd(), source_dir_input)
+            if not Path(source_dir_input).is_absolute():
+                source_directory = str(Path.cwd() / source_dir_input)
             else:
                 source_directory = source_dir_input
 
         # Ask for template name if not specified
         if not name:
-            default_name = os.path.basename(source_directory)
+            default_name = Path(source_directory).name
             name = click.prompt("Template name", default=default_name)
 
         # Ask for description and use case if not specified
@@ -683,11 +680,11 @@ def make(
     else:
         # Non-interactive mode - use current directory if not specified
         if not source_directory:
-            source_directory = os.getcwd()
+            source_directory = str(Path.cwd())
 
         # If name is not provided, use the directory name
         if not name:
-            name = os.path.basename(source_directory)
+            name = Path(source_directory).name
 
         # Determine the output directory
         if not output_directory:
@@ -789,7 +786,6 @@ def make(
     # Create metadata
     metadata = create_template_metadata(
         name=name,
-        directory=source_directory,
         description=description,
         use_case=use_case,
         variables=variables,
@@ -815,16 +811,13 @@ def make(
             # Skip directories that should be excluded
             dirs_to_remove = []
             for d in dirs:
-                rel_path = os.path.join(rel_root, d)
+                rel_path = str(Path(rel_root) / d) if rel_root else d
                 # Ensure proper gitignore path format for directories
                 git_path = rel_path.replace(os.sep, "/")
                 if not git_path.endswith("/"):
                     git_path += "/"
 
-                if gitignore_spec and gitignore_spec.match_file(git_path):
-                    dirs_to_remove.append(d)
-                    excluded_files.append(f"{rel_path}/")
-                elif additional_spec and additional_spec.match_file(git_path):
+                if gitignore_spec and gitignore_spec.match_file(git_path) or additional_spec and additional_spec.match_file(git_path):
                     dirs_to_remove.append(d)
                     excluded_files.append(f"{rel_path}/")
 
@@ -833,7 +826,7 @@ def make(
 
             # Check files
             for file in files:
-                rel_path = os.path.join(rel_root, file)
+                rel_path = str(Path(rel_root) / file) if rel_root else file
                 # Ensure proper gitignore path format
                 git_path = rel_path.replace(os.sep, "/")
 
@@ -895,7 +888,7 @@ def make(
     # Create the template
     try:
         # Create the template directory structure
-        os.makedirs(output_directory, exist_ok=True)
+        Path(output_directory).mkdir(parents=True, exist_ok=True)
 
         # Create template structure with special handling for Markdown files
         create_template_structure(
@@ -924,7 +917,7 @@ def make(
         )
 
         # Add information about filename templating syntax
-        click.echo("\n💡 Filename Templating:")
+        click.echo("\nFilename Templating:")
         click.echo("For Windows compatibility, use %{variable} syntax in filenames:")
         click.echo("  - %{project_name}.kicad_pro")
         click.echo("  - %{project_name.lower}.kicad_sch")

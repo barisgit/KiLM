@@ -3,12 +3,13 @@ Pin command implementation for KiCad Library Manager.
 """
 
 import sys
+
 import click
 
 from ..library_manager import find_kicad_config, list_libraries
 from ..utils.env_vars import (
-    find_environment_variables,
     expand_user_path,
+    find_environment_variables,
     update_pinned_libraries,
 )
 

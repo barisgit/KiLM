@@ -2,19 +2,17 @@
 Metadata management utilities for KiCad Library Manager.
 """
 
-import yaml
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Union
+
+import yaml
+
+from ..constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 
-# Metadata filenames
-GITHUB_METADATA_FILE = "kilm.yaml"
-CLOUD_METADATA_FILE = ".kilm_metadata"
-
-
-def read_github_metadata(directory: Path) -> Optional[Dict[str, Any]]:
+def read_github_metadata(directory: Path) -> Optional[Dict[str, Union[str, List, Dict]]]:
     """
     Read metadata from a GitHub library directory.
 
@@ -29,7 +27,7 @@ def read_github_metadata(directory: Path) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        with open(metadata_file, "r") as f:
+        with metadata_file.open() as f:
             metadata = yaml.safe_load(f)
 
         if not isinstance(metadata, dict):
@@ -55,7 +53,7 @@ def write_github_metadata(directory: Path, metadata: Dict[str, Any]) -> bool:
     metadata_file = directory / GITHUB_METADATA_FILE
 
     try:
-        with open(metadata_file, "w") as f:
+        with metadata_file.open("w") as f:
             yaml.dump(metadata, f, default_flow_style=False)
         return True
     except Exception as e:
@@ -78,7 +76,7 @@ def read_cloud_metadata(directory: Path) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        with open(metadata_file, "r") as f:
+        with metadata_file.open() as f:
             metadata = json.load(f)
 
         if not isinstance(metadata, dict):
@@ -104,7 +102,7 @@ def write_cloud_metadata(directory: Path, metadata: Dict[str, Any]) -> bool:
     metadata_file = directory / CLOUD_METADATA_FILE
 
     try:
-        with open(metadata_file, "w") as f:
+        with metadata_file.open("w") as f:
             json.dump(metadata, f, indent=2)
         return True
     except Exception as e:

@@ -2,22 +2,23 @@
 Setup command implementation for KiCad Library Manager.
 """
 
+import re
 import sys
-import click
 from pathlib import Path
 from typing import Dict, List
-import re
 
+import click
+
+from ..config import Config, LibraryDict
 from ..library_manager import add_libraries, find_kicad_config
+from ..utils.backup import create_backup
 from ..utils.env_vars import (
-    find_environment_variables,
     expand_user_path,
+    find_environment_variables,
     update_kicad_env_vars,
     update_pinned_libraries,
 )
-from ..utils.backup import create_backup
-from ..config import Config
-from ..utils.metadata import read_github_metadata, read_cloud_metadata
+from ..utils.metadata import read_cloud_metadata, read_github_metadata
 
 
 def fix_invalid_uris(
@@ -49,7 +50,7 @@ def fix_invalid_uris(
     for table_path in [sym_table, fp_table]:
         if table_path.exists():
             # Ensure UTF-8 encoding when reading
-            with open(table_path, "r", encoding="utf-8") as f:
+            with table_path.open(encoding="utf-8") as f:
                 content = f.read()
 
             # Look for URIs with invalid environment variable syntax like ${/path/to/lib}
@@ -65,7 +66,7 @@ def fix_invalid_uris(
                     fixed_content = re.sub(pattern, r'(uri "\\1/\\2")', content)
 
                     # Ensure UTF-8 encoding when writing
-                    with open(table_path, "w", encoding="utf-8") as f:
+                    with table_path.open("w", encoding="utf-8") as f:
                         f.write(fixed_content)
 
     return changes_made
@@ -169,8 +170,8 @@ def setup(
 
     # Check Config file for library paths
     config_lib_paths: Dict[str, str] = {}
-    config_3d_libs: List[Dict[str, str]] = []
-    config_symbol_libs: List[Dict[str, str]] = []
+    config_3d_libs: List[LibraryDict] = []
+    config_symbol_libs: List[LibraryDict] = []
     config_obj = None
 
     try:
@@ -246,7 +247,7 @@ def setup(
                     metadata = read_github_metadata(Path(lib_path))
                     if metadata and "env_var" in metadata:
                         env_var = metadata["env_var"]
-                        if env_var:
+                        if env_var and isinstance(env_var, str):
                             # Store all GitHub libraries with their env vars
                             config_lib_paths[env_var] = lib_path
                             click.echo(f"    Using environment variable: {env_var}")
@@ -277,7 +278,7 @@ def setup(
                     metadata = read_cloud_metadata(Path(lib_path))
                     if metadata and "env_var" in metadata:
                         env_var = metadata["env_var"]
-                        if env_var:
+                        if env_var and isinstance(env_var, str):
                             # Store all 3D libraries with their env vars
                             config_lib_paths[env_var] = lib_path
                             click.echo(f"    Using environment variable: {env_var}")

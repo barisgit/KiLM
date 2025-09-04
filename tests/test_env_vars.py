@@ -1,6 +1,8 @@
 import json
-import pytest
 from pathlib import Path
+
+import pytest
+
 from kicad_lib_manager.utils.env_vars import update_kicad_env_vars
 
 
@@ -13,7 +15,7 @@ def test_update_kicad_env_vars(tmp_path):
     # Create a test kicad_common.json file
     kicad_common = kicad_config / "kicad_common.json"
     initial_config = {"environment": {"vars": {"EXISTING_VAR": "/existing/path"}}}
-    with open(kicad_common, "w") as f:
+    with Path(kicad_common).open("w") as f:
         json.dump(initial_config, f)
 
     # Test 1: Update with valid environment variables
@@ -22,7 +24,7 @@ def test_update_kicad_env_vars(tmp_path):
     assert changes is True
 
     # Verify the changes
-    with open(kicad_common, "r") as f:
+    with Path(kicad_common).open() as f:
         config = json.load(f)
     assert config["environment"]["vars"]["KICAD_USER_LIB"] == "/path/to/lib"
     assert config["environment"]["vars"]["KICAD_3D_LIB"] == "/path/to/3d"
@@ -44,7 +46,7 @@ def test_update_kicad_env_vars(tmp_path):
     )  # Changes should be True because we're removing KICAD_USER_LIB
 
     # Verify KICAD_USER_LIB was removed and KICAD_3D_LIB remains unchanged
-    with open(kicad_common, "r") as f:
+    with Path(kicad_common).open() as f:
         config = json.load(f)
     assert "KICAD_USER_LIB" not in config["environment"]["vars"]
     assert config["environment"]["vars"]["KICAD_3D_LIB"] == "/path/to/3d"
@@ -68,7 +70,7 @@ def test_update_kicad_env_vars(tmp_path):
     assert changes is True
 
     # Verify only valid values were updated
-    with open(kicad_common, "r") as f:
+    with Path(kicad_common).open() as f:
         config = json.load(f)
     assert config["environment"]["vars"]["KICAD_USER_LIB"] == "/new/path"
     assert "KICAD_3D_LIB" not in config["environment"]["vars"]
@@ -81,7 +83,7 @@ def test_update_kicad_env_vars(tmp_path):
     assert changes is True
 
     # Verify no changes were made in dry run mode
-    with open(kicad_common, "r") as f:
+    with Path(kicad_common).open() as f:
         config = json.load(f)
     assert config["environment"]["vars"]["KICAD_USER_LIB"] == "/new/path"
 
@@ -90,7 +92,7 @@ def test_update_kicad_env_vars(tmp_path):
         update_kicad_env_vars(Path("/nonexistent"), env_vars)
 
     # Test 9: Invalid JSON in config file
-    with open(kicad_common, "w") as f:
+    with Path(kicad_common).open("w") as f:
         f.write("invalid json")
 
     with pytest.raises(ValueError):

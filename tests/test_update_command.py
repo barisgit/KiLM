@@ -2,9 +2,10 @@
 Tests for KiCad Library Manager update command.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, Mock
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from click.testing import CliRunner
 
 from kicad_lib_manager.cli import main
@@ -195,9 +196,7 @@ def test_check_for_library_changes():
                 mock_file = MagicMock()
                 mock_file.name = "test.kicad_sym"
                 return [mock_file]
-            elif "**/*.pretty" in pattern:
-                return []
-            elif "*" in pattern:
+            elif "**/*.pretty" in pattern or "*" in pattern:
                 return []
             return []
 

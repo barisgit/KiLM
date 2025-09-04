@@ -4,15 +4,16 @@ Provides commands for managing KiCad Library Manager configuration.
 """
 
 import sys
-import click
 from pathlib import Path
+
+import click
 
 from ..config import Config
 from ..utils.metadata import (
-    read_github_metadata,
-    read_cloud_metadata,
-    GITHUB_METADATA_FILE,
     CLOUD_METADATA_FILE,
+    GITHUB_METADATA_FILE,
+    read_cloud_metadata,
+    read_github_metadata,
 )
 
 
@@ -110,12 +111,13 @@ def list(library_type, verbose):
                             )
                         if "capabilities" in metadata:
                             caps = metadata["capabilities"]
-                            click.echo(
-                                "      Capabilities: "
-                                + f"symbols={'✓' if caps.get('symbols') else '✗'}, "
-                                + f"footprints={'✓' if caps.get('footprints') else '✗'}, "
-                                + f"templates={'✓' if caps.get('templates') else '✗'}"
-                            )
+                            if isinstance(caps, dict):
+                                click.echo(
+                                    "      Capabilities: "
+                                    + f"symbols={'✓' if caps.get('symbols') else '✗'}, "
+                                    + f"footprints={'✓' if caps.get('footprints') else '✗'}, "
+                                    + f"templates={'✓' if caps.get('templates') else '✗'}"
+                                )
                     else:
                         click.echo(f"      Metadata: No {GITHUB_METADATA_FILE} file")
 
@@ -289,6 +291,9 @@ def set_default(library_name, library_type):
                 sys.exit(1)
 
         # Set as current library
+        if library_path is None:
+            click.echo(f"Error: Could not find path for library '{library_name}'", err=True)
+            sys.exit(1)
         config.set_current_library(library_path)
         click.echo(f"Set {library_type} library '{library_name}' as default.")
         click.echo(f"Path: {library_path}")
@@ -345,9 +350,8 @@ def remove(library_name, library_type, force):
         # Find libraries matching the name and type
         matching_libraries = []
         for lib in all_libraries:
-            if lib.get("name") == library_name:
-                if library_type == "all" or lib.get("type") == library_type:
-                    matching_libraries.append(lib)
+            if lib.get("name") == library_name and (library_type == "all" or lib.get("type") == library_type):
+                matching_libraries.append(lib)
 
         if not matching_libraries:
             if library_type == "all":

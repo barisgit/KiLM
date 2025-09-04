@@ -3,18 +3,18 @@ Init command implementation for KiCad Library Manager.
 Initializes the current directory as a KiCad library directory (symbols, footprints, templates).
 """
 
-import os
 import sys
-import click
 from pathlib import Path
+
+import click
 
 from ..config import Config
 from ..utils.metadata import (
+    GITHUB_METADATA_FILE,
+    generate_env_var_name,
+    get_default_github_metadata,
     read_github_metadata,
     write_github_metadata,
-    get_default_github_metadata,
-    generate_env_var_name,
-    GITHUB_METADATA_FILE,
 )
 
 
@@ -109,12 +109,15 @@ def init(name, set_current, description, env_var, force, no_env_var):
 
         # Update metadata if command line parameters were provided
         if name or description or env_var or no_env_var:
-            metadata["name"] = library_name
-            metadata["description"] = library_description
+            if library_name is not None:
+                metadata["name"] = library_name
+            if library_description is not None:
+                metadata["description"] = library_description
             if library_env_var and not no_env_var:
                 metadata["env_var"] = library_env_var
             else:
-                metadata["env_var"] = None
+                # Don't set env_var if not needed
+                pass
             metadata["updated_with"] = "kilm"
             write_github_metadata(current_dir, metadata)
             click.echo("Updated metadata file with new information.")
@@ -161,7 +164,7 @@ def init(name, set_current, description, env_var, force, no_env_var):
             existing_folders.append(folder)
         else:
             try:
-                os.makedirs(folder_path, exist_ok=True)
+                folder_path.mkdir(parents=True, exist_ok=True)
                 created_folders.append(folder)
             except Exception as e:
                 click.echo(f"Error creating {folder} directory: {e}", err=True)
@@ -173,9 +176,9 @@ def init(name, set_current, description, env_var, force, no_env_var):
         try:
             # Create a template with comments and examples
             template_content = """# Library Descriptions for KiCad
-# Format: 
+# Format:
 #   library_name: "Description text"
-# 
+#
 # Example:
 #   Symbols_library: "Sample symbol library description"
 
@@ -187,7 +190,7 @@ symbols:
 footprints:
   Footprints_library: "Sample footprint library description"
 """
-            with open(library_descriptions_file, "w") as f:
+            with library_descriptions_file.open("w", encoding="utf-8") as f:
                 f.write(template_content)
             click.echo("Created library_descriptions.yaml template file.")
         except Exception as e:
@@ -222,12 +225,13 @@ footprints:
     try:
         config = Config()
         # Record as a GitHub library (symbols + footprints)
-        config.add_library(library_name, str(current_dir), "github")
+        safe_library_name = str(library_name or current_dir.name)
+        config.add_library(safe_library_name, str(current_dir), "github")
 
         if set_current:
             config.set_current_library(str(current_dir))
 
-        click.echo(f"Library '{library_name}' initialized successfully!")
+        click.echo(f"Library '{safe_library_name}' initialized successfully!")
         click.echo("Type: GitHub library (symbols, footprints, templates)")
         click.echo(f"Path: {current_dir}")
 

@@ -4,10 +4,10 @@ File operation utilities
 
 import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
-def read_file_with_encoding(file_path: Path, encodings: List[str] = None) -> str:
+def read_file_with_encoding(file_path: Path, encodings: Optional[List[str]] = None) -> str:
     """
     Read a file trying multiple encodings until successful
 
@@ -27,7 +27,7 @@ def read_file_with_encoding(file_path: Path, encodings: List[str] = None) -> str
     last_error = None
     for encoding in encodings:
         try:
-            with open(file_path, "r", encoding=encoding) as f:
+            with Path(file_path).open(encoding=encoding) as f:
                 return f.read()
         except UnicodeDecodeError as e:
             last_error = e
@@ -49,7 +49,7 @@ def write_file_with_encoding(
         content: Content to write
         encoding: Encoding to use (defaults to utf-8)
     """
-    with open(file_path, "w", encoding=encoding) as f:
+    with Path(file_path).open("w", encoding=encoding) as f:
         f.write(content)
 
 

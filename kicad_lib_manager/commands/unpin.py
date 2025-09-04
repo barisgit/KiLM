@@ -2,8 +2,9 @@
 Unpin command implementation for KiCad Library Manager.
 """
 
-import sys
 import json
+import sys
+
 import click
 
 from ..library_manager import find_kicad_config
@@ -65,7 +66,7 @@ def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
     # If --all is specified, unpin all libraries
     if all:
         try:
-            with open(kicad_common, "r") as f:
+            with kicad_common.open() as f:
                 config = json.load(f)
 
             # Get all pinned libraries from kicad_common.json
@@ -110,7 +111,7 @@ def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
 
     # Unpin the libraries by removing them from the kicad_common.json file
     try:
-        with open(kicad_common, "r") as f:
+        with kicad_common.open() as f:
             config = json.load(f)
 
         changes_needed = False
@@ -149,7 +150,7 @@ def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
             # Create backup before making changes
             create_backup(kicad_common, max_backups)
 
-            with open(kicad_common, "w") as f:
+            with kicad_common.open("w") as f:
                 json.dump(config, f, indent=2)
 
         if changes_needed:

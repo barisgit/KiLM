@@ -1,9 +1,12 @@
-import pytest
 import os
+from pathlib._local import Path
+
+import pytest
+
 from kicad_lib_manager.library_manager import (
+    add_entries_to_table,
     add_libraries,
     format_uri,
-    add_entries_to_table,
 )
 
 
@@ -162,7 +165,7 @@ def test_add_entries_with_special_chars(tmp_path):
     """Test adding entries with special characters in paths."""
     # Create a temporary library table
     table_path = tmp_path / "fp-lib-table"
-    with open(table_path, "w", encoding="utf-8") as f:
+    with Path(table_path).open("w", encoding="utf-8") as f:
         f.write("(fp_lib_table\n  (version 7)\n)\n")
 
     # Test entries with special characters
@@ -185,7 +188,7 @@ def test_add_entries_with_special_chars(tmp_path):
     add_entries_to_table(table_path, entries)
 
     # Read the updated table
-    with open(table_path, "r", encoding="utf-8") as f:
+    with Path(table_path).open(encoding="utf-8") as f:
         content = f.read()
 
     # Verify the entries were added correctly

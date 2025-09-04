@@ -6,17 +6,17 @@ Command-line interface for KiCad Library Manager
 import click
 
 from . import __version__
-from .commands.setup import setup
-from .commands.list_libraries import list_cmd
-from .commands.status import status
-from .commands.pin import pin
-from .commands.unpin import unpin
-from .commands.init import init
 from .commands.add_3d import add_3d
-from .commands.config import config
-from .commands.update import update
 from .commands.add_hook import add_hook
+from .commands.config import config
+from .commands.init import init
+from .commands.list_libraries import list_cmd
+from .commands.pin import pin
+from .commands.setup import setup
+from .commands.status import status
 from .commands.template import template
+from .commands.unpin import unpin
+from .commands.update import update
 
 
 @click.group()

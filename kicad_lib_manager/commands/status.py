@@ -3,12 +3,13 @@ Status command implementation for KiCad Library Manager.
 """
 
 import json
-import yaml
 from pathlib import Path
+
 import click
+import yaml
 
 from ..library_manager import find_kicad_config, list_configured_libraries
-from ..utils.metadata import read_github_metadata, read_cloud_metadata
+from ..utils.metadata import read_cloud_metadata, read_github_metadata
 
 
 @click.command()
@@ -21,11 +22,11 @@ def status():
             if config_file.exists():
                 click.echo("KILM Configuration:")
                 try:
-                    with open(config_file, "r") as f:
+                    with config_file.open() as f:
                         config_data = yaml.safe_load(f)
 
                     # Show libraries
-                    if "libraries" in config_data and config_data["libraries"]:
+                    if config_data and "libraries" in config_data and config_data["libraries"]:
                         click.echo("  Configured Libraries:")
 
                         # Group by type
@@ -47,7 +48,7 @@ def status():
                                 path = lib.get("path", "unknown")
                                 current = (
                                     " (current)"
-                                    if config_data.get("current_library") == path
+                                    if config_data and config_data.get("current_library") == path
                                     else ""
                                 )
                                 click.echo(f"      - {name}: {path}{current}")
@@ -66,7 +67,7 @@ def status():
                                 path = lib.get("path", "unknown")
                                 current = (
                                     " (current)"
-                                    if config_data.get("current_library") == path
+                                    if config_data and config_data.get("current_library") == path
                                     else ""
                                 )
                                 click.echo(f"      - {name}: {path}{current}")
@@ -82,7 +83,7 @@ def status():
 
                     # Show current library
                     if (
-                        "current_library" in config_data
+                        config_data and "current_library" in config_data
                         and config_data["current_library"]
                     ):
                         click.echo(
@@ -92,7 +93,7 @@ def status():
                         click.echo("  No current library set")
 
                     # Show other settings
-                    if "max_backups" in config_data:
+                    if config_data and "max_backups" in config_data:
                         click.echo(f"  Max Backups: {config_data['max_backups']}")
 
                 except Exception as e:
@@ -113,7 +114,7 @@ def status():
         kicad_common = kicad_config / "kicad_common.json"
         if kicad_common.exists():
             try:
-                with open(kicad_common, "r") as f:
+                with kicad_common.open() as f:
                     common_config = json.load(f)
 
                 click.echo("\nEnvironment Variables in KiCad:")
@@ -169,7 +170,7 @@ def check_pinned_libraries(kicad_config):
     kicad_common = kicad_config / "kicad_common.json"
     if kicad_common.exists():
         try:
-            with open(kicad_common, "r") as f:
+            with kicad_common.open() as f:
                 common_config = json.load(f)
 
             found_pinned = False
@@ -213,7 +214,7 @@ def check_pinned_libraries(kicad_config):
     pinned_libs = kicad_config / "pinned"
     if pinned_libs.exists():
         try:
-            with open(pinned_libs, "r") as f:
+            with pinned_libs.open() as f:
                 pinned_config = json.load(f)
 
             click.echo("\nPinned Libraries in KiCad (legacy format):")

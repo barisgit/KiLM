@@ -11,18 +11,18 @@ import pytest
 import yaml
 
 from kicad_lib_manager.utils.template import (
-    TEMPLATES_DIR,
-    TEMPLATE_METADATA,
-    TEMPLATE_CONTENT_DIR,
     HOOKS_DIR,
     POST_CREATE_HOOK,
+    TEMPLATE_CONTENT_DIR,
+    TEMPLATE_METADATA,
+    TEMPLATES_DIR,
+    create_project_from_template,
     create_template_metadata,
-    write_template_metadata,
-    render_template_string,
     render_filename,
     render_filename_custom,
     render_template_file,
-    create_project_from_template,
+    render_template_string,
+    write_template_metadata,
 )
 
 
@@ -134,7 +134,6 @@ class TestTemplateUtils:
         # Create template metadata
         metadata = create_template_metadata(
             name=template_name,
-            directory=template_dir,
             description="Test template",
             use_case="For testing",
             variables={
@@ -153,10 +152,11 @@ class TestTemplateUtils:
         assert metadata_file.exists()
 
         # Read back metadata
-        with open(metadata_file, "r") as f:
+        with Path(metadata_file).open() as f:
             read_metadata = yaml.safe_load(f)
 
         # Check metadata contents
+        assert read_metadata is not None
         assert read_metadata["name"] == template_name
         assert read_metadata["description"] == "Test template"
         assert read_metadata["use_case"] == "For testing"
@@ -169,7 +169,7 @@ class TestTemplateUtils:
         template_dir.mkdir(exist_ok=True)
 
         template_file = template_dir / "test.txt.jinja2"
-        with open(template_file, "w") as f:
+        with Path(template_file).open("w") as f:
             f.write("Hello, {{ name }}!")
 
         # Render the template file
@@ -188,7 +188,7 @@ class TestTemplateUtils:
         assert target_file.exists()
 
         # Check contents
-        with open(target_file, "r") as f:
+        with Path(target_file).open() as f:
             content = f.read()
 
         assert content == "Hello, World!"
@@ -227,11 +227,11 @@ class TestTemplateCreation:
         }
 
         # Write metadata
-        with open(self.template_dir / TEMPLATE_METADATA, "w") as f:
+        with Path(self.template_dir / TEMPLATE_METADATA).open("w") as f:
             yaml.dump(metadata, f)
 
         # Create post-creation hook
-        with open(self.hooks_dir / POST_CREATE_HOOK, "w") as f:
+        with Path(self.hooks_dir / POST_CREATE_HOOK).open("w") as f:
             f.write("""
 def post_create(context):
     print(f"Project created successfully: {context['variables']['project_name']}")
@@ -239,11 +239,11 @@ def post_create(context):
 
         # Create template files
         test_file = self.template_content_dir / "README.md.jinja2"
-        with open(test_file, "w") as f:
+        with Path(test_file).open("w") as f:
             f.write("# {{ project_name }}\n\nThis is a test project.")
 
         template_file = self.template_content_dir / "{{ project_name }}.txt.jinja2"
-        with open(template_file, "w") as f:
+        with Path(template_file).open("w") as f:
             f.write("Hello from {{ project_name }}!")
 
     def teardown_method(self):
@@ -273,12 +273,12 @@ def post_create(context):
         assert (project_dir / "MyProject.txt").exists()
 
         # Check contents
-        with open(project_dir / "README.md", "r") as f:
+        with Path(project_dir / "README.md").open() as f:
             content = f.read()
 
         assert content == "# MyProject\n\nThis is a test project."
 
-        with open(project_dir / "MyProject.txt", "r") as f:
+        with Path(project_dir / "MyProject.txt").open() as f:
             content = f.read()
 
         assert content == "Hello from MyProject!"

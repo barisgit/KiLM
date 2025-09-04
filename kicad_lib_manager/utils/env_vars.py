@@ -2,13 +2,13 @@
 Environment variable handling utilities
 """
 
+import json
 import os
 import re
-import subprocess
 import shutil
-import json
+import subprocess
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 # Import Config here, but only use it when needed to avoid circular imports
 try:
@@ -19,10 +19,10 @@ except ImportError:
 # Try to import metadata utilities without causing circular imports
 try:
     from ..utils.metadata import (
-        read_github_metadata,
-        read_cloud_metadata,
-        GITHUB_METADATA_FILE,
         CLOUD_METADATA_FILE,
+        GITHUB_METADATA_FILE,
+        read_cloud_metadata,
+        read_github_metadata,
     )
 except ImportError:
     read_github_metadata = None
@@ -120,7 +120,7 @@ def find_environment_variables(var_name: str) -> Optional[str]:
             continue
 
         try:
-            with open(config_file, "r") as f:
+            with Path(config_file).open() as f:
                 for line in f:
                     match = pattern.search(line.strip())
                     if match:
@@ -142,7 +142,7 @@ def expand_user_path(path: str) -> str:
         The expanded path
     """
     if path.startswith("~"):
-        return os.path.expanduser(path)
+        return str(Path(path).expanduser())
     return path
 
 
@@ -185,10 +185,10 @@ def update_kicad_env_vars(
         )
 
     try:
-        with open(kicad_common, "r") as f:
+        with Path(kicad_common).open() as f:
             config = json.load(f)
-    except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON format in {kicad_common}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format in {kicad_common}") from e
 
     # Check if environment section exists
     if "environment" not in config:
@@ -222,7 +222,7 @@ def update_kicad_env_vars(
         # Create backup before making changes
         create_backup(kicad_common, max_backups)
 
-        with open(kicad_common, "w") as f:
+        with Path(kicad_common).open("w") as f:
             json.dump(config, f, indent=2)
 
     return changes_needed
@@ -230,8 +230,8 @@ def update_kicad_env_vars(
 
 def update_pinned_libraries(
     kicad_config: Path,
-    symbol_libs: List[str] = None,
-    footprint_libs: List[str] = None,
+    symbol_libs: Optional[List[str]] = None,
+    footprint_libs: Optional[List[str]] = None,
     dry_run: bool = False,
     max_backups: int = 5,
 ) -> bool:
@@ -269,10 +269,10 @@ def update_pinned_libraries(
         )
 
     try:
-        with open(kicad_common, "r") as f:
+        with Path(kicad_common).open() as f:
             config = json.load(f)
-    except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON format in {kicad_common}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format in {kicad_common}") from e
 
     # Ensure session section exists
     if "session" not in config:
@@ -314,7 +314,7 @@ def update_pinned_libraries(
         # Create backup before making changes
         create_backup(kicad_common, max_backups)
 
-        with open(kicad_common, "w") as f:
+        with Path(kicad_common).open("w") as f:
             json.dump(config, f, indent=2)
 
     return changes_needed

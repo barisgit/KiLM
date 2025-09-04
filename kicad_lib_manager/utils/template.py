@@ -3,30 +3,26 @@ Template utility functions for KiCad Library Manager.
 Provides functions for working with project templates.
 """
 
+import importlib.util
+import json
 import os
 import re
-import yaml
-import json
 import shutil
-import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import pathspec
-import jinja2
+from typing import Any, Dict, List, Optional
+
 import click
+import jinja2
+import pathspec
+import yaml
 
-# Default template directory name in a library
-TEMPLATES_DIR = "templates"
-
-# Template metadata file name
-TEMPLATE_METADATA = "metadata.yaml"
-
-# Default template directory name within the template
-TEMPLATE_CONTENT_DIR = "template"
-
-# Default hooks directory
-HOOKS_DIR = "hooks"
+from ..constants import (
+    HOOKS_DIR,
+    TEMPLATE_CONTENT_DIR,
+    TEMPLATE_METADATA,
+    TEMPLATES_DIR,
+)
 
 # Post-creation hook name
 POST_CREATE_HOOK = "post_create.py"
@@ -68,7 +64,7 @@ def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
         return None
 
     try:
-        with open(gitignore_file, "r") as f:
+        with Path(gitignore_file).open() as f:
             lines = f.readlines()
 
         # Add patterns to explicitly ignore common directories if not present
@@ -124,7 +120,7 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
             continue
 
         try:
-            with open(metadata_file, "r") as f:
+            with Path(metadata_file).open() as f:
                 metadata = yaml.safe_load(f)
 
             if not metadata or not isinstance(metadata, dict):
@@ -145,7 +141,7 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
 
 
 def find_potential_variables(
-    directory: Path, patterns: List[str] = None
+    directory: Path, patterns: Optional[List[str]] = None
 ) -> Dict[str, List[str]]:
     """
     Scan files in a directory for potential template variables.
@@ -177,20 +173,20 @@ def find_potential_variables(
 
         for file in files:
             # Skip gitignored files - ensure proper path format
-            rel_path = os.path.join(rel_root, file)
+            rel_path = str(Path(rel_root) / file) if rel_root else file
             git_path = rel_path.replace(os.sep, "/")
             if gitignore_spec and gitignore_spec.match_file(git_path):
                 continue
 
             # Skip binary files and large files
-            file_path = os.path.join(root, file)
+            file_path = str(Path(root) / file)
             try:
                 # Skip files larger than 1MB
-                if os.path.getsize(file_path) > 1024 * 1024:
+                if Path(file_path).stat().st_size > 1024 * 1024:
                     continue
 
                 # Try to read as text
-                with open(file_path, "r", encoding="utf-8") as f:
+                with Path(file_path).open(encoding="utf-8") as f:
                     content = f.read()
 
                 # Search for patterns
@@ -212,19 +208,17 @@ def find_potential_variables(
 
 def create_template_metadata(
     name: str,
-    directory: Path,
-    description: str = None,
-    use_case: str = None,
-    variables: Dict[str, Dict[str, Any]] = None,
-    extends: str = None,
-    dependencies: List[str] = None,
+    description: Optional[str] = None,
+    use_case: Optional[str] = None,
+    variables: Optional[Dict[str, Dict[str, Any]]] = None,
+    extends: Optional[str] = None,
+    dependencies: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Create template metadata dictionary.
 
     Args:
         name: Template name
-        directory: Template directory
         description: Template description
         use_case: Template use case
         variables: Dictionary of template variables
@@ -252,19 +246,19 @@ def create_template_metadata(
         }
     else:
         # Make sure we have the predefined variables
-        if not any(k.lower() == "project_name" for k in variables.keys()):
+        if not any(k.lower() == "project_name" for k in variables):
             variables["project_name"] = {
                 "description": "Project name (used in documentation and KiCad files)",
                 "default": name,
             }
 
-        if not any(k.lower() == "directory_name" for k in variables.keys()):
+        if not any(k.lower() == "directory_name" for k in variables):
             variables["directory_name"] = {
                 "description": "Directory/repository name (used for folder structure)",
                 "default": "%{project_name.lower.replace(' ', '-')}",
             }
 
-        if not any(k.lower() == "project_filename" for k in variables.keys()):
+        if not any(k.lower() == "project_filename" for k in variables):
             variables["project_filename"] = {
                 "description": "Main KiCad project filename (without extension)",
                 "default": "%{project_name}",
@@ -300,7 +294,7 @@ def write_template_metadata(directory: Path, metadata: Dict[str, Any]) -> None:
     """
     metadata_file = directory / TEMPLATE_METADATA
 
-    with open(metadata_file, "w") as f:
+    with Path(metadata_file).open("w") as f:
         yaml.dump(metadata, f, default_flow_style=False)
 
 
@@ -316,7 +310,7 @@ def process_markdown_file(
         variables: Dictionary of template variables
     """
     try:
-        with open(source_file, "r", encoding="utf-8") as f:
+        with Path(source_file).open(encoding="utf-8") as f:
             content = f.read()
 
         # Add a Jinja comment and variable reference section at the top
@@ -339,7 +333,7 @@ def process_markdown_file(
 
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + ".jinja2")
-        with open(target_file_jinja, "w", encoding="utf-8") as f:
+        with Path(target_file_jinja).open("w", encoding="utf-8") as f:
             f.write(new_content)
 
         click.echo(f"Processed Markdown file: {source_file.name}")
@@ -374,8 +368,8 @@ def create_template_structure(
     template_content_dir = template_directory / TEMPLATE_CONTENT_DIR
     hooks_dir = template_directory / HOOKS_DIR
 
-    os.makedirs(template_content_dir, exist_ok=True)
-    os.makedirs(hooks_dir, exist_ok=True)
+    template_content_dir.mkdir(parents=True, exist_ok=True)
+    hooks_dir.mkdir(parents=True, exist_ok=True)
 
     # Write metadata
     write_template_metadata(template_directory, metadata)
@@ -437,7 +431,7 @@ def create_template_structure(
 
         # Look for KiCad files in the root directory
         for file in files:
-            rel_path = os.path.join(rel_root, file)
+            rel_path = str(Path(rel_root) / file)
             git_path = rel_path.replace(os.sep, "/")
 
             # Skip gitignored files
@@ -445,21 +439,21 @@ def create_template_structure(
                 continue
 
             # Look for main files in the root directory or top-level folders
-            if rel_root == "." or len(rel_root.split(os.sep)) <= 1:
+            if rel_root == "." or len(Path(rel_root).parts) <= 1:
                 file_lower = file.lower()
 
                 if file_lower.endswith(KICAD_PROJECT_EXT) and not main_project_file:
-                    main_project_file = os.path.join(root, file)
+                    main_project_file = str(Path(root) / file)
                     click.echo(f"Found main project file: {file}")
 
                 elif (
                     file_lower.endswith(KICAD_SCHEMATIC_EXT) and not main_schematic_file
                 ):
-                    main_schematic_file = os.path.join(root, file)
+                    main_schematic_file = str(Path(root) / file)
                     click.echo(f"Found main schematic file: {file}")
 
                 elif file_lower.endswith(KICAD_PCB_EXT) and not main_pcb_file:
-                    main_pcb_file = os.path.join(root, file)
+                    main_pcb_file = str(Path(root) / file)
                     click.echo(f"Found main PCB file: {file}")
 
     # Copy files from source to template
@@ -478,7 +472,7 @@ def create_template_structure(
                 continue
 
             # Check if this is a path we would exclude
-            rel_path = os.path.join(rel_root, d)
+            rel_path = Path(rel_root) / d
 
             # Ensure proper path format for gitignore matching
             # (pathspec expects paths with forward slashes and trailing slash for directories)
@@ -487,9 +481,7 @@ def create_template_structure(
                 git_path += "/"
 
             # Prevent copying into template directory to avoid recursion
-            if template_directory.as_posix() in os.path.join(
-                source_directory, rel_path
-            ):
+            if template_directory.as_posix() in str(Path(source_directory) / rel_path):
                 dirs_to_remove.append(d)
                 click.echo(f"Preventing recursive template copy: {rel_path}")
                 continue
@@ -515,13 +507,13 @@ def create_template_structure(
                 click.echo(f"Skipping directory due to path length: {rel_root}")
                 continue
 
-            os.makedirs(target_dir, exist_ok=True)
+            Path(target_dir).mkdir(parents=True, exist_ok=True)
         else:
             target_dir = template_content_dir
 
         # Copy files
         for file in files:
-            rel_path = os.path.join(rel_root, file)
+            rel_path = Path(rel_root) / file
 
             # Ensure proper path format for gitignore matching
             git_path = rel_path.replace(os.sep, "/")
@@ -542,7 +534,7 @@ def create_template_structure(
             source_file = source_directory / rel_path
 
             # Special handling for main KiCad files and markdown
-            file_path = os.path.join(root, file)
+            file_path = Path(root) / file
 
             # Generate target file path
             # For main KiCad files, use generic names with Windows-compatible syntax
@@ -574,15 +566,11 @@ def create_template_structure(
 
             # Process main schematic file
             elif main_schematic_file and file_path == main_schematic_file:
-                process_kicad_schematic_file(
-                    source_file, target_file, metadata.get("variables", {})
-                )
+                process_kicad_schematic_file(source_file, target_file)
 
             # Process main PCB file
             elif main_pcb_file and file_path == main_pcb_file:
-                process_kicad_pcb_file(
-                    source_file, target_file, metadata.get("variables", {})
-                )
+                process_kicad_pcb_file(source_file, target_file)
 
             # Process Markdown files
             elif source_file.name.lower().endswith(".md"):
@@ -615,36 +603,36 @@ This script runs after the template has been used to create a new project.
 def post_create(context):
     """
     Hook that runs after project creation.
-    
+
     Args:
         context: Dict containing:
             - project_dir: Path to the created project
             - variables: Dict of all template variables and their values
             - template: Template metadata
-    
+
     Returns:
         None
     """
     # Uncomment and modify as needed
     # import subprocess
     # import os
-    
+
     # Example: Initialize git repository
     # subprocess.run(["git", "init"], cwd=context["project_dir"])
-    
+
     # Example: Create README.md if it doesn't exist
     # readme_path = os.path.join(context["project_dir"], "README.md")
     # if not os.path.exists(readme_path):
-    #     with open(readme_path, "w") as f:
+    #     with Path(readme_path).open("w") as f:
     #         f.write(f"# {context['variables']['project_name']}\\n\\n")
     #         f.write("Created with KiCad Library Manager\\n")
-    
+
     # Print message to user
     click.echo(f"Project {context['variables']['project_name']} created successfully!")
     click.echo(f"Location: {context['project_dir']}")
 '''
 
-    with open(hook_script, "w") as f:
+    with Path(hook_script).open("w") as f:
         f.write(script_content)
 
 
@@ -660,12 +648,12 @@ def process_kicad_project_file(
         variables: Dictionary of template variables
     """
     try:
-        with open(source_file, "r", encoding="utf-8") as f:
+        with Path(source_file).open(encoding="utf-8") as f:
             content = f.read()
 
         # Get project name variable
         project_name_var = None
-        for var_name, var_info in variables.items():
+        for var_name, _var_info in variables.items():
             if var_name.lower() in ("project_name", "projectname", "project"):
                 project_name_var = var_name
                 break
@@ -689,7 +677,7 @@ def process_kicad_project_file(
 
             # Write updated JSON to a .jinja2 file
             target_file_jinja = Path(str(target_file) + ".jinja2")
-            with open(target_file_jinja, "w", encoding="utf-8") as f:
+            with Path(target_file_jinja).open("w", encoding="utf-8") as f:
                 json.dump(project_data, f, indent=2)
 
             click.echo(
@@ -711,7 +699,7 @@ def process_kicad_project_file(
 
 
 def process_kicad_schematic_file(
-    source_file: Path, target_file: Path, variables: Dict[str, Dict[str, Any]]
+    source_file: Path, target_file: Path
 ) -> None:
     """
     Process a KiCad schematic file (.kicad_sch).
@@ -719,10 +707,9 @@ def process_kicad_schematic_file(
     Args:
         source_file: Source file path
         target_file: Target file path
-        variables: Dictionary of template variables
     """
     try:
-        with open(source_file, "r", encoding="utf-8") as f:
+        with Path(source_file).open(encoding="utf-8") as f:
             content = f.read()
 
         # Replace project name references in schematic file
@@ -735,7 +722,7 @@ def process_kicad_schematic_file(
 
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + ".jinja2")
-        with open(target_file_jinja, "w", encoding="utf-8") as f:
+        with Path(target_file_jinja).open("w", encoding="utf-8") as f:
             f.write(content)
 
         click.echo(
@@ -751,7 +738,7 @@ def process_kicad_schematic_file(
 
 
 def process_kicad_pcb_file(
-    source_file: Path, target_file: Path, variables: Dict[str, Dict[str, Any]]
+    source_file: Path, target_file: Path
 ) -> None:
     """
     Process a KiCad PCB file (.kicad_pcb).
@@ -759,10 +746,9 @@ def process_kicad_pcb_file(
     Args:
         source_file: Source file path
         target_file: Target file path
-        variables: Dictionary of template variables
     """
     try:
-        with open(source_file, "r", encoding="utf-8") as f:
+        with Path(source_file).open(encoding="utf-8") as f:
             content = f.read()
 
         # Find and replace sheet references
@@ -784,7 +770,7 @@ def process_kicad_pcb_file(
 
         # Write to .jinja2 file
         target_file_jinja = Path(str(target_file) + ".jinja2")
-        with open(target_file_jinja, "w", encoding="utf-8") as f:
+        with Path(target_file_jinja).open("w", encoding="utf-8") as f:
             f.write(content)
 
         click.echo(
@@ -1009,7 +995,7 @@ def render_template_file(
         True if successful, False otherwise
     """
     # Create target directory if it doesn't exist
-    os.makedirs(target_file.parent, exist_ok=True)
+    target_file.parent.mkdir(parents=True, exist_ok=True)
 
     if is_binary:
         # Simply copy binary files
@@ -1023,7 +1009,7 @@ def render_template_file(
     # For text files, render them if they have a .jinja2 extension
     try:
         file_content = ""
-        with open(source_file, "r", encoding="utf-8") as f:
+        with Path(source_file).open(encoding="utf-8") as f:
             file_content = f.read()
 
         # If it's a Jinja template, process it
@@ -1041,8 +1027,11 @@ def render_template_file(
                 rendered_content = template.render(**variables)
 
                 # Write rendered content to target file (without .jinja2 extension)
-                target_path = Path(str(target_file).rstrip(".jinja2"))
-                with open(target_path, "w", encoding="utf-8") as f:
+                target_path_str = str(target_file)
+                if target_path_str.endswith(".jinja2"):
+                    target_path_str = target_path_str[:-7]  # Remove ".jinja2"
+                target_path = Path(target_path_str)
+                with Path(target_path).open("w", encoding="utf-8") as f:
                     f.write(rendered_content)
 
                 return True
@@ -1119,7 +1108,7 @@ def create_project_from_template(
             )
             return False
         try:
-            with open(metadata_file, "r") as f:
+            with Path(metadata_file).open() as f:
                 metadata = yaml.safe_load(f)
             if not metadata:  # Handle empty metadata file
                 click.echo(
@@ -1166,7 +1155,7 @@ def create_project_from_template(
     files_to_create = []
 
     # Walk through the template directory
-    for root, dirs, files in os.walk(template_content_dir):
+    for root, _dirs, files in os.walk(template_content_dir):
         rel_root = os.path.relpath(root, template_content_dir)
         if rel_root == ".":
             rel_root = ""
