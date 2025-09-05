@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import requests
 from packaging.version import InvalidVersion, Version
@@ -198,7 +198,7 @@ class UpdateManager:
         """Check if automatic update is possible for this installation method."""
         return self.installation_method in ["pipx", "pip", "pip-venv", "uv"]
 
-    def perform_update(self) -> tuple[bool, str]:
+    def perform_update(self) -> Tuple[bool, str]:
         """
         Execute update using detected installation method.
         Returns: (success: bool, message: str)

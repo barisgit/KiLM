@@ -1,7 +1,7 @@
 repos:
   # Ruff formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.15
+    rev: v0.11.6
     hooks:
       - id: ruff-format
         name: ruff format
@@ -9,7 +9,7 @@ repos:
 
   # Ruff linter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.15
+    rev: v0.11.6
     hooks:
       - id: ruff
         name: ruff check --fix
@@ -22,7 +22,7 @@ repos:
       - id: pyrefly
         name: pyrefly check
         description: Type check Python code with pyrefly
-        entry: pyrefly
+        entry: .venv/bin/pyrefly
         args: [check]
         language: system
         types: [python]
@@ -33,7 +33,7 @@ repos:
       - id: pytest
         name: pytest
         description: Run tests with pytest
-        entry: pytest
+        entry: .venv/bin/pytest
         language: system
         types: [python]
         pass_filenames: false
