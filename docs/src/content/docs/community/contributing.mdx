@@ -1,0 +1,141 @@
+---
+title: Contributing
+description: Guidelines for contributing to KiLM with code standards and submission workflow.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+We welcome contributions to KiLM! This guide covers reporting issues, submitting code changes, and following our development standards.
+
+## Reporting Issues
+
+Before creating a new issue, search the [GitHub Issues page](https://github.com/barisgit/kilm/issues) for similar reports.
+
+### Bug Reports
+
+Include the following information:
+- **KiLM version**: `kilm --version`
+- **KiCad version**: Check Help → About KiCad
+- **Operating System**: Windows/macOS/Linux with version
+- **Clear description**: What happened vs. what you expected
+- **Reproduction steps**: Minimal steps to reproduce the issue
+- **Error messages**: Full error output (use `--verbose` if available)
+- **Configuration**: Relevant parts of your `config.yaml` if applicable
+
+### Feature Requests
+
+- **Use case**: Describe the problem you're trying to solve
+- **Proposed solution**: How you envision the feature working
+- **Alternatives**: Other approaches you've considered
+- **Impact**: Who would benefit from this feature
+
+## Pull Request Workflow
+
+<Steps>
+
+1. **Fork and Clone**
+   
+   Fork the [KiLM repository](https://github.com/barisgit/kilm) and clone your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/kilm.git
+   cd kilm
+   ```
+
+2. **Development Setup**
+   
+   Follow the [Development Setup guide](/community/development/) to install dependencies.
+
+3. **Create Feature Branch**
+   
+   ```bash
+   git checkout -b feature/my-feature  # or fix/issue-123
+   ```
+
+4. **Implement Changes**
+   
+   Make your changes following the coding standards below.
+
+5. **Quality Checks**
+   
+   Run the complete quality pipeline:
+   ```bash
+   # Type checking (required - zero "Any" types)
+   pyrefly
+   
+   # Code formatting
+   black .
+   
+   # Linting
+   ruff check --fix .
+   
+   # Tests with coverage
+   pytest --cov=kicad_lib_manager
+   ```
+
+6. **Commit Changes**
+   
+   Use descriptive commit messages:
+   ```bash
+   git add .
+   git commit -m "feat: Add library template validation"
+   # or
+   git commit -m "fix: Handle missing KiCad config gracefully"
+   ```
+
+7. **Push and Create PR**
+   
+   ```bash
+   git push origin feature/my-feature
+   ```
+   
+   Open a Pull Request with:
+   - Clear description of changes
+   - Link to relevant issues ("Closes #123")
+   - Screenshots/examples if applicable
+
+</Steps>
+
+## Coding Standards
+
+### Type Safety (Mandatory)
+- **Complete type hints**: All functions must have proper type annotations
+- **Zero "Any" types**: Use specific types, protocols, or generics instead
+- **Type checking**: Code must pass `pyrefly` type checking without errors
+
+### Code Quality
+- **Professional standards**: No emojis in code, comments, or output
+- **No hardcoding**: Use constants, configuration, or environment variables
+- **Cross-platform**: Use `pathlib.Path` for all file operations
+- **Error handling**: Consistent error patterns with informative messages
+
+### Testing Requirements
+- **New features**: Must include corresponding tests
+- **Bug fixes**: Add regression tests where applicable
+- **Coverage**: Aim for high test coverage of new code
+- **Integration tests**: Test KiCad integration where possible
+
+### Documentation
+- **Docstrings**: Use clear, concise docstrings for public functions
+- **Comments**: Explain complex logic, not obvious operations
+- **User-facing changes**: Update relevant documentation files
+
+## Code Review Process
+
+All Pull Requests undergo review for:
+- **Functionality**: Does it work as intended?
+- **Code quality**: Follows coding standards and best practices
+- **Type safety**: Proper type annotations and no "Any" types
+- **Testing**: Adequate test coverage
+- **Documentation**: Clear and up-to-date
+
+<Aside type="tip">
+Running the quality checks locally before submitting saves time during review. Use the development tools outlined in the [Development Setup](/community/development/) guide.
+</Aside>
+
+## Getting Help
+
+- **Discussions**: Use [GitHub Discussions](https://github.com/barisgit/kilm/discussions) for questions
+- **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/barisgit/kilm/issues)  
+- **Documentation**: Review the [Development Setup](/community/development/) guide
+
+Thank you for contributing to KiLM!

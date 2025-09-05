@@ -1,0 +1,159 @@
+---
+title: add-3d
+description: Add a directory containing 3D models (e.g., STEP, WRL) to KiLM configuration.
+---
+
+import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
+
+The `kilm add-3d` command registers a directory containing 3D models (like `.step` or `.wrl` files) with KiLM. This is typically used for libraries stored outside the main symbol/footprint Git repository, such as in cloud-synced folders.
+
+## Usage
+
+```bash
+kilm add-3d [OPTIONS]
+```
+
+## Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--directory DIRECTORY` | Path to the directory containing 3D models | Current working directory | `--directory ~/kicad/3d-models` |
+| `--name TEXT` | Custom name for this 3D library entry | Auto-generated from directory name | `--name standard-3d-lib` |
+| `--description TEXT` | Description for this 3D library | None | `--description "My custom STEP models"` |
+| `--env-var TEXT` | Custom KiCad environment variable name | Auto-generated (e.g., `KICAD_3D_STANDARD_3D_LIB`) | `--env-var KICAD_USER_3DMOD` |
+| `--no-env-var` | Don't assign an environment variable to this library | `False` | `--no-env-var` |
+| `--force` | Overwrite existing metadata file if present | `False` | `--force` |
+| `--help` | Show help message and exit | - | `--help` |
+
+## Behavior
+
+The command performs the following main actions:
+
+1. **Creates/Updates Metadata**: Creates or modifies `.kilm_cloud_metadata` in the target directory containing:
+   - Library name, description, and associated environment variable
+   - Count of detected model files
+   - Last updated timestamp
+
+2. **Updates Global Configuration**: Adds library entry (type `cloud`) to main `config.yaml`
+
+3. **Verification**: Scans directory for common 3D model file extensions (`.step`, `.stp`, `.wrl`, `.wings`)
+
+4. **Environment Variable Setup**: Prepares environment variable for use with `kilm setup`
+
+## Examples
+
+### Basic Usage
+
+**Add a 3D library with automatic configuration:**
+
+```bash
+# Add directory with default settings
+kilm add-3d --directory ~/my-3d-parts --description "Custom 3D mechanical parts"
+```
+
+**Add current directory as 3D library:**
+
+```bash
+cd ~/kicad-3d-models
+kilm add-3d --name my-3d-models --description "Project-specific 3D models"
+```
+
+### Advanced Configuration
+
+**Add with custom environment variable:**
+
+```bash
+kilm add-3d --directory /opt/kicad/packages3d \
+    --name kicad-official-3d \
+    --env-var KICAD_OFFICIAL_3D \
+    --description "KiCad Official 3D Models"
+```
+
+**Add without environment variable:**
+
+```bash
+kilm add-3d --directory ~/local-3d-models \
+    --name local-models \
+    --no-env-var \
+    --description "Local 3D models (no env var needed)"
+```
+
+**Force overwrite existing metadata:**
+
+```bash
+kilm add-3d --directory ~/existing-3d-lib \
+    --force \
+    --name updated-3d-lib \
+    --description "Updated description"
+```
+
+## Error Handling
+
+### Common Issues
+
+- **No 3D models found**: Command will warn but allow continuation
+- **Directory not found**: Command will fail with clear error message
+- **Permission denied**: Command will fail if unable to write metadata file
+- **Existing metadata**: Use `--force` to overwrite or command will update existing file
+
+### Error Examples
+
+```bash
+# Directory doesn't exist
+kilm add-3d --directory /nonexistent/path
+# Error: Directory '/nonexistent/path' does not exist
+
+# No write permissions
+kilm add-3d --directory /readonly/directory
+# Error: Permission denied when creating metadata file
+```
+
+## Integration with Other Commands
+
+<CardGrid>
+  <LinkCard
+    title="setup"
+    href="/reference/cli/setup/"
+    description="Configure KiCad to use the registered 3D libraries"
+  />
+  <LinkCard
+    title="status"
+    href="/reference/cli/status/"
+    description="Check current configuration status including 3D libraries"
+  />
+  <LinkCard
+    title="config"
+    href="/reference/cli/config/"
+    description="Manage library configuration and defaults"
+  />
+</CardGrid>
+
+### Workflow Integration
+
+After adding 3D libraries, you typically need to run `kilm setup` to make them available in KiCad:
+
+```bash
+# Add 3D library
+kilm add-3d --directory ~/my-3d-models --name my-models
+
+# Configure KiCad to use it
+kilm setup --all-libraries
+
+# Verify configuration
+kilm status
+```
+
+## File Extensions Supported
+
+The command automatically detects these 3D model file extensions:
+- `.step` - STEP files
+- `.stp` - STEP files (alternative extension)
+- `.wrl` - VRML files
+- `.wings` - Wings 3D files
+
+## Notes
+
+- **Environment Variables**: Use `kilm setup` to activate the configured environment variables in KiCad
+- **Cross-platform**: Works on Windows, macOS, and Linux with appropriate path handling
+- **Metadata Storage**: Library information is stored in `.kilm_cloud_metadata` in the target directory
+- **KiCad Integration**: Requires `kilm setup` to complete the integration with KiCad

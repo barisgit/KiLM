@@ -1,0 +1,153 @@
+---
+title: Development Setup
+description: Complete guide for setting up a KiLM development environment with modern Python tooling.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+This guide covers setting up a professional development environment for KiLM with type safety, code quality tools, and testing infrastructure.
+
+## Prerequisites
+
+- **Python 3.8+**: Required for KiLM development
+- **Git**: For version control and contribution workflow
+- **KiCad 6.x+**: For testing KiLM integration (run at least once)
+
+## Development Workflow
+
+<Steps>
+
+1. **Clone the Repository**
+   
+   ```bash
+   git clone https://github.com/barisgit/kilm.git
+   cd kilm
+   ```
+
+2. **Create Virtual Environment**
+   
+   ```bash
+   # Using Python's built-in venv
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+3. **Install Development Dependencies**
+   
+   ```bash
+   # Install KiLM in editable mode with dev dependencies
+   pip install -e ".[dev]"
+   ```
+
+   This installs:
+   - KiLM in editable mode (changes reflect immediately)
+   - Development tools: pytest, black, ruff, pyrefly
+   - Pre-commit hooks and coverage tools
+
+</Steps>
+
+## Verification
+
+Verify your development setup:
+
+```bash
+# Check KiLM installation
+kilm --version
+kilm --help
+
+# Verify KiCad detection
+kilm status
+```
+
+## Code Quality Standards
+
+KiLM follows strict code quality standards:
+
+### Type Safety (Required)
+```bash
+# Type checking with pyrefly (zero "Any" types allowed)
+pyrefly
+
+# Check for type issues
+pyrefly --check kicad_lib_manager/
+```
+
+### Code Formatting
+```bash
+# Format code with Black
+black .
+
+# Check formatting without applying changes
+black --check .
+```
+
+### Linting and Analysis
+```bash
+# Run Ruff linting and analysis
+ruff check .
+
+# Fix auto-fixable issues
+ruff check --fix .
+
+# Format imports and code
+ruff format .
+```
+
+### Testing
+```bash
+# Run all tests
+pytest
+
+# Run with coverage reporting
+pytest --cov=kicad_lib_manager --cov-report=html
+
+# Run specific test file
+pytest tests/test_config_commands.py
+
+# Run tests with verbose output
+pytest -v
+```
+
+## Development Tools
+
+### Pre-commit Hooks (Recommended)
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run all hooks on all files
+pre-commit run --all-files
+
+# Update hook repositories
+pre-commit autoupdate
+```
+
+### Quality Pipeline
+```bash
+# Run complete quality check (to be implemented)
+# This should include: pyrefly, black, ruff, pytest
+make quality  # or equivalent script
+```
+
+<Aside type="note">
+KiLM follows a **type-first development** approach. All code must have proper type hints with no `Any` types allowed.
+</Aside>
+
+## Project Architecture
+
+### Core Modules
+- **`cli.py`**: Click-based command interface
+- **`commands/`**: Individual command implementations  
+- **`library_manager.py`**: Core library management logic
+- **`config.py`**: KiCad configuration handling
+- **`utils/`**: File operations, backups, metadata, templates
+
+### Development Principles
+- **Professional code standards**: No emojis, no hardcoded values
+- **Cross-platform compatibility**: Support Windows, macOS, Linux
+- **SOLID principles**: Clean, maintainable architecture
+- **CLI-focused**: Simple, reliable command-line interface
+
+## Next Steps
+
+Ready to contribute? See the [Contributing Guide](/community/contributing/) for submission guidelines and coding standards.

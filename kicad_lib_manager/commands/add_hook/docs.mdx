@@ -1,0 +1,183 @@
+---
+title: add-hook
+description: Add a Git post-merge hook to automatically update KiLM-managed libraries.
+---
+
+import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
+
+The `kilm add-hook` command creates or modifies a Git `post-merge` hook script in a specified repository. This hook is designed to automatically run `kilm update` after successful `git pull` or `git merge` operations, helping keep your KiLM-managed libraries synchronized.
+
+## Usage
+
+```bash
+kilm add-hook [OPTIONS]
+```
+
+## Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--directory DIRECTORY` | Path to the Git repository directory | Current working directory | `--directory ~/my-kicad-libs-repo` |
+| `--force` | Overwrite existing hook if present | `False` | `--force` |
+| `--help` | Show help message and exit | - | `--help` |
+
+## Behavior
+
+The command performs the following actions:
+
+1. **Detects Active Hooks Directory**:
+   - Queries `git config core.hooksPath` for custom hooks directory
+   - Falls back to `.git/hooks` (standard location)
+   - Handles Git worktrees where hooks live in the linked location
+
+2. **Checks Existing Hook**: Looks for an existing `post-merge` file
+
+3. **Creates Safe Backup**: If a hook exists, creates a timestamped backup before modification
+
+4. **Intelligent Content Management**:
+   - If KiLM content already exists, updates the managed section
+   - If other content exists, merges KiLM content with clear markers
+   - Preserves existing user logic while adding KiLM functionality
+
+5. **Writes Hook Script**: Creates or updates the hook file with executable content
+
+6. **Sets Permissions**: Ensures the hook has executable permissions (`chmod +x`)
+
+## Examples
+
+### Basic Usage
+
+**Add hook to current Git repository:**
+
+```bash
+# Navigate to your KiCad library repository
+cd ~/kicad-libraries
+
+# Add the hook
+kilm add-hook
+```
+
+**Add hook to specific repository:**
+
+```bash
+kilm add-hook --directory /path/to/another/kicad-lib-repo
+```
+
+### Advanced Usage
+
+**Force overwrite existing hook:**
+
+```bash
+kilm add-hook --directory ~/my-libs --force
+```
+
+## Hook Script Content
+
+The command creates a `post-merge` hook with the following structure:
+
+```bash
+#!/bin/sh
+# BEGIN KiLM-managed section
+# KiCad Library Manager auto-update hook
+# Added by kilm add-hook command
+
+echo "Running KiCad Library Manager update..."
+kilm update
+
+# Uncomment to set up libraries automatically (use with caution)
+# kilm setup
+
+echo "KiCad libraries update complete."
+# END KiLM-managed section
+```
+
+## Advanced Features
+
+### Custom Hooks Directory
+
+If your repository uses `git config core.hooksPath` to specify a custom hooks directory, KiLM will automatically detect and use that location.
+
+```bash
+# Example: Repository with custom hooks path
+git config core.hooksPath ~/.git-hooks
+kilm add-hook  # Will use ~/.git-hooks/post-merge
+```
+
+### Git Worktree Support
+
+For repositories using Git worktrees, KiLM correctly identifies the main repository location and installs hooks in the appropriate hooks directory.
+
+### Safe Updates
+
+- **First Run**: Creates a new hook with KiLM content
+- **Subsequent Runs**: Updates only the KiLM-managed section, preserving other customizations
+- **Backup Protection**: Always creates timestamped backups before modifications
+- **Idempotent**: Safe to run multiple times without duplicating content
+
+## Customization
+
+You can manually edit the generated hook script to add more functionality. For example, to automatically run `kilm setup` after updating:
+
+```bash
+#!/bin/sh
+# BEGIN KiLM-managed section
+# KiCad Library Manager auto-update hook
+# Added by kilm add-hook command
+
+echo "Running KiCad Library Manager update..."
+kilm update
+
+# Uncomment to set up libraries automatically (use with caution)
+kilm setup
+
+echo "KiCad libraries update complete."
+# END KiLM-managed section
+```
+
+## Error Handling
+
+### Common Issues
+
+- **Not a Git repository**: Command will fail if the directory is not a valid Git repository
+- **Permission denied**: Command will fail if unable to write to the hooks directory
+- **Existing hook conflicts**: Use `--force` to overwrite existing hooks
+
+### Error Examples
+
+```bash
+# Not a Git repository
+kilm add-hook --directory /regular/directory
+# Error: Not a git repository
+
+# No write permissions
+kilm add-hook --directory /readonly/repo
+# Error: Permission denied when writing hook file
+```
+
+## Integration with Other Commands
+
+<CardGrid>
+  <LinkCard
+    title="update"
+    href="/reference/cli/update/"
+    description="The command that gets executed by the post-merge hook"
+  />
+  <LinkCard
+    title="setup"
+    href="/reference/cli/setup/"
+    description="Can be optionally added to the hook for automatic setup"
+  />
+  <LinkCard
+    title="status"
+    href="/reference/cli/status/"
+    description="Check hook installation status"
+  />
+</CardGrid>
+
+## Notes
+
+- **Git Integration**: Hook only runs after successful `git pull` or `git merge` operations
+- **Cross-platform**: Works on Windows, macOS, and Linux (uses appropriate shell syntax)
+- **Safety**: Creates backups before modifying existing hooks
+- **Idempotent**: Safe to run multiple times without side effects
+- **Customizable**: Generated hook can be manually modified for additional functionality

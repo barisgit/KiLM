@@ -1,0 +1,165 @@
+---
+title: list
+description: List symbol and footprint libraries found within a directory.
+---
+
+import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
+
+The `kilm list` command scans a specified directory (typically your main KiCad library directory) and lists the symbol (`.kicad_sym`) and footprint (`.pretty`) libraries it finds in the `symbols` and `footprints` subdirectories. This is useful for verifying the contents of a specific library directory, independent of KiLM's own configuration.
+
+## Usage
+
+```bash
+kilm list [OPTIONS]
+```
+
+## Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--kicad-lib-dir TEXT` | Path to the KiCad library directory to scan | `KICAD_USER_LIB` environment variable | `--kicad-lib-dir ~/kicad-libs` |
+| `--help` | Show help message and exit | - | `--help` |
+
+## Behavior
+
+1.  **Determines Target Directory:** Uses the path provided via `--kicad-lib-dir` or falls back to the `KICAD_USER_LIB` environment variable.
+2.  **Scans Directory:** Scans the target directory (top-level only).
+3.  **Identifies Libraries:**
+    - Looks for files ending in `.kicad_sym` to identify symbol libraries.
+    - Looks for directories ending in `.pretty` to identify footprint libraries.
+4.  **Prints Lists:** Outputs separate lists of the symbol and footprint library names found.
+
+## Examples
+
+**List Libraries in Default Directory:**
+Scans the directory specified by the `KICAD_USER_LIB` environment variable.
+
+```bash
+kilm list
+```
+
+_Expected Output (example):_
+
+```
+Available Symbol Libraries:
+  - 74xx
+  - Connector
+  - Device
+
+Available Footprint Libraries:
+  - Capacitor_SMD
+  - Connector_PinHeader_2.54mm
+  - Resistor_SMD
+```
+
+**List libraries in specific directory:**
+
+```bash
+kilm list --kicad-lib-dir ~/my-kicad-libraries
+```
+
+### Expected Output
+
+```text
+Available Symbol Libraries:
+  - 74xx
+  - Connector
+  - Device
+  - Memory
+  - Transistor
+
+Available Footprint Libraries:
+  - Capacitor_SMD
+  - Connector_PinHeader_2.54mm
+  - Package_SO
+  - Resistor_SMD
+```
+
+## Error Handling
+
+### Common Issues
+
+- **Environment variable not set**: Command fails if `KICAD_USER_LIB` is not set and no directory is specified
+- **Directory not found**: Command fails if the specified directory doesn't exist
+- **Permission denied**: Command fails if unable to read the directory
+- **No libraries found**: Command shows empty lists if no valid libraries are detected
+
+### Error Examples
+
+```bash
+# Environment variable not set
+KICAD_USER_LIB= kilm list
+# Error: KICAD_USER_LIB not set and not provided
+
+# Directory doesn't exist
+kilm list --kicad-lib-dir /nonexistent/path
+# Error: Directory '/nonexistent/path' does not exist
+```
+
+## Integration with Other Commands
+
+<CardGrid>
+  <LinkCard
+    title="pin"
+    href="/reference/cli/pin/"
+    description="Pin libraries to KiCad's favorites list"
+  />
+  <LinkCard
+    title="unpin"
+    href="/reference/cli/unpin/"
+    description="Remove libraries from KiCad's favorites list"
+  />
+  <LinkCard
+    title="status"
+    href="/reference/cli/status/"
+    description="Check current KiCad configuration status"
+  />
+  <LinkCard
+    title="setup"
+    href="/reference/cli/setup/"
+    description="Configure KiCad to use listed libraries"
+  />
+</CardGrid>
+
+### Typical Usage Patterns
+
+**Verify library contents before setup:**
+
+```bash
+# Check what libraries are available
+kilm list --kicad-lib-dir ~/kicad-official-libs
+
+# Pin specific libraries to favorites
+kilm pin --kicad-lib-dir ~/kicad-official-libs -s Device -f Package_SO
+
+# Configure KiCad to use all libraries
+kilm setup --kicad-lib-dir ~/kicad-official-libs
+```
+
+**Compare library contents:**
+
+```bash
+# Compare two library directories
+kilm list --kicad-lib-dir ~/project-libs
+kilm list --kicad-lib-dir ~/company-libs
+```
+
+## Library Types Detected
+
+### Symbol Libraries
+- **File extension**: `.kicad_sym`
+- **Purpose**: Contains schematic symbols for KiCad
+- **Example**: `Device.kicad_sym`, `Connector.kicad_sym`
+
+### Footprint Libraries
+- **Directory extension**: `.pretty`
+- **Purpose**: Contains footprint definitions for PCB layout
+- **Example**: `Capacitor_SMD.pretty`, `Package_SO.pretty`
+
+## Notes
+
+- **Independent operation**: Works without KiLM configuration, scans directories directly
+- **Top-level scanning**: Searches only the symbols and footprints directories for library files
+- **Sorted output**: Results are displayed in alphabetical order
+- **Cross-platform**: Uses appropriate path separators for Windows/macOS/Linux
+- **Performance**: Efficient scanning of large directory structures

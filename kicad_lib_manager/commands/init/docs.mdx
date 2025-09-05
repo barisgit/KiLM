@@ -1,0 +1,189 @@
+---
+title: init
+description: Initialize the current directory as a KiCad library collection for symbols, footprints, and templates.
+---
+
+import { LinkCard, Card, CardGrid, FileTree, Code } from "@astrojs/starlight/components";
+
+The `kilm init` command prepares the current working directory to be managed by KiLM as a library collection, primarily intended for symbol, footprint, and template libraries (often managed via Git, hence the internal type `github`).
+
+It performs several actions:
+
+1.  Creates standard subdirectories (`symbols/`, `footprints/`, `templates/`) if they don't exist.
+2.  Creates a template `library_descriptions.yaml` file if it doesn't exist, used for richer descriptions in KiCad.
+3.  Creates or updates a metadata file named `kilm.yaml` within the current directory. This stores the library's name, description, associated environment variable, and detected capabilities (symbols, footprints, templates).
+4.  Adds an entry for this library (with its path and type `github`) to the main KiLM configuration file (`~/.config/kicad-lib-manager/config.yaml`).
+5.  Optionally sets this library as the `current_library` in the main configuration.
+
+## Usage
+
+Run this command from _within_ the directory you want to initialize:
+
+<Code code={`cd /path/to/your-library
+kilm init [OPTIONS]`} lang="bash" />
+
+## Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--name TEXT` | Custom name for the library collection | Auto-generated from directory name | `--name my-custom-library` |
+| `--description TEXT` | Description for the library metadata | None | `--description "My collection of custom components"` |
+| `--env-var TEXT` | Custom KiCad environment variable name | Auto-generated (e.g., `KICAD_LIB_MY_LIBRARY`) | `--env-var MY_LIB_PATH` |
+| `--no-env-var` | Don't assign an environment variable to this library | `False` | `--no-env-var` |
+| `--set-current/--no-set-current` | Set this as the current active library | `True` | `--no-set-current` |
+| `--force` | Overwrite existing metadata file if present | `False` | `--force` |
+| `--help` | Show help message and exit | - | `--help` |
+
+## Behavior
+
+The command performs the following actions:
+
+1. **Creates Directory Structure**: Creates standard subdirectories (`symbols/`, `footprints/`, `templates/`) if they don't exist
+
+2. **Creates Template Files**: Creates a template `library_descriptions.yaml` file for richer KiCad descriptions
+
+3. **Creates/Updates Metadata**: Creates or modifies `kilm.yaml` with library information:
+   - Library name, description, and environment variable
+   - Detected capabilities (symbols, footprints, templates)
+   - Last updated timestamp
+
+4. **Updates Global Configuration**: Adds library entry (type `github`) to main `config.yaml`
+
+5. **Sets Default Library**: Optionally sets this library as the current active library
+
+## Examples
+
+### Basic Usage
+
+**Initialize current directory as KiCad library:**
+
+<Code code={`# Navigate to your library directory
+cd ~/my-kicad-libraries
+
+# Initialize with default settings
+kilm init`} lang="bash" />
+
+**Initialize with custom name and description:**
+
+<Code code={`cd ~/company-components
+kilm init --name company-symbols --description "Company-wide KiCad components"`} lang="bash" />
+
+### Advanced Configuration
+
+**Initialize with custom environment variable:**
+
+<Code code={`cd ~/project-libraries
+kilm init --name project-libs \
+    --description "Project-specific components" \
+    --env-var PROJECT_COMPONENTS \
+    --no-set-current`} lang="bash" />
+
+**Force re-initialization:**
+
+<Code code={`cd ~/existing-library
+kilm init --force --name updated-library`} lang="bash" />
+
+### Workflow Examples
+
+**Complete library setup workflow:**
+
+<Code code={`# 1. Create and initialize library
+mkdir ~/my-symbols && cd ~/my-symbols
+kilm init --name my-symbols --description "My custom symbols"
+
+# 2. Add your symbol files to symbols/ directory
+# Copy your .kicad_sym files to symbols/
+
+# 3. Configure KiCad to use the library
+kilm setup
+
+# 4. Verify setup
+kilm status`} lang="bash" />
+
+## Error Handling
+
+### Common Issues
+
+- **Permission denied**: Command will fail if unable to create directories or files
+- **Existing library**: Use `--force` to overwrite existing metadata
+- **Invalid directory**: Command must be run in a writable directory
+- **Configuration error**: Command will fail if unable to update global config
+
+### Error Examples
+
+<Code code={`# No write permissions
+cd /readonly/directory
+kilm init
+# Error: Permission denied when creating directories
+
+# Directory doesn't exist
+cd /nonexistent/path
+kilm init
+# Error: Directory does not exist`} lang="bash" />
+
+## Integration with Other Commands
+
+<CardGrid>
+  <LinkCard
+    title="setup"
+    href="/reference/cli/setup/"
+    description="Configure KiCad to use the initialized library"
+  />
+  <LinkCard
+    title="status"
+    href="/reference/cli/status/"
+    description="Check the status of initialized libraries"
+  />
+  <LinkCard
+    title="update"
+    href="/reference/cli/update/"
+    description="Update Git-based libraries after initialization"
+  />
+  <LinkCard
+    title="config"
+    href="/reference/cli/config/"
+    description="Manage library configuration and settings"
+  />
+</CardGrid>
+
+### Typical Workflow
+
+After running `kilm init`, you typically need to:
+
+1. **Add your library files**: Place `.kicad_sym` files in `symbols/`, `.pretty` directories in `footprints/`
+2. **Run setup**: Execute `kilm setup` to configure KiCad to use the library
+3. **Verify**: Use `kilm status` to check that everything is configured correctly
+
+## Generated Files
+
+The command creates the following files and directories:
+
+### Directory Structure
+<FileTree>
+- your-library
+  - symbols/                    # Directory for .kicad_sym files
+  - footprints/                 # Directory for .pretty directories
+  - templates/                  # Directory for project templates
+  - kilm.yaml                   # Library metadata (created/updated)
+  - library_descriptions.yaml   # KiCad descriptions (created if missing)
+</FileTree>
+
+### Metadata File
+
+<Code code={`name: "my-library"
+description: "My KiCad library"
+env_var: "KICAD_LIB_MY_LIBRARY"
+capabilities:
+  symbols: true
+  footprints: true
+  templates: false
+version: "1.0.0"
+updated_with: "kilm"`} lang="yaml" title="kilm.yaml" />
+
+## Notes
+
+- **Working Directory**: Command must be run from within the directory you want to initialize
+- **Environment Variables**: Use `kilm setup` to activate configured environment variables in KiCad
+- **Cross-platform**: Works on Windows, macOS, and Linux with appropriate path handling
+- **Git Integration**: Designed for Git-managed libraries but works with any directory structure
+- **Safe Updates**: Preserves existing metadata unless `--force` is used

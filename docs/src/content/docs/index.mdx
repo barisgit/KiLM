@@ -1,21 +1,41 @@
 ---
 title: KiCad Library Manager (KiLM)
-description: A command-line tool for managing KiCad libraries across projects and workstations.
+description: Professional command-line tool for managing KiCad libraries across projects and workstations with cross-platform support and team collaboration.
 template: splash
 hero:
-  title: KiCad Library Manager
-  tagline: Streamline your KiCad library management across projects and workstations.
+  title: KiCad Library Manager (KiLM)
+  tagline: Professional KiCad library management with cross-platform support and seamless team collaboration.
   image:
     file: ../../assets/KiCad-Logo.webp
+    alt: KiCad logo
   actions:
     - text: Get Started
       link: /guides/getting-started/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
-      link: https://github.com/barisgit/kilm
+      link: https://github.com/barisgit/KiLM
       icon: github
       variant: minimal
+features:
+  - icon: tabler:library
+    title: Unified Library Management
+    details: Manage symbols, footprints, and 3D models from a single professional CLI tool.
+  - icon: tabler:device-desktop
+    title: Cross-Platform Support
+    details: Works seamlessly on Windows, macOS, and Linux with automatic KiCad detection.
+  - icon: tabler:rocket
+    title: Reliable & Fast
+    details: Built for reliability with comprehensive error handling and quick library operations.
+  - icon: tabler:settings
+    title: Professional Standards
+    details: Clean code, proper configuration management, and comprehensive backup system.
+  - icon: tabler:cloud-download
+    title: Team Collaboration
+    details: Share libraries via Git with consistent metadata and environment setup.
+  - icon: tabler:terminal-2
+    title: Modern CLI Design
+    details: Intuitive commands with comprehensive help, dry-run modes, and clear feedback.
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
@@ -23,181 +43,71 @@ import BadgeData from "../../components/BadgeData.astro";
 
 <BadgeData />
 
-<div class="rounded-2xl p-8 my-8 relative overflow-hidden border border-white/10 bg-[rgba(20,20,28,0.7)] backdrop-blur-lg transition-all duration-300 hover:translate-y-[-3px] hover:shadow-xl group">
-  <div class="absolute inset-0 -z-10 opacity-30 bg-gradient-to-br from-[rgba(79,57,250,0.6)] to-[rgba(218,98,196,0.6)] bg-[length:200%_200%] animate-gradient"></div>
+<div class="pointer-events-none absolute inset-x-0 -top-6 h-48 -z-10 blur-3xl opacity-40 aurora-bg"></div>
 
-## ✨ What can you do with KiLM?
+<h2 class="mt-10 mb-4 text-[1.6rem] sm:text-2xl font-semibold tracking-tight">
+  <span class="bg-gradient-to-r from-sky-400 via-violet-300 to-amber-300 bg-clip-text text-transparent pr-4">Quickstart</span>
+  <span class="align-middle text-xs px-2 py-0.5 rounded-full border border-white/10 text-white/70 bg-white/5">~1 min</span>
+  
+</h2>
 
-**KiLM** centralizes how you handle symbol, footprint, and 3D model libraries across projects and workstations.
-It helps maintain consistency in your designs with a standardized approach to library management.
+```bash
+# Install with pipx (recommended - isolated environment)
+pipx install kilm
 
-<div class="mt-6 flex flex-wrap gap-3">
-  <a
-    href="https://pypi.org/project/kilm/"
-    class="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
-  >
-    v
-    <span id="pypi-version" class="text-[#60efff] font-semibold mx-1">
-      Latest
-    </span>
-  </a>
-  <a
-    href="https://pypi.org/project/kilm/"
-    class="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
-  >
-    <span class="mr-2">🐍</span> Python{" "}
-    <span id="python-versions" class="ml-1 font-semibold">
-      3.7+
-    </span>
-  </a>
-  <a
-    href="https://pepy.tech/projects/kilm"
-    class="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
-  >
-    <span class="mr-2">📊</span>{" "}
-    <span id="pypi-downloads" class="text-[#60efff] font-semibold mr-1">
-      4K+
-    </span>{" "}
-    Downloads
-  </a>
-  <a
-    href="https://opensource.org/licenses/MIT"
-    class="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
-  >
-    <span class="mr-2">📄</span> MIT License
-  </a>
-  <a
-    href="https://kilm.aristovnik.me"
-    class="inline-flex items-center bg-[rgba(30,30,40,0.8)] rounded-lg py-2 px-4 text-sm font-medium text-white/90 shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-lg hover:text-white border border-white/10"
-  >
-    <span class="mr-2">📚</span> Documentation
-  </a>
-</div>
+# Alternative: using uv (fastest)
+uv pip install kilm
 
-</div>
+# Verify installation
+kilm --version
 
-<div class="rounded-2xl p-8 my-8 relative overflow-hidden border border-white/10 bg-[rgba(20,20,28,0.7)] backdrop-blur-lg transition-all duration-300 hover:translate-y-[-3px] hover:shadow-xl group">
-  <div class="absolute inset-0 -z-10 opacity-30 bg-gradient-to-br from-[rgba(0,255,135,0.5)] to-[rgba(96,239,255,0.5)] bg-[length:200%_200%] animate-gradient"></div>
+# Check KiCad detection
+kilm status
 
-## 🚀 Take a guided tour
+# Initialize library in your project
+kilm init --name my-library --description "My KiCad components"
 
-Follow the [Getting Started tutorial](/guides/getting-started/) to learn the basics and set up your first KiLM configuration.
+# Set up KiCad configuration
+kilm setup
+```
 
-</div>
+<p class="mt-4 text-white/80">
+  New to KiLM? Start with the <a href="/guides/getting-started/">Getting Started</a> guide for a complete walkthrough, then explore <a href="/guides/configuration/">Configuration</a> options.
+</p>
 
-<div class="rounded-2xl p-8 my-8 relative overflow-hidden border border-white/10 bg-[rgba(20,20,28,0.7)] backdrop-blur-lg transition-all duration-300 hover:translate-y-[-3px] hover:shadow-xl group">
-  <div class="absolute inset-0 -z-10 opacity-30 bg-gradient-to-br from-[rgba(255,113,112,0.5)] to-[rgba(255,229,127,0.5)] bg-[length:200%_200%] animate-gradient"></div>
+<ul class="mt-2 text-white/80">
+  <li><a href="/guides/installation/">Installation Methods</a> - pipx, uv, pip, and development setup</li>
+  <li><a href="/guides/getting-started/">Getting Started</a> - creator and consumer workflows</li>
+  <li><a href="/guides/configuration/">Configuration</a> - KiLM and KiCad integration</li>
+  <li><a href="/community/development/">Development Setup</a> - contribute with type safety</li>
+</ul>
 
-## ⚡ Start a new setup
+<h2 class="mt-12 mb-4 text-[1.6rem] sm:text-2xl font-semibold tracking-tight">
+  <span class="bg-gradient-to-r from-sky-400 via-violet-300 to-amber-300 bg-clip-text text-transparent">Learn</span>
+</h2>
 
-<div class="bg-[#1a1b26] rounded-lg my-6 font-mono shadow-xl border border-white/10 overflow-hidden">
-  <div class="flex items-center px-4 py-2 bg-[#16161e] border-b border-white/5">
-    <div class="flex items-center">
-      <span class="w-3 h-3 rounded-full bg-[#ff5f56] inline-block mr-2"></span>
-      <span class="w-3 h-3 rounded-full bg-[#ffbd2e] inline-block mr-2"></span>
-      <span class="w-3 h-3 rounded-full bg-[#27c93f] inline-block mr-2"></span>
-    </div>
-  </div>
-  <div class="text-[#f1f1f1] p-4 overflow-x-auto leading-relaxed">
-    <div class="my-2 relative pl-5 text-[#e4e4e4]">
-      <span class="absolute left-0 text-[#63f2f1] font-bold">$</span>pip
-      install kilm
-    </div>
-    <div class="my-2 mb-4 text-[#a9b1d6] opacity-90">
-      Successfully installed kilm-1.0.0
-    </div>
-    <div class="my-2 relative pl-5 text-[#e4e4e4]">
-      <span class="absolute left-0 text-[#63f2f1] font-bold">$</span>kilm
-      init
-    </div>
-    <div class="my-2 mb-4 text-[#a9b1d6] opacity-90">
-      Initializing new KiLM configuration...
-    </div>
-  </div>
-</div>
+<CardGrid>
+  <Card title="Creator & Consumer Workflows" link="/guides/getting-started/">
+    Learn how to set up shared libraries and use them across teams with Git integration.
+    <a class="card-cta" href="/guides/getting-started/">Learn workflows <span aria-hidden="true" class="arrow">→</span></a>
+  </Card>
+  <Card title="Development & Contributing" link="/community/development/">
+    Quality standards, modern Python development practices, and contribution guidelines.
+    <a class="card-cta" href="/community/development/">Contribute <span aria-hidden="true" class="arrow">→</span></a>
+  </Card>
+  <Card title="Complete CLI Reference" link="/reference/cli/">
+    Every command with detailed options, examples, and cross-platform usage.
+    <a class="card-cta" href="/reference/cli/">Browse commands <span aria-hidden="true" class="arrow">→</span></a>
+  </Card>
+  <Card title="Configuration Management" link="/guides/configuration/">
+    KiLM and KiCad configuration files, backup systems, and environment variables.
+    <a class="card-cta" href="/guides/configuration/">Configure setup <span aria-hidden="true" class="arrow">→</span></a>
+  </Card>
+</CardGrid>
 
-Our [installation guide](/guides/installation/) has step-by-step instructions for installing KiLM using pip, pipx, or from source, setting up a new project from an existing configuration, and more.
-
-</div>
-
-## 📖 Learn
-
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-10 w-full">
-  <div class="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
-    <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4f39fa] to-[#da62c4] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 class="mt-0 mb-4 font-semibold text-white/95">Key Features</h3>
-    <p class="mb-4 text-white/70 leading-relaxed flex-grow">
-      Learn about KiLM's core capabilities and how they can improve your
-      workflow.
-    </p>
-    <a
-      href="/guides/getting-started/"
-      class="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#4f39fa] mt-auto"
-    >
-      Explore Features
-      <span class="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
-        →
-      </span>
-    </a>
-  </div>
-  <div class="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
-    <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#00ff87] to-[#60efff] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 class="mt-0 mb-4 font-semibold text-white/95">
-      Project Architecture
-    </h3>
-    <p class="mb-4 text-white/70 leading-relaxed flex-grow">
-      Understand how KiLM organizes and manages your libraries.
-    </p>
-    <a
-      href="/community/development/"
-      class="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#00ff87] mt-auto"
-    >
-      View Architecture
-      <span class="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
-        →
-      </span>
-    </a>
-  </div>
-  <div class="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
-    <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff7043] to-[#ffab40] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 class="mt-0 mb-4 font-semibold text-white/95">Command Reference</h3>
-    <p class="mb-4 text-white/70 leading-relaxed flex-grow">
-      Explore the complete list of commands and their options.
-    </p>
-    <a
-      href="/reference/cli/"
-      class="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ffab40] mt-auto"
-    >
-      View Commands
-      <span class="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
-        →
-      </span>
-    </a>
-  </div>
-  <div class="rounded-lg p-6 bg-[rgba(30,30,40,0.5)] border border-white/10 transition-all duration-300 backdrop-blur-md overflow-hidden relative flex flex-col min-h-[250px] hover:translate-y-[-5px] hover:shadow-lg group">
-    <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#e91e63] to-[#ff4081] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-    <h3 class="mt-0 mb-4 font-semibold text-white/95">
-      Configuration Options
-    </h3>
-    <p class="mb-4 text-white/70 leading-relaxed flex-grow">
-      Learn how to customize KiLM to fit your specific needs.
-    </p>
-    <a
-      href="/guides/configuration/"
-      class="inline-flex items-center text-[#60efff] font-medium no-underline transition-colors duration-200 hover:text-[#ff4081] mt-auto"
-    >
-      View Config Options
-      <span class="ml-2 transition-transform duration-200 group-hover:translate-x-[3px]">
-        →
-      </span>
-    </a>
-  </div>
-</div>
-
-<div class="rounded-2xl p-8 my-8 relative overflow-hidden border border-white/10 bg-[rgba(20,20,28,0.7)] backdrop-blur-lg transition-all duration-300 hover:translate-y-[-3px] hover:shadow-xl group">
-  <div class="absolute inset-0 -z-10 opacity-30 bg-gradient-to-br from-[rgba(121,40,202,0.5)] to-[rgba(255,0,128,0.5)] bg-[length:200%_200%] animate-gradient"></div>
-
-## 🔮 Extend
+<h2 class="mt-12 mb-4 text-[1.6rem] sm:text-2xl font-semibold tracking-tight">
+  <span class="bg-gradient-to-r from-sky-400 via-violet-300 to-amber-300 bg-clip-text text-transparent">Extend</span>
+</h2>
 
 <CardGrid>
   <Card
@@ -206,6 +116,7 @@ Our [installation guide](/guides/installation/) has step-by-step instructions fo
     icon="add-document"
   >
     Integrate third-party symbol, footprint, and 3D model libraries.
+    <a class="card-cta" href="/reference/cli/add-3d/">Add 3D libs <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
   <Card
     title="Create Project Templates"
@@ -213,17 +124,18 @@ Our [installation guide](/guides/installation/) has step-by-step instructions fo
     icon="document"
   >
     Standardize designs with reusable project templates.
+    <a class="card-cta" href="/reference/cli/template/">Create template <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
   <Card
     title="Set Environment Variables"
     link="/reference/cli/config/"
-    icon="seti:config"
+    icon="document"
   >
     Configure KiCad environment variables directly through KiLM.
+    <a class="card-cta" href="/reference/cli/config/">Set env vars <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
-  <Card title="Manage Pinned Libraries" link="/reference/cli/pin/" icon="pin">
+  <Card title="Manage Pinned Libraries" link="/reference/cli/pin/" icon="setting">
     Keep your favorite libraries readily accessible within KiCad.
+    <a class="card-cta" href="/reference/cli/pin/">Manage pins <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
 </CardGrid>
-
-</div>

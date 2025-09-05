@@ -39,7 +39,7 @@ main.add_command(init)
 main.add_command(add_3d)
 main.add_command(config)
 main.add_command(update)
-main.add_command(add_hook, name="add-hook")
+main.add_command(add_hook)
 main.add_command(template)
 
 

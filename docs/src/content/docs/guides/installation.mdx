@@ -1,0 +1,93 @@
+---
+title: Installation
+description: How to install KiLM on your system.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+KiLM (KiCad Library Manager) is a Python CLI tool that requires Python 3.8+ and KiCad 6.x+ to be installed and run at least once.
+
+## System Requirements
+
+- **Python 3.8 or newer**
+- **KiCad 6.x or newer** (must be launched at least once to create configuration directories)
+- **Operating System:** Windows, macOS, or Linux
+
+<Aside type="note">
+KiLM automatically detects KiCad installations and configuration paths across different platforms.
+</Aside>
+
+## Installation Methods
+
+You can install KiLM using several methods:
+
+### Method 1: Using pipx (Recommended)
+
+[`pipx`](https://pypa.github.io/pipx/) installs CLI tools in isolated environments, preventing dependency conflicts:
+
+```bash
+# Install pipx if you don't have it
+python -m pip install --user pipx
+python -m pipx ensurepath
+
+# Install KiLM using pipx
+pipx install kilm
+```
+
+### Method 2: Using uv (Fastest)
+
+[`uv`](https://github.com/astral-sh/uv) is an extremely fast Python package installer:
+
+```bash
+# Install uv (Linux/macOS)
+curl -sSf https://astral.sh/uv/install.sh | sh
+
+# Install KiLM using uv
+uv pip install kilm
+```
+
+### Method 3: Using pip (Traditional)
+
+Standard Python package installation:
+
+```bash
+pip install kilm
+```
+
+<Aside type="caution">
+Using `pip` may cause dependency conflicts with other Python projects. Consider using `pipx` or `uv` for a cleaner installation.
+</Aside>
+
+### Method 4: From Source (Development)
+
+For contributors or those wanting the latest development version:
+
+```bash
+# Clone the repository
+git clone https://github.com/barisgit/kilm.git
+cd kilm
+
+# Install in editable mode with development dependencies
+pip install -e ".[dev]"
+```
+
+See the [Development Setup](/community/development/) guide for more details.
+
+## Verification
+
+After installation, verify KiLM is installed correctly:
+
+```bash
+# Check version
+kilm --version
+
+# View available commands
+kilm --help
+
+# Check KiCad detection
+kilm status
+```
+
+<Aside type="tip">
+If `kilm status` shows "KiCad configuration not found," make sure you've launched KiCad at least once to create the configuration directories.
+</Aside>
