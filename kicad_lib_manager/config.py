@@ -274,16 +274,9 @@ class Config:
         # Validate and clean up each library entry
         normalized_libraries: List[LibraryDict] = []
         for lib in libraries:
-            if isinstance(lib, dict) and all(
-                key in lib for key in ["name", "path", "type"]
-            ):
-                # Ensure all values are strings
-                normalized_lib = _make_library_dict(
-                    name=str(lib["name"]),
-                    path=str(lib["path"]),
-                    type_=str(lib["type"]),
-                )
-                normalized_libraries.append(normalized_lib)
+            validated_lib = _validate_library_entry(lib)
+            if validated_lib is not None:
+                normalized_libraries.append(validated_lib)
             else:
                 click.echo(f"Warning: Skipping invalid library entry: {lib}", err=True)
 
@@ -312,16 +305,9 @@ class Config:
         needs_save = False
 
         for lib in libraries_raw:
-            if isinstance(lib, dict) and all(
-                key in lib for key in ["name", "path", "type"]
-            ):
-                # Ensure all values are strings
-                normalized_lib = _make_library_dict(
-                    name=str(lib["name"]),
-                    path=str(lib["path"]),
-                    type_=str(lib["type"]),
-                )
-                normalized_libraries.append(normalized_lib)
+            validated_lib = _validate_library_entry(lib)
+            if validated_lib is not None:
+                normalized_libraries.append(validated_lib)
             else:
                 click.echo(f"Warning: Skipping invalid library entry: {lib}", err=True)
                 needs_save = True
@@ -336,4 +322,17 @@ class Config:
 
 def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:
     """Typed constructor for `LibraryDict` to satisfy type checker."""
-    return cast("LibraryDict", {"name": name, "path": path, "type": type_})
+    return LibraryDict(name=name, path=path, type=type_)
+
+
+def _validate_library_entry(
+    lib: Union[Dict[str, str], LibraryDict],
+) -> Optional[LibraryDict]:
+    """Validate and normalize a library entry."""
+    if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
+        return _make_library_dict(
+            name=str(lib["name"]),
+            path=str(lib["path"]),
+            type_=str(lib["type"]),
+        )
+    return None
