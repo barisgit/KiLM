@@ -1,3 +1,3 @@
-from .command import check_for_library_changes, update
+from .command import update
 
-__all__ = ["check_for_library_changes", "update"]
+__all__ = ["update"]
