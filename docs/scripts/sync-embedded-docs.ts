@@ -273,12 +273,14 @@ function cleanupDocs(): void {
 
   const commandDocs = findCommandDocs();
   const expectedFiles = new Set(commandDocs.map(doc => path.basename(doc.outputPath)));
+  // Keep manually-authored index file or any other non-generated files
+  const doNotDelete = new Set<string>(["index.mdx", "index.md"]);
   
   const existingFiles = fs.readdirSync(docsOutputDir)
     .filter(file => file.endsWith('.mdx') || file.endsWith('.md'));
 
   for (const file of existingFiles) {
-    if (!expectedFiles.has(file)) {
+    if (!expectedFiles.has(file) && !doNotDelete.has(file)) {
       const filePath = path.join(docsOutputDir, file);
       fs.unlinkSync(filePath);
       console.log(`Removed orphaned doc: ${file}`);
