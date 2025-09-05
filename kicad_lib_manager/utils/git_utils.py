@@ -131,14 +131,14 @@ def create_kilm_hook_content() -> str:
         Formatted hook content string
     """
     return """# BEGIN KiLM-managed section
-# KiCad Library Manager auto-update hook
+# KiCad Library Manager auto-sync hook
 # Added by kilm add-hook command
 
-echo "Running KiCad Library Manager update..."
-kilm update
+echo "Running KiCad Library Manager sync..."
+kilm sync
 
 # Uncomment to set up libraries automatically (use with caution)
 # kilm setup
 
-echo "KiCad libraries update complete."
+echo "KiCad libraries sync complete."
 # END KiLM-managed section"""

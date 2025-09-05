@@ -60,6 +60,7 @@ export default defineConfig({
             { label: "template", link: "/reference/cli/template/" },
             { label: "list", link: "/reference/cli/list/" },
             { label: "status", link: "/reference/cli/status/" },
+            { label: "sync", link: "/reference/cli/sync/" },
             { label: "update", link: "/reference/cli/update/" },
             { label: "add-hook", link: "/reference/cli/add-hook/" },
           ],

@@ -24,7 +24,7 @@ class TestGitUtils:
 
         assert "BEGIN KiLM-managed section" in content
         assert "END KiLM-managed section" in content
-        assert "kilm update" in content
+        assert "kilm sync" in content
         assert "kilm setup" in content
         assert content.startswith("# BEGIN KiLM-managed section")
         assert content.endswith("# END KiLM-managed section")
@@ -77,7 +77,7 @@ echo 'after kilm'"""
         assert result.count("BEGIN KiLM-managed section") == 1
         assert result.count("END KiLM-managed section") == 1
         assert "old kilm content" not in result
-        assert "kilm update" in result
+        assert "kilm sync" in result
 
     @patch("subprocess.run")
     def test_get_git_hooks_directory_standard(self, mock_run, tmp_path):

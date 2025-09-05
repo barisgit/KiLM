@@ -1,0 +1,40 @@
+repos:
+  # Ruff formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.6
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        description: Format Python code with ruff
+
+  # Ruff linter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.6
+    hooks:
+      - id: ruff
+        name: ruff check --fix
+        description: Lint Python code with ruff and auto-fix issues
+        args: [--fix]
+
+  # Pyrefly type checker
+  - repo: local
+    hooks:
+      - id: pyrefly
+        name: pyrefly check
+        description: Type check Python code with pyrefly
+        entry: .venv/bin/pyrefly
+        args: [check]
+        language: system
+        types: [python]
+
+  # Pytest tests
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        description: Run tests with pytest
+        entry: .venv/bin/pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true

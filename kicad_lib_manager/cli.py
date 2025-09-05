@@ -15,6 +15,7 @@ from .commands.list_libraries import list_cmd
 from .commands.pin import pin
 from .commands.setup import setup
 from .commands.status import status
+from .commands.sync import sync
 from .commands.template import template
 from .commands.unpin import unpin
 from .commands.update import update
@@ -39,6 +40,7 @@ main.add_command(unpin)
 main.add_command(init)
 main.add_command(add_3d)
 main.add_command(config)
+main.add_command(sync)
 main.add_command(update)
 main.add_command(add_hook)
 main.add_command(template)

@@ -2,6 +2,7 @@
 Configuration management
 """
 
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TypedDict, Union, cast
 
@@ -29,6 +30,9 @@ ConfigValue = Union[str, int, List[LibraryDict]]
 DEFAULT_CONFIG: Dict[str, ConfigValue] = {
     "max_backups": DEFAULT_MAX_BACKUPS,
     "libraries": DEFAULT_LIBRARIES,
+    "update_check": True,
+    "update_check_frequency": "daily",  # daily, weekly, never
+    "auto_update": False,  # Never auto-update without permission
 }
 
 
@@ -318,6 +322,128 @@ class Config:
             self.save()
 
         return normalized_libraries
+
+    def should_check_updates(self) -> bool:
+        """
+        Determine if update check should run based on configuration.
+
+        Returns:
+            True if update check should be performed
+        """
+        if not self.get("update_check", True):
+            return False
+
+        frequency = self.get("update_check_frequency", "daily")
+        if frequency == "never":
+            return False
+
+        # Check if we've checked recently based on frequency
+        cache_dir = Path.home() / ".cache" / "kilm"
+        last_check_file = cache_dir / "last_update_check"
+
+        if not last_check_file.exists():
+            return True
+
+        try:
+            last_check = float(last_check_file.read_text().strip())
+            now = time.time()
+
+            if frequency == "daily":
+                return now - last_check > 86400  # 24 hours
+            elif frequency == "weekly":
+                return now - last_check > 604800  # 7 days
+        except (ValueError, OSError):
+            return True
+
+        return False
+
+    def mark_update_check_performed(self) -> None:
+        """Mark that an update check was performed."""
+
+        cache_dir = Path.home() / ".cache" / "kilm"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        last_check_file = cache_dir / "last_update_check"
+        last_check_file.write_text(str(time.time()))
+
+    def get_update_preferences(self) -> Dict[str, Union[bool, str]]:
+        """
+        Get update-related preferences.
+
+        Returns:
+            Dictionary containing update preferences
+        """
+        return {
+            "update_check": bool(self.get("update_check", True)),
+            "update_check_frequency": str(self.get("update_check_frequency", "daily")),
+            "auto_update": bool(self.get("auto_update", False)),
+        }
+
+    def set_update_preference(self, key: str, value: Union[bool, str]) -> None:
+        """
+        Set an update preference with strict type validation and coercion.
+
+        Args:
+            key: Preference key ('update_check', 'update_check_frequency', 'auto_update')
+            value: Preference value (will be coerced to appropriate type)
+        """
+        valid_keys = {"update_check", "update_check_frequency", "auto_update"}
+        if key not in valid_keys:
+            raise ValueError(f"Invalid update preference key: {key}")
+
+        # Handle boolean keys with type coercion
+        if key in {"update_check", "auto_update"}:
+            coerced_value = self._coerce_to_bool(value)
+        # Handle frequency key with string validation
+        elif key == "update_check_frequency":
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"update_check_frequency must be a string, got {type(value).__name__}"
+                )
+            valid_frequencies = {"daily", "weekly", "never"}
+            if value not in valid_frequencies:
+                raise ValueError(
+                    f"Invalid frequency: {value}. Must be one of: {valid_frequencies}"
+                )
+            coerced_value = value
+        else:
+            coerced_value = value
+
+        self.set(key, coerced_value)
+        self.save()
+
+    def _coerce_to_bool(self, value: Union[bool, str]) -> bool:
+        """
+        Coerce a value to boolean with strict validation.
+
+        Args:
+            value: Value to coerce (bool or string)
+
+        Returns:
+            Boolean value
+
+        Raises:
+            ValueError: If value cannot be coerced to boolean
+        """
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, str):
+            value_lower = value.lower().strip()
+            if value_lower in {"true", "1", "yes"}:
+                return True
+            elif value_lower in {"false", "0", "no"}:
+                return False
+            else:
+                raise ValueError(
+                    f"Invalid boolean value: '{value}'. "
+                    f"Must be one of: true, false, 1, 0, yes, no (case-insensitive)"
+                )
+
+        # Should never happen
+        raise ValueError(
+            f"Cannot coerce {type(value).__name__} to boolean. "
+            f"Expected bool or string, got {type(value).__name__}"
+        )
 
 
 def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:

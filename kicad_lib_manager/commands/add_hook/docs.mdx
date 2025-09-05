@@ -5,7 +5,7 @@ description: Add a Git post-merge hook to automatically update KiLM-managed libr
 
 import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
 
-The `kilm add-hook` command creates or modifies a Git `post-merge` hook script in a specified repository. This hook is designed to automatically run `kilm update` after successful `git pull` or `git merge` operations, helping keep your KiLM-managed libraries synchronized.
+The `kilm add-hook` command creates or modifies a Git `post-merge` hook script in a specified repository. This hook is designed to automatically run `kilm sync` after successful `git pull` or `git merge` operations, helping keep your KiLM-managed libraries synchronized.
 
 ## Usage
 
@@ -81,8 +81,8 @@ The command creates a `post-merge` hook with the following structure:
 # KiCad Library Manager auto-update hook
 # Added by kilm add-hook command
 
-echo "Running KiCad Library Manager update..."
-kilm update
+echo "Running KiCad Library Manager sync..."
+kilm sync
 
 # Uncomment to set up libraries automatically (use with caution)
 # kilm setup
@@ -124,8 +124,8 @@ You can manually edit the generated hook script to add more functionality. For e
 # KiCad Library Manager auto-update hook
 # Added by kilm add-hook command
 
-echo "Running KiCad Library Manager update..."
-kilm update
+echo "Running KiCad Library Manager sync..."
+kilm sync
 
 # Uncomment to set up libraries automatically (use with caution)
 kilm setup
@@ -158,8 +158,8 @@ kilm add-hook --directory /readonly/repo
 
 <CardGrid>
   <LinkCard
-    title="update"
-    href="/reference/cli/update/"
+    title="sync"
+    href="/reference/cli/sync/"
     description="The command that gets executed by the post-merge hook"
   />
   <LinkCard

@@ -1,13 +1,19 @@
 ---
 title: update
-description: Update configured Git-based libraries using git pull.
+description: Update KiLM to the latest version from PyPI.
 ---
 
 import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
 
-The `kilm update` command attempts to update all configured symbol, footprint, and template libraries (type `github`) that are identified as Git repositories by running `git pull` within their directories.
+The `kilm update` command updates KiLM itself to the latest version available on PyPI. It automatically detects your installation method and uses the appropriate update mechanism.
 
-This command helps keep your local copies of shared libraries synchronized with their remote Git repositories.
+:::caution[Breaking Change in v0.4.0]
+The `kilm update` command behavior changed in KiLM v0.4.0:
+- **Now:** Updates KiLM itself (self-update)
+- **Previously:** Updated library content (now use `kilm sync`)
+
+A deprecation banner will guide users during the transition period.
+:::
 
 ## Usage
 
@@ -17,54 +23,76 @@ kilm update [OPTIONS]
 
 ## Options
 
-- `--dry-run`:
-  Show which libraries are detected as Git repositories and would be updated, but do not actually run `git pull`.
-  _Example:_ `kilm update --dry-run`
+- `--check`:
+  Check for available updates without installing them. Shows current version, latest version, and update instructions.
+  _Example:_ `kilm update --check`
 
-- `--verbose`:
-  Show detailed output during the update process, including the full output from the `git pull` commands.
-  _Example:_ `kilm update --verbose`
-
-- `--auto-setup`:
-  If the `git pull` operation results in changes that likely require updating KiCad's configuration (e.g., new symbol or footprint libraries detected), automatically run `kilm setup` after the updates are complete. Default: `False`.
-  _Example:_ `kilm update --auto-setup`
+- `--force`:
+  Force update even if already up to date. Useful for reinstalling the current version.
+  _Example:_ `kilm update --force`
 
 - `--help`:
   Show the help message and exit.
 
 ## Behavior
 
-1.  **Reads KiLM Config:** Loads library information from `config.yaml`.
-2.  **Identifies `github` Libraries:** Filters for libraries with type `github`.
-3.  **Checks for `.git`:** For each library path, checks if it exists and contains a `.git` directory.
-4.  **Runs `git pull`:** If it's a valid Git repository, navigates into the directory and executes `git pull` (unless `--dry-run`).
-5.  **Checks for Changes:** After a successful pull, analyzes the output and file system to detect if new symbol libraries (`.kicad_sym`), footprint libraries (`.pretty`), or templates (`templates/*/metadata.yaml`) were added.
-6.  **Reports & Optional Setup:** Summarizes the update results. If changes requiring configuration updates were detected, it recommends running `kilm setup` or runs it automatically if `--auto-setup` was specified.
+1.  **Installation Detection:** Automatically detects how KiLM was installed (pipx, pip, uv).
+2.  **Version Check:** Queries PyPI for the latest available version using cached requests.
+3.  **Update Execution:** For supported methods (pipx, pip, uv), automatically executes the update command.
+4.  **Unavailable Methods:** For conda and homebrew (not yet published), provides information about planned availability.
+
+## Supported Installation Methods
+
+| Method | Auto-Update | Update Command |
+|--------|-------------|----------------|
+| **pipx** ✅ | Yes | `pipx upgrade kilm` |
+| **pip** ✅ | Yes | `pip install --upgrade kilm` |
+| **pip (venv)** ✅ | Yes | `pip install --upgrade kilm` |
+| **uv** ✅ | Yes | `uv tool upgrade kilm` |
+| **conda** | Unavailable | N/A (planned for future) |
+| **homebrew** | Unavailable | N/A (planned for future) |
 
 ## Examples
 
-**Update all Git-based libraries:**
+**Check for updates:**
+
+```bash
+kilm update --check
+```
+
+**Update KiLM to latest version:**
 
 ```bash
 kilm update
 ```
 
-**Preview which libraries would be updated:**
+**Force reinstall current version:**
 
 ```bash
-kilm update --dry-run
+kilm update --force
 ```
 
-**Update libraries with detailed output:**
+## Configuration
+
+Update checking behavior can be configured using `kilm config`:
 
 ```bash
-kilm update --verbose
+# Disable update checking
+kilm config set update_check false
+
+# Set check frequency
+kilm config set update_check_frequency weekly  # daily, weekly, never
 ```
 
-**Update libraries and automatically run setup if needed:**
+## Troubleshooting
 
-```bash
-kilm update --auto-setup
-```
+**Update fails with permission errors:**
+- For system pip: Try `pip install --user --upgrade kilm`
+- For pipx: Reinstall with `pipx uninstall kilm && pipx install kilm`
 
-**Note:** If `git pull` fails (e.g., due to local changes or merge conflicts), you will need to resolve the issues manually within the affected repository directory using standard Git commands before `kilm update` can succeed for that library.
+**Cannot detect installation method:**
+- Install via pipx for best CLI tool experience: `pipx install kilm`
+
+**Network/PyPI connection issues:**
+- Check internet connection
+- Try again later (PyPI may be temporarily unavailable)

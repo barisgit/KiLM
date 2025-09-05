@@ -1,0 +1,92 @@
+---
+title: sync
+description: Update configured Git-based libraries using git pull.
+---
+
+import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
+
+The `kilm sync` command attempts to update all configured symbol, footprint, and template libraries (type `github`) that are identified as Git repositories by running `git pull` within their directories.
+
+This command helps keep your local copies of shared libraries synchronized with their remote Git repositories.
+
+:::note[Command History]
+In KiLM v0.4.0, library synchronization was moved from `kilm update` to `kilm sync` to make room for self-update functionality.
+:::
+
+## Usage
+
+```bash
+kilm sync [OPTIONS]
+```
+
+## Options
+
+- `--dry-run`:
+  Show which libraries are detected as Git repositories and would be updated, but do not actually run `git pull`.
+  _Example:_ `kilm sync --dry-run`
+
+- `--verbose`:
+  Show detailed output during the update process, including the full output from the `git pull` commands.
+  _Example:_ `kilm sync --verbose`
+
+- `--auto-setup`:
+  If the `git pull` operation results in changes that likely require updating KiCad's configuration (e.g., new symbol or footprint libraries detected), automatically run `kilm setup` after the updates are complete. Default: `False`.
+  _Example:_ `kilm sync --auto-setup`
+
+- `--help`:
+  Show the help message and exit.
+
+## Behavior
+
+1.  **Reads KiLM Config:** Loads library information from `config.yaml`.
+2.  **Identifies `github` Libraries:** Filters for libraries with type `github`.
+3.  **Checks for `.git`:** For each library path, checks if it exists and contains a `.git` directory.
+4.  **Runs `git pull`:** If it's a valid Git repository, navigates into the directory and executes `git pull` (unless `--dry-run`).
+5.  **Checks for Changes:** After a successful pull, analyzes the output and file system to detect if new symbol libraries (`.kicad_sym`), footprint libraries (`.pretty`), or templates (`templates/*/metadata.yaml`) were added.
+6.  **Reports & Optional Setup:** Summarizes the update results. If changes requiring configuration updates were detected, it recommends running `kilm setup` or runs it automatically if `--auto-setup` was specified.
+
+## Examples
+
+**Sync all Git-based libraries:**
+
+```bash
+kilm sync
+```
+
+**Preview which libraries would be synced:**
+
+```bash
+kilm sync --dry-run
+```
+
+**Sync libraries with detailed output:**
+
+```bash
+kilm sync --verbose
+```
+
+**Sync libraries and automatically run setup if needed:**
+
+```bash
+kilm sync --auto-setup
+```
+
+## Troubleshooting
+
+**Git pull fails with merge conflicts:**
+Navigate to the library directory and resolve conflicts manually using standard Git commands:
+
+```bash
+cd /path/to/library
+git status
+git merge --continue  # after resolving conflicts
+```
+
+**Library not found or not a Git repository:**
+- Ensure the library path is correct in your KiLM configuration
+- Verify the directory contains a `.git` folder
+- Use `kilm list` to check available libraries
+
+**Permission denied errors:**
+- Check file permissions in the library directory
+- Ensure you have write access to the library path
