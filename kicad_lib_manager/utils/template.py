@@ -698,9 +698,7 @@ def process_kicad_project_file(
         shutil.copy2(source_file, target_file)
 
 
-def process_kicad_schematic_file(
-    source_file: Path, target_file: Path
-) -> None:
+def process_kicad_schematic_file(source_file: Path, target_file: Path) -> None:
     """
     Process a KiCad schematic file (.kicad_sch).
 
@@ -737,9 +735,7 @@ def process_kicad_schematic_file(
         shutil.copy2(source_file, target_file)
 
 
-def process_kicad_pcb_file(
-    source_file: Path, target_file: Path
-) -> None:
+def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
     """
     Process a KiCad PCB file (.kicad_pcb).
 

@@ -50,7 +50,9 @@ def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
     """Unpin libraries in KiCad"""
     # Enforce mutual exclusivity of --all with --symbols/--footprints
     if all and (symbols or footprints):
-        raise click.UsageError("'--all' cannot be used with '--symbols' or '--footprints'")
+        raise click.UsageError(
+            "'--all' cannot be used with '--symbols' or '--footprints'"
+        )
 
     # Find KiCad configuration
     try:

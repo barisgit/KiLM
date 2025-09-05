@@ -26,7 +26,11 @@ def status():
                         config_data = yaml.safe_load(f)
 
                     # Show libraries
-                    if config_data and "libraries" in config_data and config_data["libraries"]:
+                    if (
+                        config_data
+                        and "libraries" in config_data
+                        and config_data["libraries"]
+                    ):
                         click.echo("  Configured Libraries:")
 
                         # Group by type
@@ -48,7 +52,8 @@ def status():
                                 path = lib.get("path", "unknown")
                                 current = (
                                     " (current)"
-                                    if config_data and config_data.get("current_library") == path
+                                    if config_data
+                                    and config_data.get("current_library") == path
                                     else ""
                                 )
                                 click.echo(f"      - {name}: {path}{current}")
@@ -67,7 +72,8 @@ def status():
                                 path = lib.get("path", "unknown")
                                 current = (
                                     " (current)"
-                                    if config_data and config_data.get("current_library") == path
+                                    if config_data
+                                    and config_data.get("current_library") == path
                                     else ""
                                 )
                                 click.echo(f"      - {name}: {path}{current}")
@@ -83,7 +89,8 @@ def status():
 
                     # Show current library
                     if (
-                        config_data and "current_library" in config_data
+                        config_data
+                        and "current_library" in config_data
                         and config_data["current_library"]
                     ):
                         click.echo(

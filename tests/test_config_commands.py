@@ -41,7 +41,9 @@ def mock_config(monkeypatch):
 @pytest.fixture
 def mock_config_class(monkeypatch, mock_config):
     """Mock the Config class to return our mock config."""
-    monkeypatch.setattr("kicad_lib_manager.commands.config.command.Config", lambda: mock_config)
+    monkeypatch.setattr(
+        "kicad_lib_manager.commands.config.command.Config", lambda: mock_config
+    )
     return mock_config
 
 

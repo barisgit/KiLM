@@ -75,7 +75,7 @@ echo 'after kilm'"""
         assert "old kilm content" not in result
         assert "kilm update" in result
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_git_hooks_directory_standard(self, mock_run, tmp_path):
         """Test standard hooks directory detection."""
         # Mock the first call to succeed with hooks path
@@ -90,7 +90,7 @@ echo 'after kilm'"""
         assert hooks_dir == repo_path / ".git" / "hooks"
         mock_run.assert_called_once()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_git_hooks_directory_custom_path(self, mock_run, tmp_path):
         """Test custom hooks directory detection."""
         custom_hooks = tmp_path / "custom" / "hooks"
@@ -107,7 +107,7 @@ echo 'after kilm'"""
         assert hooks_dir == custom_hooks
         mock_run.assert_called_once()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_git_hooks_directory_relative_path(self, mock_run, tmp_path):
         """Test relative custom hooks path handling."""
         mock_run.return_value = Mock(returncode=0, stdout="custom/hooks")
@@ -122,7 +122,7 @@ echo 'after kilm'"""
         assert hooks_dir == repo_path / "custom" / "hooks"
         mock_run.assert_called_once()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_git_hooks_directory_worktree(self, mock_run, tmp_path):
         """Test Git worktree hooks directory detection."""
         # Mock the Git command to return the worktree hooks path
@@ -144,5 +144,3 @@ echo 'after kilm'"""
         """Test error when directory is not a Git repository."""
         with pytest.raises(RuntimeError, match="Not a Git repository"):
             get_git_hooks_directory(tmp_path)
-
-

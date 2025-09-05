@@ -478,7 +478,6 @@ def setup(
 
             # Also list existing libraries to pin them all
             try:
-
                 existing_symbols, existing_footprints = list_libraries(kicad_lib_dir)
                 symbol_libs = existing_symbols
                 footprint_libs = existing_footprints

@@ -12,7 +12,9 @@ import yaml
 from ..constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 
-def read_github_metadata(directory: Path) -> Optional[Dict[str, Union[str, List, Dict]]]:
+def read_github_metadata(
+    directory: Path,
+) -> Optional[Dict[str, Union[str, List, Dict]]]:
     """
     Read metadata from a GitHub library directory.
 

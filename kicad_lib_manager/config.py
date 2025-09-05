@@ -18,6 +18,7 @@ from .constants import (
 
 class LibraryDict(TypedDict):
     """Type definition for library configuration."""
+
     name: str
     path: str
     type: str
@@ -62,7 +63,9 @@ class Config:
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir / CONFIG_FILE_NAME
 
-    def get(self, key: str, default: Optional[ConfigValue] = None) -> Optional[ConfigValue]:
+    def get(
+        self, key: str, default: Optional[ConfigValue] = None
+    ) -> Optional[ConfigValue]:
         """Get a configuration value"""
         return self._config.get(key, default)
 
@@ -122,9 +125,7 @@ class Config:
                 if not (lib["name"] == name and lib["type"] == library_type)
             ]
         else:
-            filtered_libraries = [
-                lib for lib in libraries if lib["name"] != name
-            ]
+            filtered_libraries = [lib for lib in libraries if lib["name"] != name]
 
         self._config["libraries"] = filtered_libraries
         removed = len(filtered_libraries) < original_count
@@ -263,14 +264,19 @@ class Config:
 
         # If libraries is not a list, reset to empty list
         if not isinstance(libraries, list):
-            click.echo(f"Warning: libraries field in config was {type(libraries).__name__}, resetting to empty list", err=True)
+            click.echo(
+                f"Warning: libraries field in config was {type(libraries).__name__}, resetting to empty list",
+                err=True,
+            )
             self._config["libraries"] = []
             return
 
         # Validate and clean up each library entry
         normalized_libraries: List[LibraryDict] = []
         for lib in libraries:
-            if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
+            if isinstance(lib, dict) and all(
+                key in lib for key in ["name", "path", "type"]
+            ):
                 # Ensure all values are strings
                 normalized_lib = _make_library_dict(
                     name=str(lib["name"]),
@@ -294,7 +300,10 @@ class Config:
 
         # If libraries is not a list, reset to empty list
         if not isinstance(libraries_raw, list):
-            click.echo(f"Warning: libraries field was {type(libraries_raw).__name__}, resetting to empty list", err=True)
+            click.echo(
+                f"Warning: libraries field was {type(libraries_raw).__name__}, resetting to empty list",
+                err=True,
+            )
             self._config["libraries"] = []
             return []
 
@@ -303,7 +312,9 @@ class Config:
         needs_save = False
 
         for lib in libraries_raw:
-            if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
+            if isinstance(lib, dict) and all(
+                key in lib for key in ["name", "path", "type"]
+            ):
                 # Ensure all values are strings
                 normalized_lib = _make_library_dict(
                     name=str(lib["name"]),
