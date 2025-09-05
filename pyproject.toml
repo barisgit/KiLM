@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kilm"
-dynamic = ["version"]
+version = "0.3.0"
 description = "A command-line tool for managing KiCad libraries across projects and workstations"
 readme = "README.md"
 license = "MIT"
@@ -66,8 +66,6 @@ Repository = "https://github.com/barisgit/KiLM"
 kilm = "kicad_lib_manager.cli:main"
 kicad-lib-manager = "kicad_lib_manager.cli:main"
 
-[tool.hatch.version]
-path = "kicad_lib_manager/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["kicad_lib_manager"]

@@ -2,22 +2,15 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., v0.3.1)'
-        required: true
-        type: string
-
-permissions:
-  contents: write
-  id-token: write
 
 jobs:
-  build-and-publish:
+  build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     
     steps:
     - uses: actions/checkout@v4
@@ -28,55 +21,44 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        
-    - name: Install build dependencies
+
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build hatch
-        
-    - name: Verify version matches tag
+        pip install build twine
+
+    - name: Get version from pyproject.toml
+      id: get_version
       run: |
-        if [[ "${{ github.event_name }}" == "push" ]]; then
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+        VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Check if release exists
+      id: check_release
+      run: |
+        if curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ steps.get_version.outputs.version }}" | grep -q '"id"'; then
+          echo "release_exists=true" >> $GITHUB_OUTPUT
+          echo "Release v${{ steps.get_version.outputs.version }} already exists"
         else
-          TAG_VERSION="${{ github.event.inputs.version }}"
-          TAG_VERSION="${TAG_VERSION#v}"
+          echo "release_exists=false" >> $GITHUB_OUTPUT
+          echo "Release v${{ steps.get_version.outputs.version }} does not exist"
         fi
-        
-        PACKAGE_VERSION=$(python -c "import kicad_lib_manager; print(kicad_lib_manager.__version__)")
-        
-        if [[ "$TAG_VERSION" != "$PACKAGE_VERSION" ]]; then
-          echo "Version mismatch: tag=$TAG_VERSION, package=$PACKAGE_VERSION"
-          exit 1
-        fi
-        
-        echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
-        
-    - name: Run tests
-      run: |
-        pip install -e .[dev]
-        ruff check .
-        ruff format --check .
-        pyrefly
-        pytest
         
     - name: Build package
+      if: steps.check_release.outputs.release_exists == 'false'
       run: |
         python -m build
         
-    - name: Check package
-      run: |
-        pip install twine
-        twine check dist/*
-        
     - name: Generate release notes
+      if: steps.check_release.outputs.release_exists == 'false'
       id: release_notes
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         # Get the previous release tag
         PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        
+
         if [ -z "$PREVIOUS_TAG" ]; then
           # First release, get all commits
           COMMITS=$(git log --oneline --no-merges)
@@ -84,73 +66,77 @@ jobs:
           # Get commits since last release
           COMMITS=$(git log --oneline --no-merges ${PREVIOUS_TAG}..HEAD)
         fi
-        
+
         # Get PR information
         PRS=$(gh pr list --state merged --search "merged:>${PREVIOUS_TAG:-1970-01-01}" --json number,title,url --jq '.[] | "- #\(.number): \(.title) (\(.url))"' 2>/dev/null || echo "")
-        
+
         # Generate release notes
         cat > release_notes.md << EOF
-        ## What's Changed in v${VERSION}
-        
+        ## What's Changed in v${{ steps.get_version.outputs.version }}
+
         ### Commits
         $(echo "$COMMITS" | sed 's/^/- /')
-        
+
         EOF
-        
+
         if [ ! -z "$PRS" ]; then
           cat >> release_notes.md << EOF
-        
+
         ### Pull Requests
         $(echo "$PRS")
-        
+
         EOF
         fi
-        
+
         cat >> release_notes.md << 'EOF'
-        
+
         ### Installation
-        
+
         **Using pipx (recommended for CLI tools):**
         ```bash
         pipx install kilm
         ```
-        
+
         **Using pip:**
         ```bash
         pip install kilm
         ```
-        
+
         **From release assets:**
         1. Download the wheel file from this release
         2. Install with pipx or pip:
         ```bash
-        pipx install kilm-${VERSION}-py3-none-any.whl
+        pipx install kilm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
         # or
-        pip install kilm-${VERSION}-py3-none-any.whl
+        pip install kilm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
         ```
-        
+
         ### Auto-Update (Coming Soon)
         Future versions will include `kilm update` functionality for easy updates.
         EOF
-        
+
         # Store release notes for next step
         echo "release_notes<<EOF" >> $GITHUB_OUTPUT
         cat release_notes.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
         
-    - name: Create GitHub Release
+    - name: Create Release
+      if: steps.check_release.outputs.release_exists == 'false'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.event_name == 'push' && github.ref_name || format('v{0}', github.event.inputs.version) }}
-        name: Release ${{ github.event_name == 'push' && github.ref_name || format('v{0}', github.event.inputs.version) }}
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Release v${{ steps.get_version.outputs.version }}
         body: ${{ steps.release_notes.outputs.release_notes }}
-        draft: true
-        prerelease: false
         files: |
           dist/*.whl
           dist/*.tar.gz
-          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Publish to PyPI
+      if: steps.check_release.outputs.release_exists == 'false'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         print-hash: true
