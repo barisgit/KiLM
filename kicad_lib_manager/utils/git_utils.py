@@ -78,7 +78,9 @@ def backup_existing_hook(hook_path: Path) -> Path:
     backup_path.write_text(hook_path.read_text(encoding="utf-8"))
 
     # Preserve executable permissions (Unix-like systems only)
-    if os.name != 'nt' and hook_path.stat().st_mode & 0o111:  # Not Windows and executable
+    if (
+        os.name != "nt" and hook_path.stat().st_mode & 0o111
+    ):  # Not Windows and executable
         backup_path.chmod(0o755)
 
     return backup_path

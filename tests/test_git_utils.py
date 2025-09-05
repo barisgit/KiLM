@@ -44,7 +44,7 @@ class TestGitUtils:
         assert backup_path.name.startswith("post-merge.backup.")
 
         # Check executable bit only on Unix-like systems
-        if os.name != 'nt':  # Not Windows
+        if os.name != "nt":  # Not Windows
             assert backup_path.stat().st_mode & 0o111  # Check executable bit
 
     def test_merge_hook_content_new_content(self):
