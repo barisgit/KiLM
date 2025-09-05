@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 
-def read_file_with_encoding(file_path: Path, encodings: Optional[List[str]] = None) -> str:
+def read_file_with_encoding(
+    file_path: Path, encodings: Optional[List[str]] = None
+) -> str:
     """
     Read a file trying multiple encodings until successful
 

@@ -817,7 +817,12 @@ def make(
                 if not git_path.endswith("/"):
                     git_path += "/"
 
-                if gitignore_spec and gitignore_spec.match_file(git_path) or additional_spec and additional_spec.match_file(git_path):
+                if (
+                    gitignore_spec
+                    and gitignore_spec.match_file(git_path)
+                    or additional_spec
+                    and additional_spec.match_file(git_path)
+                ):
                     dirs_to_remove.append(d)
                     excluded_files.append(f"{rel_path}/")
 

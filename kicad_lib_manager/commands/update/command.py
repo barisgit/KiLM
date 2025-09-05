@@ -175,6 +175,7 @@ def update(dry_run, verbose, auto_setup):
         )
         click.echo("Use 'kilm status' to check your current configuration.")
 
+
 # TODO: Should be in services or utils
 def check_for_library_changes(git_output, lib_path):
     """
@@ -202,23 +203,35 @@ def check_for_library_changes(git_output, lib_path):
     templates_path = lib_path / "templates"
 
     # Look for symbol libraries (.kicad_sym files)
-    if symbols_path.exists() and symbols_path.is_dir() and any(
-        f.name.endswith(".kicad_sym") for f in symbols_path.glob("**/*.kicad_sym")
+    if (
+        symbols_path.exists()
+        and symbols_path.is_dir()
+        and any(
+            f.name.endswith(".kicad_sym") for f in symbols_path.glob("**/*.kicad_sym")
+        )
     ):
         changes.append("symbols")
 
     # Look for footprint libraries (.pretty directories)
-    if footprints_path.exists() and footprints_path.is_dir() and any(
-        f.is_dir() and f.name.endswith(".pretty")
-        for f in footprints_path.glob("**/*.pretty")
+    if (
+        footprints_path.exists()
+        and footprints_path.is_dir()
+        and any(
+            f.is_dir() and f.name.endswith(".pretty")
+            for f in footprints_path.glob("**/*.pretty")
+        )
     ):
         changes.append("footprints")
 
     # Look for project templates (directories with metadata.yaml)
-    if templates_path.exists() and templates_path.is_dir() and any(
-        (f / "metadata.yaml").exists()
-        for f in templates_path.glob("*")
-        if f.is_dir()
+    if (
+        templates_path.exists()
+        and templates_path.is_dir()
+        and any(
+            (f / "metadata.yaml").exists()
+            for f in templates_path.glob("*")
+            if f.is_dir()
+        )
     ):
         changes.append("templates")
 

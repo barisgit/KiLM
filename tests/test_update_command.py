@@ -23,7 +23,9 @@ def mock_config(monkeypatch):
     config_mock = MagicMock()
     config_mock.get_libraries.return_value = TEST_LIBRARIES
 
-    monkeypatch.setattr("kicad_lib_manager.commands.update.command.Config", lambda: config_mock)
+    monkeypatch.setattr(
+        "kicad_lib_manager.commands.update.command.Config", lambda: config_mock
+    )
     return config_mock
 
 
@@ -169,7 +171,9 @@ def test_update_no_libraries(monkeypatch):
     """Test update when no libraries are configured."""
     config_mock = MagicMock()
     config_mock.get_libraries.return_value = []
-    monkeypatch.setattr("kicad_lib_manager.commands.update.command.Config", lambda: config_mock)
+    monkeypatch.setattr(
+        "kicad_lib_manager.commands.update.command.Config", lambda: config_mock
+    )
 
     runner = CliRunner()
     result = runner.invoke(main, ["update"])

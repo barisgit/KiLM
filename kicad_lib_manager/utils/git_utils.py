@@ -3,6 +3,7 @@ Git utility functions for KiCad Library Manager.
 Handles Git hooks directory detection and safe hook management.
 """
 
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -32,7 +33,9 @@ def get_git_hooks_directory(repo_path: Path) -> Path:
     try:
         rp = subprocess.run(
             ["git", "-C", str(repo_path), "rev-parse", "--git-path", "hooks"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         hooks_dir = Path(rp.stdout.strip())
         if not hooks_dir.is_absolute():
@@ -44,7 +47,9 @@ def get_git_hooks_directory(repo_path: Path) -> Path:
         try:
             cd = subprocess.run(
                 ["git", "-C", str(repo_path), "rev-parse", "--git-common-dir"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
             common_dir = Path(cd.stdout.strip())
             if not common_dir.is_absolute():
@@ -72,8 +77,10 @@ def backup_existing_hook(hook_path: Path) -> Path:
     # Copy the file content
     backup_path.write_text(hook_path.read_text(encoding="utf-8"))
 
-    # Preserve executable permissions
-    if hook_path.stat().st_mode & 0o111:  # Check if executable
+    # Preserve executable permissions (Unix-like systems only)
+    if (
+        os.name != "nt" and hook_path.stat().st_mode & 0o111
+    ):  # Not Windows and executable
         backup_path.chmod(0o755)
 
     return backup_path
@@ -93,7 +100,7 @@ def merge_hook_content(existing_content: str, kilm_content: str) -> str:
     # Check if KiLM content is already present
     if "KiLM-managed section" in existing_content:
         # Already has KiLM content, replace the section
-        lines = existing_content.split('\n')
+        lines = existing_content.split("\n")
         start_marker = "# BEGIN KiLM-managed section"
         end_marker = "# END KiLM-managed section"
 
@@ -109,8 +116,8 @@ def merge_hook_content(existing_content: str, kilm_content: str) -> str:
 
         if start_idx is not None and end_idx is not None:
             # Replace existing KiLM section
-            new_lines = lines[:start_idx] + [kilm_content] + lines[end_idx + 1:]
-            return '\n'.join(new_lines)
+            new_lines = lines[:start_idx] + [kilm_content] + lines[end_idx + 1 :]
+            return "\n".join(new_lines)
 
     # Add KiLM content at the end with clear markers
     return f"{existing_content.rstrip()}\n\n{kilm_content}"

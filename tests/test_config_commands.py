@@ -2,16 +2,18 @@
 Tests for KiCad Library Manager config commands.
 """
 
+from typing import List
+
 import pytest
 from click.testing import CliRunner
 
 from kicad_lib_manager.cli import main
-from kicad_lib_manager.config import Config
+from kicad_lib_manager.config import Config, LibraryDict
 
 # Sample test data
-TEST_LIBRARIES = [
-    {"name": "test-github-lib", "path": "/path/to/github/library", "type": "github"},
-    {"name": "test-cloud-lib", "path": "/path/to/cloud/library", "type": "cloud"},
+TEST_LIBRARIES: List[LibraryDict] = [
+    LibraryDict(name="test-github-lib", path="/path/to/github/library", type="github"),
+    LibraryDict(name="test-cloud-lib", path="/path/to/cloud/library", type="cloud"),
 ]
 
 
@@ -41,7 +43,9 @@ def mock_config(monkeypatch):
 @pytest.fixture
 def mock_config_class(monkeypatch, mock_config):
     """Mock the Config class to return our mock config."""
-    monkeypatch.setattr("kicad_lib_manager.commands.config.command.Config", lambda: mock_config)
+    monkeypatch.setattr(
+        "kicad_lib_manager.commands.config.command.Config", lambda: mock_config
+    )
     return mock_config
 
 

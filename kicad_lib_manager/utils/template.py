@@ -276,7 +276,8 @@ def create_template_metadata(
         metadata["extends"] = extends
 
     if dependencies:
-        metadata["dependencies"] = {"recommended": dependencies}
+        deps_dict: Dict[str, Any] = {"recommended": dependencies}
+        metadata["dependencies"] = deps_dict
 
     return metadata
 
@@ -409,9 +410,9 @@ def create_template_structure(
     MAX_PATH_LENGTH = 512
 
     # Track main KiCad files
-    main_project_file = None
-    main_schematic_file = None
-    main_pcb_file = None
+    main_project_file: Optional[str] = None
+    main_schematic_file: Optional[str] = None
+    main_pcb_file: Optional[str] = None
 
     # First scan to find main KiCad files
     click.echo("Scanning for main KiCad files...")
@@ -430,31 +431,32 @@ def create_template_structure(
             continue
 
         # Look for KiCad files in the root directory
-        for file in files:
-            rel_path = str(Path(rel_root) / file)
-            git_path = rel_path.replace(os.sep, "/")
+        for file_name in files:
+            file_path = Path(rel_root) / file_name
+            rel_path_str = str(file_path)
+            git_path = rel_path_str.replace(os.sep, "/")
 
             # Skip gitignored files
-            if gitignore_spec and gitignore_spec.match_file(git_path):
+            if gitignore_spec is not None and gitignore_spec.match_file(git_path):
                 continue
 
             # Look for main files in the root directory or top-level folders
             if rel_root == "." or len(Path(rel_root).parts) <= 1:
-                file_lower = file.lower()
+                file_lower = file_name.lower()
 
                 if file_lower.endswith(KICAD_PROJECT_EXT) and not main_project_file:
-                    main_project_file = str(Path(root) / file)
-                    click.echo(f"Found main project file: {file}")
+                    main_project_file = str(Path(root) / file_name)
+                    click.echo(f"Found main project file: {file_name}")
 
                 elif (
                     file_lower.endswith(KICAD_SCHEMATIC_EXT) and not main_schematic_file
                 ):
-                    main_schematic_file = str(Path(root) / file)
-                    click.echo(f"Found main schematic file: {file}")
+                    main_schematic_file = str(Path(root) / file_name)
+                    click.echo(f"Found main schematic file: {file_name}")
 
                 elif file_lower.endswith(KICAD_PCB_EXT) and not main_pcb_file:
-                    main_pcb_file = str(Path(root) / file)
-                    click.echo(f"Found main PCB file: {file}")
+                    main_pcb_file = str(Path(root) / file_name)
+                    click.echo(f"Found main PCB file: {file_name}")
 
     # Copy files from source to template
     for root, dirs, files in os.walk(source_directory):
@@ -476,7 +478,7 @@ def create_template_structure(
 
             # Ensure proper path format for gitignore matching
             # (pathspec expects paths with forward slashes and trailing slash for directories)
-            git_path = rel_path.replace(os.sep, "/")
+            git_path = str(rel_path).replace(os.sep, "/")
             if not git_path.endswith("/"):
                 git_path += "/"
 
@@ -516,7 +518,7 @@ def create_template_structure(
             rel_path = Path(rel_root) / file
 
             # Ensure proper path format for gitignore matching
-            git_path = rel_path.replace(os.sep, "/")
+            git_path = str(rel_path).replace(os.sep, "/")
 
             # Skip gitignored files and additional excluded files
             if gitignore_spec and gitignore_spec.match_file(git_path):
@@ -698,9 +700,7 @@ def process_kicad_project_file(
         shutil.copy2(source_file, target_file)
 
 
-def process_kicad_schematic_file(
-    source_file: Path, target_file: Path
-) -> None:
+def process_kicad_schematic_file(source_file: Path, target_file: Path) -> None:
     """
     Process a KiCad schematic file (.kicad_sch).
 
@@ -737,9 +737,7 @@ def process_kicad_schematic_file(
         shutil.copy2(source_file, target_file)
 
 
-def process_kicad_pcb_file(
-    source_file: Path, target_file: Path
-) -> None:
+def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
     """
     Process a KiCad PCB file (.kicad_pcb).
 

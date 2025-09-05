@@ -77,7 +77,9 @@ def add_hook(directory, force):
             else:
                 # Merge with existing content to preserve user logic
                 click.echo("Merging KiLM content with existing hook...")
-                new_content = merge_hook_content(existing_content, create_kilm_hook_content())
+                new_content = merge_hook_content(
+                    existing_content, create_kilm_hook_content()
+                )
 
         except (OSError, UnicodeDecodeError):
             click.echo("Warning: Could not read existing hook content, overwriting...")

@@ -8,7 +8,7 @@
 
 Professional command-line tool for managing KiCad libraries across projects and workstations.
 
-**[📚 Official Documentation](https://kilm.aristovnik.me)**
+**[Official Documentation](https://kilm.aristovnik.me)**
 
 ## Features
 
@@ -41,18 +41,18 @@ kilm setup
 kilm status
 ```
 
-> **📚 [Complete Installation Guide](https://kilm.aristovnik.me/guides/installation/)** - Multiple installation methods, verification steps, and troubleshooting.
+> **[Complete Installation Guide](https://kilm.aristovnik.me/guides/installation/)** - Multiple installation methods, verification steps, and troubleshooting.
 
 ## Documentation
 
-**[📚 Complete Documentation](https://kilm.aristovnik.me)**
+**[Complete Documentation](https://kilm.aristovnik.me)**
 
 | Guide | Description |
 |-------|-------------|
-| [🚀 Getting Started](https://kilm.aristovnik.me/guides/getting-started/) | Creator and consumer workflows with Git integration |
-| [⚙️ Configuration](https://kilm.aristovnik.me/guides/configuration/) | KiLM and KiCad configuration management |
-| [📖 CLI Reference](https://kilm.aristovnik.me/reference/cli/) | Complete command documentation with examples |
-| [🛠️ Development](https://kilm.aristovnik.me/community/development/) | Setup guide for contributors and development |
+| [Getting Started](https://kilm.aristovnik.me/guides/getting-started/) | Creator and consumer workflows with Git integration |
+| [Configuration](https://kilm.aristovnik.me/guides/configuration/) | KiLM and KiCad configuration management |
+| [CLI Reference](https://kilm.aristovnik.me/reference/cli/) | Complete command documentation with examples |
+| [Development](https://kilm.aristovnik.me/community/development/) | Setup guide for contributors and development |
 
 ## License
 
@@ -70,5 +70,5 @@ Contributions are welcome! See our comprehensive guides:
 git clone https://github.com/barisgit/kilm.git
 cd kilm
 pip install -e ".[dev]"
-pytest  # Run tests
+pytest  # Run all tests
 ```
