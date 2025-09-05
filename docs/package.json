@@ -13,19 +13,25 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.33.2",
-    "@astrojs/starlight-tailwind": "^4.0.0",
-    "@tailwindcss/vite": "^4.1.4",
-    "astro": "^5.6.1",
+    "@astrojs/starlight": "^0.35.2",
+    "@astrojs/starlight-tailwind": "^4.0.1",
+    "@tailwindcss/vite": "^4.1.13",
+    "astro": "^5.13.5",
     "prettier": "^3.6.2",
     "starlight-site-graph": "^0.5.0",
-    "tailwindcss": "^4.1.4"
+    "tailwindcss": "^4.1.13"
   },
   "devDependencies": {
-    "@types/node": "^22.10.3",
-    "chokidar": "^4.0.2",
-    "concurrently": "^9.1.0",
-    "sharp": "^0.32.6",
-    "tsx": "^4.19.3"
+    "@types/node": "^24.3.1",
+    "chokidar": "^4.0.3",
+    "concurrently": "^9.2.1",
+    "sharp": "^0.34.3",
+    "tsx": "^4.20.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "devalue": "^5.3.2",
+      "tar-fs": "^3.1.0"
+    }
   }
 }
