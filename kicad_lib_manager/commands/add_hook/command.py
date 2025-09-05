@@ -30,11 +30,11 @@ from ...utils.git_utils import (
     show_default=True,
 )
 def add_hook(directory, force):
-    """Add a Git post-merge hook to automatically update KiCad libraries.
+    """Add a Git post-merge hook to automatically sync KiCad libraries.
 
     This command adds a Git post-merge hook to the specified repository
     (or the current directory if none specified) that automatically runs
-    'kilm update' after a 'git pull' or 'git merge' operation.
+    'kilm sync' after a 'git pull' or 'git merge' operation.
 
     This ensures your KiCad libraries are always up-to-date after pulling
     changes from remote repositories.
@@ -98,7 +98,7 @@ def add_hook(directory, force):
 
         click.echo(f"Successfully installed post-merge hook at {post_merge_hook}")
         click.echo(
-            "The hook will run 'kilm update' after every 'git pull' or 'git merge' operation."
+            "The hook will run 'kilm sync' after every 'git pull' or 'git merge' operation."
         )
 
         if post_merge_hook.exists() and "KiLM-managed section" in new_content:

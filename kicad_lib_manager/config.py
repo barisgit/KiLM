@@ -2,6 +2,7 @@
 Configuration management
 """
 
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TypedDict, Union, cast
 
@@ -29,6 +30,9 @@ ConfigValue = Union[str, int, List[LibraryDict]]
 DEFAULT_CONFIG: Dict[str, ConfigValue] = {
     "max_backups": DEFAULT_MAX_BACKUPS,
     "libraries": DEFAULT_LIBRARIES,
+    "update_check": True,
+    "update_check_frequency": "daily",  # daily, weekly, never
+    "auto_update": False,  # Never auto-update without permission
 }
 
 
@@ -318,6 +322,83 @@ class Config:
             self.save()
 
         return normalized_libraries
+
+    def should_check_updates(self) -> bool:
+        """
+        Determine if update check should run based on configuration.
+
+        Returns:
+            True if update check should be performed
+        """
+        if not self.get("update_check", True):
+            return False
+
+        frequency = self.get("update_check_frequency", "daily")
+        if frequency == "never":
+            return False
+
+        # Check if we've checked recently based on frequency
+        cache_dir = Path.home() / ".cache" / "kilm"
+        last_check_file = cache_dir / "last_update_check"
+
+        if not last_check_file.exists():
+            return True
+
+        try:
+            last_check = float(last_check_file.read_text().strip())
+            now = time.time()
+
+            if frequency == "daily":
+                return now - last_check > 86400  # 24 hours
+            elif frequency == "weekly":
+                return now - last_check > 604800  # 7 days
+        except (ValueError, OSError):
+            return True
+
+        return False
+
+    def mark_update_check_performed(self) -> None:
+        """Mark that an update check was performed."""
+
+        cache_dir = Path.home() / ".cache" / "kilm"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        last_check_file = cache_dir / "last_update_check"
+        last_check_file.write_text(str(time.time()))
+
+    def get_update_preferences(self) -> Dict[str, Union[bool, str]]:
+        """
+        Get update-related preferences.
+
+        Returns:
+            Dictionary containing update preferences
+        """
+        return {
+            "update_check": bool(self.get("update_check", True)),
+            "update_check_frequency": str(self.get("update_check_frequency", "daily")),
+            "auto_update": bool(self.get("auto_update", False)),
+        }
+
+    def set_update_preference(self, key: str, value: Union[bool, str]) -> None:
+        """
+        Set an update preference.
+
+        Args:
+            key: Preference key ('update_check', 'update_check_frequency', 'auto_update')
+            value: Preference value
+        """
+        valid_keys = {"update_check", "update_check_frequency", "auto_update"}
+        if key not in valid_keys:
+            raise ValueError(f"Invalid update preference key: {key}")
+
+        if key == "update_check_frequency":
+            valid_frequencies = {"daily", "weekly", "never"}
+            if value not in valid_frequencies:
+                raise ValueError(
+                    f"Invalid frequency: {value}. Must be one of: {valid_frequencies}"
+                )
+
+        self.set(key, value)
+        self.save()
 
 
 def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:

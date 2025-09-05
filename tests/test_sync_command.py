@@ -1,5 +1,5 @@
 """
-Tests for KiCad Library Manager update command.
+Tests for KiCad Library Manager sync command (formerly update command).
 """
 
 from pathlib import Path
@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from kicad_lib_manager.cli import main
-from kicad_lib_manager.commands.update import check_for_library_changes
+from kicad_lib_manager.commands.sync.command import check_for_library_changes
 
 # Sample test libraries
 TEST_LIBRARIES = [
@@ -24,7 +24,7 @@ def mock_config(monkeypatch):
     config_mock.get_libraries.return_value = TEST_LIBRARIES
 
     monkeypatch.setattr(
-        "kicad_lib_manager.commands.update.command.Config", lambda: config_mock
+        "kicad_lib_manager.commands.sync.command.Config", lambda: config_mock
     )
     return config_mock
 
@@ -84,15 +84,15 @@ def mock_path_methods(monkeypatch):
     monkeypatch.setattr(Path, "glob", mock_glob)
 
 
-def test_update_command(mock_config, mock_subprocess_run, mock_path_methods):
-    """Test the basic update command."""
+def test_sync_command(mock_config, mock_subprocess_run, mock_path_methods):
+    """Test the basic sync command."""
     runner = CliRunner()
-    result = runner.invoke(main, ["update"])
+    result = runner.invoke(main, ["sync"])
 
     assert result.exit_code == 0
-    assert "Updating 1 KiCad GitHub libraries" in result.output
+    assert "Syncing 1 KiCad GitHub libraries" in result.output
     assert "Updated" in result.output
-    assert "1 libraries updated" in result.output
+    assert "1 libraries synced" in result.output
 
     # Verify subprocess was called correctly
     mock_subprocess_run.assert_called_once()
@@ -101,8 +101,8 @@ def test_update_command(mock_config, mock_subprocess_run, mock_path_methods):
     assert kwargs["check"] is False
 
 
-def test_update_with_auto_setup(mock_config, mock_subprocess_run, mock_path_methods):
-    """Test update with auto-setup option."""
+def test_sync_with_auto_setup(mock_config, mock_subprocess_run, mock_path_methods):
+    """Test sync with auto-setup option."""
     # Create a mock context to track invocation
     context_mock = Mock()
 
@@ -117,7 +117,7 @@ def test_update_with_auto_setup(mock_config, mock_subprocess_run, mock_path_meth
             "sys.modules", {"kicad_lib_manager.commands.setup": setup_module_mock}
         ):
             runner = CliRunner()
-            result = runner.invoke(main, ["update", "--auto-setup"])
+            result = runner.invoke(main, ["sync", "--auto-setup"])
 
             assert result.exit_code == 0
             assert "Running 'kilm setup'" in result.output
@@ -127,7 +127,7 @@ def test_update_with_auto_setup(mock_config, mock_subprocess_run, mock_path_meth
             # expected message about running setup
 
 
-def test_update_with_already_up_to_date(mock_config, mock_path_methods):
+def test_sync_with_already_up_to_date(mock_config, mock_path_methods):
     """Test update when repositories are already up to date."""
     # Create a mock that returns "Already up to date" for git pull
     mock_run = MagicMock()
@@ -138,27 +138,27 @@ def test_update_with_already_up_to_date(mock_config, mock_path_methods):
 
     with patch("subprocess.run", mock_run):
         runner = CliRunner()
-        result = runner.invoke(main, ["update"])
+        result = runner.invoke(main, ["sync"])
 
         assert result.exit_code == 0
         assert "Up to date" in result.output
-        assert "0 libraries updated" in result.output
+        assert "0 libraries synced" in result.output
         assert "1 libraries up to date" in result.output
 
 
-def test_update_with_verbose(mock_config, mock_subprocess_run, mock_path_methods):
+def test_sync_with_verbose(mock_config, mock_subprocess_run, mock_path_methods):
     """Test update with verbose option."""
     runner = CliRunner()
-    result = runner.invoke(main, ["update", "--verbose"])
+    result = runner.invoke(main, ["sync", "--verbose"])
 
     assert result.exit_code == 0
     assert "Success:" in result.output
 
 
-def test_update_dry_run(mock_config, mock_subprocess_run, mock_path_methods):
+def test_sync_dry_run(mock_config, mock_subprocess_run, mock_path_methods):
     """Test update with dry-run option."""
     runner = CliRunner()
-    result = runner.invoke(main, ["update", "--dry-run"])
+    result = runner.invoke(main, ["sync", "--dry-run"])
 
     assert result.exit_code == 0
     assert "Dry run: would execute 'git pull'" in result.output
@@ -167,16 +167,16 @@ def test_update_dry_run(mock_config, mock_subprocess_run, mock_path_methods):
     mock_subprocess_run.assert_not_called()
 
 
-def test_update_no_libraries(monkeypatch):
-    """Test update when no libraries are configured."""
+def test_sync_no_libraries(monkeypatch):
+    """Test sync when no libraries are configured."""
     config_mock = MagicMock()
     config_mock.get_libraries.return_value = []
     monkeypatch.setattr(
-        "kicad_lib_manager.commands.update.command.Config", lambda: config_mock
+        "kicad_lib_manager.commands.sync.command.Config", lambda: config_mock
     )
 
     runner = CliRunner()
-    result = runner.invoke(main, ["update"])
+    result = runner.invoke(main, ["sync"])
 
     assert result.exit_code == 0
     assert "No GitHub libraries configured" in result.output
