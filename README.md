@@ -70,5 +70,5 @@ Contributions are welcome! See our comprehensive guides:
 git clone https://github.com/barisgit/kilm.git
 cd kilm
 pip install -e ".[dev]"
-pytest  # Run tests
+pytest  # Run all tests
 ```
