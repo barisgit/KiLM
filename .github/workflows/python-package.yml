@@ -36,7 +36,7 @@ jobs:
         
     - name: Type check with pyrefly
       run: |
-        pyrefly
+        pyrefly check
         
     - name: Test with pytest
       run: |
