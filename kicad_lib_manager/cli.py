@@ -3,9 +3,10 @@
 Command-line interface for KiCad Library Manager
 """
 
+import importlib.metadata
+
 import click
 
-from . import __version__
 from .commands.add_3d import add_3d
 from .commands.add_hook import add_hook
 from .commands.config import config
@@ -20,7 +21,7 @@ from .commands.update import update
 
 
 @click.group()
-@click.version_option(version=__version__)
+@click.version_option(version=importlib.metadata.version("kilm"))
 def main():
     """KiCad Library Manager - Manage KiCad libraries
 
