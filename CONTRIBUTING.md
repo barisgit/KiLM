@@ -17,7 +17,7 @@ We welcome contributions of all types:
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.8 or higher
 - Git
 - A GitHub account
 - KiCad 8.x or newer (for testing)

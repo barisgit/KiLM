@@ -13,6 +13,20 @@ const rootDir = path.resolve(__dirname, '../..');
 const commandsDir = path.join(rootDir, 'kicad_lib_manager', 'commands');
 const docsOutputDir = path.join(__dirname, '..', 'src', 'content', 'docs', 'reference', 'cli');
 
+/**
+ * Sanitize command name to create safe filenames
+ */
+function sanitizeCommandName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-');
+}
+
+/**
+ * Escape string for safe use in YAML frontmatter
+ */
+function escapeYaml(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
+}
+
 interface CommandDoc {
   commandName: string;
   embeddedPath: string;
@@ -29,7 +43,7 @@ function getCommandName(commandDir: string, dirName: string): string {
     try {
       const commandName = fs.readFileSync(commandFile, 'utf-8').trim();
       if (commandName) {
-        return commandName;
+        return sanitizeCommandName(commandName);
       }
     } catch (error) {
       console.warn(`Failed to read .command file for ${dirName}:`, error);
@@ -37,7 +51,7 @@ function getCommandName(commandDir: string, dirName: string): string {
   }
   
   // Fallback to directory name
-  return dirName;
+  return sanitizeCommandName(dirName);
 }
 
 /**
@@ -90,36 +104,39 @@ function findCommandDocs(): CommandDoc[] {
  * Process MDX content and add proper frontmatter if needed
  */
 function processEmbeddedDoc(content: string, commandName: string): string {
+  // Strip UTF-8 BOM if present
+  const cleanContent = content.replace(/^\uFEFF/, '');
+  
   // Check if content already has frontmatter
-  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const frontmatterMatch = cleanContent.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   
   if (frontmatterMatch) {
     // Content already has frontmatter, return as-is
-    return content;
+    return cleanContent;
   }
   
   // No frontmatter, add it
   // Extract title from first heading or use command name
-  const titleMatch = content.match(/^# (.+)$/m);
+  const titleMatch = cleanContent.match(/^# (.+)$/m);
   const title = titleMatch ? titleMatch[1] : commandName;
   
   // Extract description from content or use default
-  const descriptionMatch = content.match(/^(.+)$/m);
+  const descriptionMatch = cleanContent.match(/^(.+)$/m);
   const firstLine = descriptionMatch ? descriptionMatch[1].replace(/^# /, '') : '';
   const description = firstLine || `${commandName} command documentation`;
 
-  // Create frontmatter
+  // Create frontmatter with properly escaped values
   const frontmatter = `---
-title: ${title}
-description: ${description}
+title: "${escapeYaml(title)}"
+description: "${escapeYaml(description)}"
 sidebar:
-  label: ${commandName}
+  label: "${escapeYaml(commandName)}"
 ---
 
 `;
 
   // Remove the first heading since it's now in frontmatter
-  const contentWithoutTitle = content.replace(/^# .+$/m, '').trim();
+  const contentWithoutTitle = cleanContent.replace(/^# .+$/m, '').trim();
   
   return frontmatter + contentWithoutTitle;
 }
@@ -176,36 +193,67 @@ function syncAllDocs(): void {
 function watchDocs(): void {
   console.log('Watching embedded docs for changes...');
   
-  const commandDocs = findCommandDocs();
-  const watchPaths = commandDocs.map(doc => doc.embeddedPath);
-  
-  if (watchPaths.length === 0) {
-    console.warn('No embedded docs to watch');
-    return;
-  }
-
   // Initial sync
   syncAllDocs();
 
-  // Watch for changes
-  const watcher = chokidar.watch(watchPaths, {
+  // Watch for changes using glob pattern to catch all relevant files
+  const watchPattern = `${commandsDir}/**/*`;
+  const watcher = chokidar.watch(watchPattern, {
     persistent: true,
     ignoreInitial: true,
   });
 
   watcher
-    .on('change', (changedPath: string) => {
-      const commandDoc = commandDocs.find(doc => doc.embeddedPath === changedPath);
-      if (commandDoc) {
-        console.log(`${commandDoc.commandName} docs changed, syncing...`);
-        syncDoc(commandDoc);
+    .on('add', (filePath: string) => {
+      console.log(`File added: ${filePath}`);
+      // Check if it's a docs file or .command file
+      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md') || filePath.endsWith('.command')) {
+        console.log('Re-syncing all docs due to new file...');
+        syncAllDocs();
       }
+    })
+    .on('change', (filePath: string) => {
+      console.log(`File changed: ${filePath}`);
+      // Check if it's a docs file
+      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md')) {
+        // Find the specific command doc and sync it
+        const commandDocs = findCommandDocs();
+        const commandDoc = commandDocs.find(doc => doc.embeddedPath === filePath);
+        if (commandDoc) {
+          console.log(`${commandDoc.commandName} docs changed, syncing...`);
+          syncDoc(commandDoc);
+        }
+      } else if (filePath.endsWith('.command')) {
+        // .command file changed, re-sync all docs to pick up new command names
+        console.log('Command file changed, re-syncing all docs...');
+        syncAllDocs();
+      }
+    })
+    .on('unlink', (filePath: string) => {
+      console.log(`File removed: ${filePath}`);
+      // Check if it's a docs file or .command file
+      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md') || filePath.endsWith('.command')) {
+        console.log('Re-syncing all docs due to file removal...');
+        syncAllDocs();
+      }
+    })
+    .on('addDir', (dirPath: string) => {
+      console.log(`Directory added: ${dirPath}`);
+      // New directory might contain docs, re-sync all
+      console.log('Re-syncing all docs due to new directory...');
+      syncAllDocs();
+    })
+    .on('unlinkDir', (dirPath: string) => {
+      console.log(`Directory removed: ${dirPath}`);
+      // Directory removal might affect docs, re-sync all
+      console.log('Re-syncing all docs due to directory removal...');
+      syncAllDocs();
     })
     .on('error', (error: unknown) => {
       console.error('Watch error:', error);
     });
 
-  console.log(`Watching ${watchPaths.length} embedded docs files`);
+  console.log(`Watching ${watchPattern} for embedded docs and command files`);
   
   // Keep the process running
   process.on('SIGINT', () => {

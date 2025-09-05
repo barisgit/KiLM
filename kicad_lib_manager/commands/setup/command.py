@@ -9,6 +9,7 @@ from typing import Dict, List
 
 import click
 
+# TODO: Use full path (kicad_lib_manager...)
 from ...config import Config, LibraryDict
 from ...library_manager import add_libraries, find_kicad_config
 from ...utils.backup import create_backup
@@ -18,6 +19,7 @@ from ...utils.env_vars import (
     update_kicad_env_vars,
     update_pinned_libraries,
 )
+from ...utils.file_ops import list_libraries
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 
@@ -476,7 +478,6 @@ def setup(
 
             # Also list existing libraries to pin them all
             try:
-                from ...library_manager import list_libraries
 
                 existing_symbols, existing_footprints = list_libraries(kicad_lib_dir)
                 symbol_libs = existing_symbols
