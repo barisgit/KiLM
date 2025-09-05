@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kilm"
-version = "0.3.0"
+version = "0.3.1"
 description = "A command-line tool for managing KiCad libraries across projects and workstations"
 readme = "README.md"
 license = "MIT"
@@ -26,7 +26,12 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Framework :: Pytest",
+    "Development Status :: 4 - Beta",
+    "Natural Language :: English",
+    "Environment :: Console",
 ]
 keywords = [
     "kicad",
@@ -34,6 +39,7 @@ keywords = [
     "eda",
     "electronics",
     "pcb-design",
+    "cli",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -72,7 +78,7 @@ packages = ["kicad_lib_manager"]
 
 [tool.black]
 line-length = 88
-target-version = ['py37']
+target-version = ['py38']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"] 
