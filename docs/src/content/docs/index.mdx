@@ -1,10 +1,10 @@
 ---
 title: KiCad Library Manager (KiLM)
-description: A command-line tool for managing KiCad libraries across projects and workstations.
+description: Professional command-line tool for managing KiCad libraries across projects and workstations with cross-platform support and team collaboration.
 template: splash
 hero:
-  title: KiCad Library Manager
-  tagline: Standardize, sync, and scale your KiCad libraries with confidence.
+  title: KiCad Library Manager (KiLM)
+  tagline: Professional KiCad library management with cross-platform support and seamless team collaboration.
   image:
     file: ../../assets/KiCad-Logo.webp
     alt: KiCad logo
@@ -19,23 +19,23 @@ hero:
       variant: minimal
 features:
   - icon: tabler:library
-    title: Unified libraries
-    details: Manage symbols, footprints, and 3D models from one CLI.
+    title: Unified Library Management
+    details: Manage symbols, footprints, and 3D models from a single professional CLI tool.
   - icon: tabler:device-desktop
-    title: Cross‑machine consistency
-    details: Reproduce the same setup across workstations and teammates.
+    title: Cross-Platform Support
+    details: Works seamlessly on Windows, macOS, and Linux with automatic KiCad detection.
   - icon: tabler:rocket
-    title: Fast setup
-    details: Initialize projects and link libraries in minutes, not hours.
+    title: Reliable & Fast
+    details: Built for reliability with comprehensive error handling and quick library operations.
   - icon: tabler:settings
-    title: Configurable
-    details: Tune KiCad env vars and paths to match your workflow.
+    title: Professional Standards
+    details: Clean code, proper configuration management, and comprehensive backup system.
   - icon: tabler:cloud-download
-    title: External sources
-    details: Pull in third‑party libs and keep them organized.
+    title: Team Collaboration
+    details: Share libraries via Git with consistent metadata and environment setup.
   - icon: tabler:terminal-2
-    title: Friendly CLI
-    details: Clear commands, helpful prompts, and sensible defaults.
+    title: Modern CLI Design
+    details: Intuitive commands with comprehensive help, dry-run modes, and clear feedback.
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
@@ -52,27 +52,34 @@ import BadgeData from "../../components/BadgeData.astro";
 </h2>
 
 ```bash
-# Install (recommended)
+# Install with pipx (recommended - isolated environment)
 pipx install kilm
 
-# Or with pip
-pip install kilm
+# Alternative: using uv (fastest)
+uv pip install kilm
 
-# Initialize in your project
-kilm init
+# Verify installation
+kilm --version
 
-# See available commands
-kilm --help
+# Check KiCad detection
+kilm status
+
+# Initialize library in your project
+kilm init --name my-library --description "My KiCad components"
+
+# Set up KiCad configuration
+kilm setup
 ```
 
 <p class="mt-4 text-white/80">
-  Looking for a walkthrough? Follow the <a href="/guides/getting-started/">Getting Started</a> guide to set up your first configuration, link libraries, and verify KiCad paths.
+  New to KiLM? Start with the <a href="/guides/getting-started/">Getting Started</a> guide for a complete walkthrough, then explore <a href="/guides/configuration/">Configuration</a> options.
 </p>
 
 <ul class="mt-2 text-white/80">
-  <li><a href="/guides/getting-started/">Getting Started</a></li>
-  <li><a href="/guides/installation/">Installation</a></li>
-  
+  <li><a href="/guides/installation/">Installation Methods</a> - pipx, uv, pip, and development setup</li>
+  <li><a href="/guides/getting-started/">Getting Started</a> - creator and consumer workflows</li>
+  <li><a href="/guides/configuration/">Configuration</a> - KiLM and KiCad integration</li>
+  <li><a href="/community/development/">Development Setup</a> - contribute with type safety</li>
 </ul>
 
 <h2 class="mt-12 mb-4 text-[1.6rem] sm:text-2xl font-semibold tracking-tight">
@@ -80,21 +87,21 @@ kilm --help
 </h2>
 
 <CardGrid>
-  <Card title="Key Concepts" link="/guides/getting-started/">
-    Learn the core ideas behind KiLM and how it streamlines library management.
-    <a class="card-cta" href="/guides/getting-started/">Learn more <span aria-hidden="true" class="arrow">→</span></a>
+  <Card title="Creator & Consumer Workflows" link="/guides/getting-started/">
+    Learn how to set up shared libraries and use them across teams with Git integration.
+    <a class="card-cta" href="/guides/getting-started/">Learn workflows <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
-  <Card title="Project Architecture" link="/community/development/">
-    Understand how KiLM organizes configs, paths, and library sources.
-    <a class="card-cta" href="/community/development/">Explore <span aria-hidden="true" class="arrow">→</span></a>
+  <Card title="Development & Contributing" link="/community/development/">
+    Quality standards, modern Python development practices, and contribution guidelines.
+    <a class="card-cta" href="/community/development/">Contribute <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
-  <Card title="CLI Reference" link="/reference/cli/">
-    Explore every command, its options, examples, and expected outputs.
-    <a class="card-cta" href="/reference/cli/">Open reference <span aria-hidden="true" class="arrow">→</span></a>
+  <Card title="Complete CLI Reference" link="/reference/cli/">
+    Every command with detailed options, examples, and cross-platform usage.
+    <a class="card-cta" href="/reference/cli/">Browse commands <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
-  <Card title="Configuration" link="/guides/configuration/">
-    Customize KiLM to match your KiCad setup and team workflows.
-    <a class="card-cta" href="/guides/configuration/">Configure <span aria-hidden="true" class="arrow">→</span></a>
+  <Card title="Configuration Management" link="/guides/configuration/">
+    KiLM and KiCad configuration files, backup systems, and environment variables.
+    <a class="card-cta" href="/guides/configuration/">Configure setup <span aria-hidden="true" class="arrow">→</span></a>
   </Card>
 </CardGrid>
 
