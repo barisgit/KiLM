@@ -2,6 +2,7 @@
 Tests for Git utility functions.
 """
 
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -41,7 +42,10 @@ class TestGitUtils:
         assert backup_path != hook_file
         assert backup_path.read_text() == hook_content
         assert backup_path.name.startswith("post-merge.backup.")
-        assert backup_path.stat().st_mode & 0o111  # Check executable bit
+
+        # Check executable bit only on Unix-like systems
+        if os.name != 'nt':  # Not Windows
+            assert backup_path.stat().st_mode & 0o111  # Check executable bit
 
     def test_merge_hook_content_new_content(self):
         """Test merging when no KiLM content exists."""

@@ -3,6 +3,7 @@ Git utility functions for KiCad Library Manager.
 Handles Git hooks directory detection and safe hook management.
 """
 
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -76,8 +77,8 @@ def backup_existing_hook(hook_path: Path) -> Path:
     # Copy the file content
     backup_path.write_text(hook_path.read_text(encoding="utf-8"))
 
-    # Preserve executable permissions
-    if hook_path.stat().st_mode & 0o111:  # Check if executable
+    # Preserve executable permissions (Unix-like systems only)
+    if os.name != 'nt' and hook_path.stat().st_mode & 0o111:  # Not Windows and executable
         backup_path.chmod(0o755)
 
     return backup_path
