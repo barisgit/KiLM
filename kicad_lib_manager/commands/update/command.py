@@ -3,9 +3,10 @@ Update command implementation for KiCad Library Manager.
 Updates KiLM itself to the latest version.
 """
 
+import importlib.metadata
+
 import click
 
-from ... import __version__
 from ...auto_update import UpdateManager
 
 
@@ -47,9 +48,11 @@ def update(check, force):
     click.echo("This notice will be removed in a future version.")
     click.echo("=" * 70 + "\n")
 
-    update_manager = UpdateManager(__version__)
+    version = importlib.metadata.version("kilm")
 
-    click.echo(f"Current KiLM version: {__version__}")
+    update_manager = UpdateManager(version)
+
+    click.echo(f"Current KiLM version: {version}")
     click.echo(f"Installation method: {update_manager.installation_method}")
     click.echo("\nChecking for updates...")
 
@@ -61,10 +64,10 @@ def update(check, force):
 
     if not update_manager.is_newer_version_available(latest_version):
         if not force:
-            click.echo(f"KiLM is up to date (v{__version__})")
+            click.echo(f"KiLM is up to date (v{version})")
             return
         else:
-            click.echo(f"Forcing update to v{latest_version} (current: v{__version__})")
+            click.echo(f"Forcing update to v{latest_version} (current: v{version})")
     else:
         click.echo(f"New version available: {latest_version}")
 
