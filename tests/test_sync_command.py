@@ -31,14 +31,24 @@ def mock_config(monkeypatch):
 
 @pytest.fixture
 def mock_subprocess_run(monkeypatch):
-    """Mock subprocess.run to simulate git pull results."""
+    """Mock subprocess.run to simulate git pull and git diff results."""
     run_mock = MagicMock()
-    # Return successful git pull by default
-    result = MagicMock()
-    result.returncode = 0
-    result.stdout = "Updating abcd123..efgh456\nsymbols/newlib.kicad_sym | 120 ++++++++++++\n1 file changed"
-    run_mock.return_value = result
 
+    # Create different results for different calls
+    def mock_run_side_effect(*args, **kwargs):
+        result = MagicMock()
+        result.returncode = 0
+
+        # Check if this is a git diff call
+        if args[0] == ["git", "diff", "--name-status", "HEAD~1", "HEAD"]:
+            result.stdout = "A\tsymbols/newlib.kicad_sym"
+        else:
+            # This is a git pull call
+            result.stdout = "Updating abcd123..efgh456\nsymbols/newlib.kicad_sym | 120 ++++++++++++\n1 file changed"
+
+        return result
+
+    run_mock.side_effect = mock_run_side_effect
     monkeypatch.setattr("subprocess.run", run_mock)
     return run_mock
 
@@ -95,36 +105,42 @@ def test_sync_command(mock_config, mock_subprocess_run, mock_path_methods):
     assert "1 libraries synced" in result.output
 
     # Verify subprocess was called correctly
-    mock_subprocess_run.assert_called_once()
-    args, kwargs = mock_subprocess_run.call_args
-    assert args[0] == ["git", "pull"]
-    assert kwargs["check"] is False
+    # Should be called twice: once for git pull, once for git diff
+    assert mock_subprocess_run.call_count == 2
+
+    # Check the first call (git pull)
+    first_call_args, first_call_kwargs = mock_subprocess_run.call_args_list[0]
+    assert first_call_args[0] == ["git", "pull"]
+    assert first_call_kwargs["check"] is False
+
+    # Check the second call (git diff)
+    second_call_args, second_call_kwargs = mock_subprocess_run.call_args_list[1]
+    assert second_call_args[0] == ["git", "diff", "--name-status", "HEAD~1", "HEAD"]
+    assert second_call_kwargs["check"] is False
 
 
 def test_sync_with_auto_setup(mock_config, mock_subprocess_run, mock_path_methods):
     """Test sync with auto-setup option."""
-    # Create a mock context to track invocation
-    context_mock = Mock()
+    # Mock the setup module import
+    setup_module_mock = Mock()
+    setup_command_mock = Mock(name="setup_command")
+    setup_command_mock.make_context = Mock(return_value=Mock())
+    setup_command_mock.invoke = Mock()
+    setup_module_mock.setup = setup_command_mock
 
-    # Mock the Context class constructor to return our mock
-    with patch("click.Context", return_value=context_mock):
-        # Mock the setup module import
-        setup_module_mock = Mock()
-        setup_module_mock.setup = Mock(name="setup_command")
+    # Mock the module import
+    with patch.dict(
+        "sys.modules", {"kicad_lib_manager.commands.setup": setup_module_mock}
+    ), patch("click.get_current_context", return_value=Mock()):
+        runner = CliRunner()
+        result = runner.invoke(main, ["sync", "--auto-setup"])
 
-        # Mock the module import
-        with patch.dict(
-            "sys.modules", {"kicad_lib_manager.commands.setup": setup_module_mock}
-        ):
-            runner = CliRunner()
-            result = runner.invoke(main, ["sync", "--auto-setup"])
+        assert result.exit_code == 0
+        assert "Running 'kilm setup'" in result.output
 
-            assert result.exit_code == 0
-            assert "Running 'kilm setup'" in result.output
-
-            # Since we've mocked Context and the setup module is properly returned by
-            # the import, we can verify the test succeeded if the output contains the
-            # expected message about running setup
+        # Verify that make_context and invoke were called
+        setup_command_mock.make_context.assert_called_once()
+        setup_command_mock.invoke.assert_called_once()
 
 
 def test_sync_with_already_up_to_date(mock_config, mock_path_methods):
@@ -187,27 +203,63 @@ def test_check_for_library_changes():
     # Create a temporary test directory
     tmp_path = Path("/tmp/test_lib")
 
-    # Test with git output indicating new symbol library
-    git_output = "symbols/newlib.kicad_sym | 120 ++++++++++"
+    # Mock subprocess.run to simulate git diff output
+    with patch("subprocess.run") as mock_run:
+        # Mock successful git diff with symbol library changes
+        result = MagicMock()
+        result.returncode = 0
+        result.stdout = (
+            "A\tsymbols/newlib.kicad_sym\nM\tfootprints/existing.pretty/file.kicad_mod"
+        )
+        mock_run.return_value = result
 
-    # Mock file existence with a patch
-    with patch.object(Path, "exists", return_value=True), patch.object(
-        Path, "is_dir", return_value=True
-    ), patch.object(Path, "glob") as mock_glob:
-        # Setup mock glob to return different files based on pattern
-        def mock_glob_func(pattern):
-            if "**/*.kicad_sym" in pattern:
-                mock_file = MagicMock()
-                mock_file.name = "test.kicad_sym"
-                return [mock_file]
-            elif "**/*.pretty" in pattern or "*" in pattern:
-                return []
-            return []
+        # Test the function with new signature (only lib_path)
+        changes = check_for_library_changes(tmp_path)
 
-        mock_glob.side_effect = mock_glob_func
-
-        # Test the function
-        changes = check_for_library_changes(git_output, tmp_path)
+        # Should detect both symbols and footprints changes
         assert "symbols" in changes
-        assert "footprints" not in changes
+        assert "footprints" in changes
         assert "templates" not in changes
+
+        # Verify git diff was called correctly
+        mock_run.assert_called_once_with(
+            ["git", "diff", "--name-status", "HEAD~1", "HEAD"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+
+def test_check_for_library_changes_fallback():
+    """Test the library change detection function fallback when git diff fails."""
+    # Create a temporary test directory
+    tmp_path = Path("/tmp/test_lib")
+
+    # Mock subprocess.run to simulate git diff failure
+    with patch("subprocess.run") as mock_run:
+        # Mock failed git diff
+        result = MagicMock()
+        result.returncode = 1
+        result.stdout = ""
+        mock_run.return_value = result
+
+        # Mock file existence with a patch for fallback behavior
+        with patch.object(Path, "exists", return_value=True), patch.object(
+            Path, "is_dir", return_value=True
+        ), patch.object(Path, "glob") as mock_glob:
+            # Setup mock glob to return symbol files
+            def mock_glob_func(pattern):
+                if "**/*.kicad_sym" in pattern:
+                    mock_file = MagicMock()
+                    mock_file.name = "test.kicad_sym"
+                    return [mock_file]
+                return []
+
+            mock_glob.side_effect = mock_glob_func
+
+            # Test the function fallback behavior
+            changes = check_for_library_changes(tmp_path)
+            assert "symbols" in changes
+            assert "footprints" not in changes
+            assert "templates" not in changes

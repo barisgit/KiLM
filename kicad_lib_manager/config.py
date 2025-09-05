@@ -380,25 +380,70 @@ class Config:
 
     def set_update_preference(self, key: str, value: Union[bool, str]) -> None:
         """
-        Set an update preference.
+        Set an update preference with strict type validation and coercion.
 
         Args:
             key: Preference key ('update_check', 'update_check_frequency', 'auto_update')
-            value: Preference value
+            value: Preference value (will be coerced to appropriate type)
         """
         valid_keys = {"update_check", "update_check_frequency", "auto_update"}
         if key not in valid_keys:
             raise ValueError(f"Invalid update preference key: {key}")
 
-        if key == "update_check_frequency":
+        # Handle boolean keys with type coercion
+        if key in {"update_check", "auto_update"}:
+            coerced_value = self._coerce_to_bool(value)
+        # Handle frequency key with string validation
+        elif key == "update_check_frequency":
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"update_check_frequency must be a string, got {type(value).__name__}"
+                )
             valid_frequencies = {"daily", "weekly", "never"}
             if value not in valid_frequencies:
                 raise ValueError(
                     f"Invalid frequency: {value}. Must be one of: {valid_frequencies}"
                 )
+            coerced_value = value
+        else:
+            coerced_value = value
 
-        self.set(key, value)
+        self.set(key, coerced_value)
         self.save()
+
+    def _coerce_to_bool(self, value: Union[bool, str]) -> bool:
+        """
+        Coerce a value to boolean with strict validation.
+
+        Args:
+            value: Value to coerce (bool or string)
+
+        Returns:
+            Boolean value
+
+        Raises:
+            ValueError: If value cannot be coerced to boolean
+        """
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, str):
+            value_lower = value.lower().strip()
+            if value_lower in {"true", "1", "yes"}:
+                return True
+            elif value_lower in {"false", "0", "no"}:
+                return False
+            else:
+                raise ValueError(
+                    f"Invalid boolean value: '{value}'. "
+                    f"Must be one of: true, false, 1, 0, yes, no (case-insensitive)"
+                )
+
+        # Should never happen
+        raise ValueError(
+            f"Cannot coerce {type(value).__name__} to boolean. "
+            f"Expected bool or string, got {type(value).__name__}"
+        )
 
 
 def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:

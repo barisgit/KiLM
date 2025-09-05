@@ -36,10 +36,10 @@ kilm update [OPTIONS]
 
 ## Behavior
 
-1.  **Installation Detection:** Automatically detects how KiLM was installed (pipx, pip, conda, uv, homebrew).
+1.  **Installation Detection:** Automatically detects how KiLM was installed (pipx, pip, uv).
 2.  **Version Check:** Queries PyPI for the latest available version using cached requests.
 3.  **Update Execution:** For supported methods (pipx, pip, uv), automatically executes the update command.
-4.  **Manual Instructions:** For unsupported methods (conda, homebrew), provides specific update instructions.
+4.  **Unavailable Methods:** For conda and homebrew (not yet published), provides information about planned availability.
 
 ## Supported Installation Methods
 
@@ -49,8 +49,8 @@ kilm update [OPTIONS]
 | **pip** ✅ | Yes | `pip install --upgrade kilm` |
 | **pip (venv)** ✅ | Yes | `pip install --upgrade kilm` |
 | **uv** ✅ | Yes | `uv tool upgrade kilm` |
-| **conda** | Manual | `conda update kilm` |
-| **homebrew** | Manual | `brew upgrade kilm` |
+| **conda** | Unavailable | N/A (planned for future) |
+| **homebrew** | Unavailable | N/A (planned for future) |
 
 ## Examples
 

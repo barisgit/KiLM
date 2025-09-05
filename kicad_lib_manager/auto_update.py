@@ -12,12 +12,13 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import requests
+from packaging.version import InvalidVersion, Version
 
 
 def detect_installation_method() -> str:
     """
     Detect how KiLM was installed to determine appropriate update strategy.
-    Returns: 'pipx' | 'pip' | 'conda' | 'uv' | 'homebrew' | 'unknown'
+    Returns: 'pipx' | 'pip' | 'pip-venv' | 'uv' | 'conda'
     """
     executable_path = Path(sys.executable)
 
@@ -34,19 +35,19 @@ def detect_installation_method() -> str:
     if os.environ.get("CONDA_DEFAULT_ENV") or "conda" in str(executable_path):
         return "conda"
 
-    # Check for homebrew installation
-    if any(
-        path in str(executable_path) for path in ["/opt/homebrew", "/usr/local/Cellar"]
-    ):
-        return "homebrew"
-
-    # Check for uv installation
-    if os.environ.get("UV_PROJECT_ENVIRONMENT") or "uv" in str(executable_path):
+    # Check for uv installation (only via official environment variables)
+    if os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR"):
         return "uv"
 
     # Check for virtual environment (pip in venv)
-    if os.environ.get("VIRTUAL_ENV"):
+    if os.environ.get("VIRTUAL_ENV") or sys.prefix != getattr(
+        sys, "base_prefix", sys.prefix
+    ):
         return "pip-venv"
+
+    # Check for homebrew installation (strict path check)
+    if str(executable_path).startswith(("/opt/homebrew/", "/usr/local/Cellar/")):
+        return "homebrew"
 
     # Default to system pip
     return "pip"
@@ -55,11 +56,11 @@ def detect_installation_method() -> str:
 class PyPIVersionChecker:
     """Responsible PyPI API client with caching and proper headers."""
 
-    def __init__(self, package_name: str):
+    def __init__(self, package_name: str, version: str = "unknown"):
         self.package_name = package_name
         self.base_url = f"https://pypi.org/pypi/{package_name}/json"
         self.cache_file = Path.home() / ".cache" / "kilm" / "version_check.json"
-        self.user_agent = "KiLM/0.4.0 (+https://github.com/barisgit/KiLM)"
+        self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
 
     def check_latest_version(self) -> Optional[str]:
         """
@@ -175,17 +176,10 @@ class UpdateManager:
     def is_newer_version_available(self, latest_version: str) -> bool:
         """Compare versions to determine if update is available."""
         try:
-            # Simple version comparison for now
-            current_parts = [int(x) for x in self.current_version.split(".")]
-            latest_parts = [int(x) for x in latest_version.split(".")]
-
-            # Pad shorter version with zeros
-            max_len = max(len(current_parts), len(latest_parts))
-            current_parts.extend([0] * (max_len - len(current_parts)))
-            latest_parts.extend([0] * (max_len - len(latest_parts)))
-
-            return latest_parts > current_parts
-        except (ValueError, AttributeError):
+            current_ver = Version(self.current_version)
+            latest_ver = Version(latest_version)
+            return latest_ver > current_ver
+        except (InvalidVersion, AttributeError):
             return False
 
     def get_update_instruction(self) -> str:
@@ -195,8 +189,8 @@ class UpdateManager:
             "pip": "pip install --upgrade kilm",
             "pip-venv": "pip install --upgrade kilm",
             "uv": "uv tool upgrade kilm",
-            "conda": "conda update kilm",
-            "homebrew": "brew upgrade kilm",
+            "conda": "Conda package not yet available (planned for future)",
+            "homebrew": "Homebrew package not yet available (planned for future)",
         }
         return instructions.get(self.installation_method, "Check your package manager")
 

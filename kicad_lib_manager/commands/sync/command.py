@@ -3,7 +3,6 @@ Sync command implementation for KiCad Library Manager.
 Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
 """
 
-import re
 import subprocess
 from pathlib import Path
 
@@ -105,22 +104,30 @@ def sync(dry_run, verbose, auto_setup):
 
             if result.returncode == 0:
                 output = result.stdout.strip() or "Already up to date."
+                is_updated = "Already up to date" not in output
+
                 if verbose:
                     click.echo(f"    Success: {output}")
-                else:
-                    is_updated = "Already up to date" not in output
+                    # Also show the short status for consistency
                     if is_updated:
                         click.echo("    Updated")
-                        updated_count += 1
                     else:
                         click.echo("    Up to date")
-                        up_to_date_count += 1
+                else:
+                    if is_updated:
+                        click.echo("    Updated")
+                    else:
+                        click.echo("    Up to date")
+
+                # Update counters regardless of verbose flag
+                if is_updated:
+                    updated_count += 1
+                else:
+                    up_to_date_count += 1
 
                 # Check if there are new library files that would require setup
-                if "Already up to date" not in output:
-                    changes_require_setup = check_for_library_changes(
-                        result.stdout, lib_path
-                    )
+                if is_updated:
+                    changes_require_setup = check_for_library_changes(lib_path)
                     if changes_require_setup:
                         libraries_with_changes.append(
                             (lib_name, lib_path, changes_require_setup)
@@ -156,7 +163,10 @@ def sync(dry_run, verbose, auto_setup):
             try:
                 from ...commands.setup import setup as setup_cmd
 
-                ctx = click.Context(setup_cmd)
+                # Create context using the command's built-in context factory
+                ctx = setup_cmd.make_context(
+                    "setup", args=[], parent=click.get_current_context()
+                )
                 setup_cmd.invoke(ctx)
             except ImportError:
                 click.echo(
@@ -177,12 +187,12 @@ def sync(dry_run, verbose, auto_setup):
 
 
 # TODO: Should be in services or utils
-def check_for_library_changes(git_output, lib_path):
+def check_for_library_changes(lib_path):
     """
-    Check if git pull output and filesystem changes indicate new libraries that would require setup.
+    Check if git pull changes indicate new libraries that would require setup.
+    Uses git diff to analyze what files were added/changed in the pull.
 
     Args:
-        git_output: Output from git pull command
         lib_path: Path to the library directory
 
     Returns:
@@ -190,19 +200,87 @@ def check_for_library_changes(git_output, lib_path):
     """
     changes = []
 
-    # Check git output for new files in key directories
-    pattern = r"[^\s]+\s+\|\s+\d+ [+]+(?:-+)?\s+(?:symbols|footprints|templates|3d)"
-    if re.search(pattern, git_output, re.IGNORECASE):
-        # This is a basic heuristic that indicates changes in library directories
-        # For more accuracy, we'll check the actual directories
-        pass
+    try:
+        # Get the diff between HEAD~1 and HEAD to see what changed in the pull
+        result = subprocess.run(
+            ["git", "diff", "--name-status", "HEAD~1", "HEAD"],
+            cwd=lib_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
-    # Check for specific library file types
+        if result.returncode != 0:
+            # If we can't get the diff (e.g., first commit), fall back to checking current state
+            return _check_current_library_state(lib_path)
+
+        diff_output = result.stdout.strip()
+        if not diff_output:
+            return changes
+
+        # Parse the diff output to find relevant changes
+        for line in diff_output.split("\n"):
+            if not line.strip():
+                continue
+
+            # Parse git diff --name-status format: STATUS\tPATH
+            parts = line.split("\t", 1)
+            if len(parts) != 2:
+                continue
+
+            status, path = parts
+            # Only consider added (A) or modified (M) files, ignore deletions
+            if status not in ["A", "M", "R"]:
+                continue
+
+            # Check for symbol library changes
+            if _is_symbol_library_change(path) and "symbols" not in changes:
+                changes.append("symbols")
+
+            # Check for footprint library changes
+            if _is_footprint_library_change(path) and "footprints" not in changes:
+                changes.append("footprints")
+
+            # Check for template changes
+            if _is_template_change(path) and "templates" not in changes:
+                changes.append("templates")
+
+    except Exception:
+        # If git diff fails, fall back to checking current state
+        return _check_current_library_state(lib_path)
+
+    return changes
+
+
+def _is_symbol_library_change(path):
+    """Check if a path change indicates a symbol library change."""
+    # Look for .kicad_sym files in symbols directory
+    return path.startswith("symbols/") and path.endswith(".kicad_sym")
+
+
+def _is_footprint_library_change(path):
+    """Check if a path change indicates a footprint library change."""
+    # Look for .pretty directories or files within them
+    return (path.startswith("footprints/") and path.endswith(".pretty")) or (
+        path.startswith("footprints/") and ".pretty/" in path
+    )
+
+
+def _is_template_change(path):
+    """Check if a path change indicates a template change."""
+    # Look for metadata.yaml files in template directories
+    return path.startswith("templates/") and path.endswith("metadata.yaml")
+
+
+def _check_current_library_state(lib_path):
+    """
+    Fallback method to check current library state when git diff is not available.
+    This is used when we can't determine what changed in the pull.
+    """
+    changes = []
+
+    # Check for symbol libraries (.kicad_sym files)
     symbols_path = lib_path / "symbols"
-    footprints_path = lib_path / "footprints"
-    templates_path = lib_path / "templates"
-
-    # Look for symbol libraries (.kicad_sym files)
     if (
         symbols_path.exists()
         and symbols_path.is_dir()
@@ -212,7 +290,8 @@ def check_for_library_changes(git_output, lib_path):
     ):
         changes.append("symbols")
 
-    # Look for footprint libraries (.pretty directories)
+    # Check for footprint libraries (.pretty directories)
+    footprints_path = lib_path / "footprints"
     if (
         footprints_path.exists()
         and footprints_path.is_dir()
@@ -223,7 +302,8 @@ def check_for_library_changes(git_output, lib_path):
     ):
         changes.append("footprints")
 
-    # Look for project templates (directories with metadata.yaml)
+    # Check for project templates (directories with metadata.yaml)
+    templates_path = lib_path / "templates"
     if (
         templates_path.exists()
         and templates_path.is_dir()
