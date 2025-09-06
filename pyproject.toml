@@ -44,6 +44,8 @@ keywords = [
 requires-python = ">=3.8"
 dependencies = [
     "click>=8.0",
+    "typer>=0.17.4",
+    "rich>=14.0.0",
     "packaging>=25.0",
     "pyyaml>=6.0",
     "pathlib>=1.0.1",
@@ -72,7 +74,7 @@ Repository = "https://github.com/barisgit/KiLM"
 
 [project.scripts]
 kilm = "kicad_lib_manager.cli:main"
-kicad-lib-manager = "kicad_lib_manager.cli:main"
+kilm-typer = "kicad_lib_manager.main:app"
 
 
 [tool.hatch.build.targets.wheel]

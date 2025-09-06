@@ -626,8 +626,8 @@ def post_create(context):
     # readme_path = os.path.join(context["project_dir"], "README.md")
     # if not os.path.exists(readme_path):
     #     with Path(readme_path).open("w") as f:
-    #         f.write(f"# {context['variables']['project_name']}\\n\\n")
-    #         f.write("Created with KiCad Library Manager\\n")
+    #         f.write(f"# {context['variables']['project_name']}\n\n")
+    #         f.write("Created with KiCad Library Manager\n")
 
     # Print message to user
     click.echo(f"Project {context['variables']['project_name']} created successfully!")

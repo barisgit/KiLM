@@ -1,29 +1,41 @@
 """
-List command implementation for KiCad Library Manager.
+List command implementation for KiCad Library Manager (Typer version).
 """
 
-import sys
+from typing import Annotated, Optional
 
-import click
+import typer
+from rich.console import Console
+from rich.table import Table
 
 from ...library_manager import list_libraries
 from ...utils.env_vars import expand_user_path, find_environment_variables
 
+console = Console()
 
-@click.command()
-@click.option(
-    "--kicad-lib-dir",
-    envvar="KICAD_USER_LIB",
-    help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
-)
-def list_cmd(kicad_lib_dir):
-    """List available libraries in the specified directory"""
+
+def list_cmd(
+    kicad_lib_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            "--kicad-lib-dir",
+            help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
+            envvar="KICAD_USER_LIB",
+        ),
+    ] = None,
+) -> None:
+    """
+    List available libraries in the specified directory.
+
+    This command scans the KiCad library directory for symbol (.kicad_sym) and
+    footprint (.pretty) libraries and displays them in organized tables.
+    """
     # Find environment variables if not provided
     if not kicad_lib_dir:
         kicad_lib_dir = find_environment_variables("KICAD_USER_LIB")
         if not kicad_lib_dir:
-            click.echo("Error: KICAD_USER_LIB not set and not provided", err=True)
-            sys.exit(1)
+            console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
+            raise typer.Exit(1)
 
     # Expand user home directory if needed
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
@@ -31,19 +43,57 @@ def list_cmd(kicad_lib_dir):
     try:
         symbols, footprints = list_libraries(kicad_lib_dir)
 
-        if symbols:
-            click.echo("\nAvailable Symbol Libraries:")
-            for symbol in sorted(symbols):
-                click.echo(f"  - {symbol}")
-        else:
-            click.echo("No symbol libraries found")
+        console.print(f"[blue]Scanning library directory:[/blue] {kicad_lib_dir}\n")
 
-        if footprints:
-            click.echo("\nAvailable Footprint Libraries:")
-            for footprint in sorted(footprints):
-                click.echo(f"  - {footprint}")
+        # Display symbol libraries in a table
+        if symbols:
+            symbol_table = Table(
+                title="Available Symbol Libraries",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            symbol_table.add_column("Library Name", style="cyan", no_wrap=True)
+            symbol_table.add_column("Type", style="blue")
+
+            for symbol in sorted(symbols):
+                symbol_table.add_row(symbol, ".kicad_sym")
+
+            console.print(symbol_table)
         else:
-            click.echo("No footprint libraries found")
+            console.print("[yellow]No symbol libraries found[/yellow]")
+
+        console.print()  # Empty line for spacing
+
+        # Display footprint libraries in a table
+        if footprints:
+            footprint_table = Table(
+                title="Available Footprint Libraries",
+                show_header=True,
+                header_style="bold magenta",
+            )
+            footprint_table.add_column("Library Name", style="magenta", no_wrap=True)
+            footprint_table.add_column("Type", style="blue")
+
+            for footprint in sorted(footprints):
+                footprint_table.add_row(footprint, ".pretty")
+
+            console.print(footprint_table)
+        else:
+            console.print("[yellow]No footprint libraries found[/yellow]")
+
+        # Summary information
+        total_libs = len(symbols) + len(footprints)
+        if total_libs > 0:
+            console.print(
+                f"\n[green]Found {total_libs} libraries total[/green] "
+                f"([cyan]{len(symbols)} symbol[/cyan], "
+                f"[magenta]{len(footprints)} footprint[/magenta])"
+            )
+        else:
+            console.print(
+                "[yellow]No libraries found in the specified directory[/yellow]"
+            )
+
     except Exception as e:
-        click.echo(f"Error listing libraries: {e}", err=True)
-        sys.exit(1)
+        console.print(f"[red]Error listing libraries: {e}[/red]")
+        raise typer.Exit(1)
