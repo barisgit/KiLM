@@ -2,6 +2,7 @@
 Pin command implementation for KiCad Library Manager (Typer version).
 """
 
+from pathlib import Path
 from typing import Annotated, List, Optional
 
 import typer
@@ -9,7 +10,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ...library_manager import find_kicad_config, list_libraries
+from ...services.kicad_service import KiCadService
+from ...services.library_service import LibraryService
 from ...utils.env_vars import (
     expand_user_path,
     find_environment_variables,
@@ -29,7 +31,7 @@ def pin(
         ),
     ] = None,
     symbols: Annotated[
-        List[str],
+        Optional[List[str]],
         typer.Option(
             "--symbols",
             "-s",
@@ -37,7 +39,7 @@ def pin(
         ),
     ] = None,
     footprints: Annotated[
-        List[str],
+        Optional[List[str]],
         typer.Option(
             "--footprints",
             "-f",
@@ -76,7 +78,7 @@ def pin(
 ) -> None:
     """
     Pin libraries in KiCad for quick access.
-    
+
     This command pins libraries in KiCad's interface for quick access.
     You can pin specific symbol and footprint libraries or all available libraries.
     """
@@ -85,7 +87,7 @@ def pin(
         symbols = []
     if footprints is None:
         footprints = []
-        
+
     # Find environment variables if not provided
     if not kicad_lib_dir:
         kicad_lib_dir = find_environment_variables("KICAD_USER_LIB")
@@ -99,9 +101,13 @@ def pin(
     if verbose:
         console.print(f"[blue]Using KiCad library directory:[/blue] {kicad_lib_dir}")
 
+    # Initialize services
+    library_service = LibraryService()
+    kicad_service = KiCadService()
+
     # Find KiCad configuration
     try:
-        kicad_config = find_kicad_config()
+        kicad_config = kicad_service.find_kicad_config_dir()
         if verbose:
             console.print(f"[blue]Found KiCad configuration at:[/blue] {kicad_config}")
     except Exception as e:
@@ -111,7 +117,9 @@ def pin(
     # If --all is specified, get all libraries from the directory
     if all_libs and not symbols and not footprints:
         try:
-            symbol_libs, footprint_libs = list_libraries(kicad_lib_dir)
+            symbol_libs, footprint_libs = library_service.list_libraries(
+                Path(kicad_lib_dir)
+            )
             symbols = list(symbol_libs)
             footprints = list(footprint_libs)
             if verbose:
@@ -131,17 +139,23 @@ def pin(
     # Validate that libraries exist
     if not all_libs and (symbols or footprints):
         try:
-            available_symbols, available_footprints = list_libraries(kicad_lib_dir)
+            available_symbols, available_footprints = library_service.list_libraries(
+                Path(kicad_lib_dir)
+            )
 
             # Check symbols
             for symbol in symbols:
                 if symbol not in available_symbols:
-                    console.print(f"[yellow]Warning: Symbol library '{symbol}' not found[/yellow]")
+                    console.print(
+                        f"[yellow]Warning: Symbol library '{symbol}' not found[/yellow]"
+                    )
 
             # Check footprints
             for footprint in footprints:
                 if footprint not in available_footprints:
-                    console.print(f"[yellow]Warning: Footprint library '{footprint}' not found[/yellow]")
+                    console.print(
+                        f"[yellow]Warning: Footprint library '{footprint}' not found[/yellow]"
+                    )
         except Exception as e:
             console.print(f"[yellow]Error validating libraries: {e}[/yellow]")
             # Continue anyway, in case the libraries are configured but not in the directory
@@ -162,15 +176,19 @@ def pin(
                 )
             else:
                 success_msg = f"[green]Pinned {len(symbols)} symbol and {len(footprints)} footprint libraries in KiCad[/green]"
-                console.print(Panel(
-                    f"{success_msg}\n\n"
-                    f"[blue]• Created backup of kicad_common.json[/blue]\n"
-                    f"[yellow]• Restart KiCad for changes to take effect[/yellow]",
-                    title="✅ Libraries Pinned",
-                    border_style="green"
-                ))
+                console.print(
+                    Panel(
+                        f"{success_msg}\n\n"
+                        f"[blue]• Created backup of kicad_common.json[/blue]\n"
+                        f"[yellow]• Restart KiCad for changes to take effect[/yellow]",
+                        title="✅ Libraries Pinned",
+                        border_style="green",
+                    )
+                )
         else:
-            console.print("[blue]No changes needed, libraries already pinned in KiCad[/blue]")
+            console.print(
+                "[blue]No changes needed, libraries already pinned in KiCad[/blue]"
+            )
 
         if verbose:
             if symbols:
@@ -181,7 +199,7 @@ def pin(
                 console.print(table)
 
             if footprints:
-                table = Table(title="Pinned Footprint Libraries")  
+                table = Table(title="Pinned Footprint Libraries")
                 table.add_column("Library", style="magenta")
                 for footprint in sorted(footprints):
                     table.add_row(footprint)

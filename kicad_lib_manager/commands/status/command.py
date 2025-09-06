@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from ...library_manager import find_kicad_config, list_configured_libraries
+from ...services.kicad_service import KiCadService
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 console = Console()
@@ -21,22 +21,25 @@ console = Console()
 def status() -> None:
     """Show the current KiCad configuration status"""
     try:
+        # Initialize services
+        kicad_service = KiCadService()
+
         # Show KILM configuration first
         _show_kilm_configuration()
 
         console.print("\n[bold cyan]KiCad Configuration[/bold cyan]")
 
-        kicad_config = find_kicad_config()
+        kicad_config = kicad_service.find_kicad_config_dir()
         console.print(f"KiCad configuration directory: [blue]{kicad_config}[/blue]")
 
         # Check environment variables in KiCad common
         _show_kicad_environment_variables(kicad_config)
 
         # Check pinned libraries
-        _check_pinned_libraries(kicad_config)
+        _check_pinned_libraries(kicad_config, kicad_service)
 
         # Check configured libraries
-        _show_configured_libraries(kicad_config)
+        _show_configured_libraries(kicad_config, kicad_service)
 
     except Exception as e:
         console.print(f"[red]Error getting KiCad configuration: {e}[/red]")
@@ -53,8 +56,13 @@ def _show_kilm_configuration() -> None:
                 with config_file.open() as f:
                     config_data = yaml.safe_load(f)
 
-                _show_configured_libraries_table(config_data)
-                _show_kilm_settings(config_data)
+                if config_data is not None:
+                    _show_configured_libraries_table(config_data)
+                    _show_kilm_settings(config_data)
+                else:
+                    console.print(
+                        "[yellow]Configuration file is empty or invalid[/yellow]"
+                    )
 
             except Exception as e:
                 console.print(f"[red]Error reading configuration: {e}[/red]")
@@ -180,8 +188,9 @@ def _show_kicad_environment_variables(kicad_config: Path) -> None:
         console.print(f"[red]Error reading KiCad common configuration: {e}[/red]")
 
 
-def _check_pinned_libraries(kicad_config: Path) -> None:
+def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> None:
     """Check and display pinned libraries"""
+    _ = kicad_service  # Suppress unused warning, TODO: implement functionality
     kicad_common = kicad_config / "kicad_common.json"
     if kicad_common.exists():
         try:
@@ -260,10 +269,10 @@ def _check_pinned_libraries(kicad_config: Path) -> None:
         console.print("\n[yellow]No pinned libraries file found[/yellow]")
 
 
-def _show_configured_libraries(kicad_config: Path) -> None:
+def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) -> None:
     """Show configured libraries in KiCad"""
     try:
-        sym_libs, fp_libs = list_configured_libraries(kicad_config)
+        sym_libs, fp_libs = kicad_service.get_configured_libraries(kicad_config)
 
         console.print("\n[bold]Configured Symbol Libraries:[/bold]")
         if sym_libs:

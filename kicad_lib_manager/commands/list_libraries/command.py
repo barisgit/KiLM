@@ -2,13 +2,14 @@
 List command implementation for KiCad Library Manager (Typer version).
 """
 
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from ...library_manager import list_libraries
+from ...services.library_service import LibraryService
 from ...utils.env_vars import expand_user_path, find_environment_variables
 
 console = Console()
@@ -41,7 +42,8 @@ def list_cmd(
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
 
     try:
-        symbols, footprints = list_libraries(kicad_lib_dir)
+        library_service = LibraryService()
+        symbols, footprints = library_service.list_libraries(Path(kicad_lib_dir))
 
         console.print(f"[blue]Scanning library directory:[/blue] {kicad_lib_dir}\n")
 
@@ -96,4 +98,4 @@ def list_cmd(
 
     except Exception as e:
         console.print(f"[red]Error listing libraries: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

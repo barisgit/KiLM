@@ -228,3 +228,34 @@ class UpdateManager:
         else:
             instruction = self.get_update_instruction()
             return False, f"Unsupported installation method. Run: {instruction}"
+
+
+class UpdateService:
+    """Service wrapper for KiLM update functionality."""
+
+    def __init__(self, current_version: str):
+        self.manager = UpdateManager(current_version)
+
+    def check_for_updates(self) -> Optional[str]:
+        """Check for available updates."""
+        return self.manager.check_latest_version()
+
+    def is_update_available(self, latest_version: str) -> bool:
+        """Check if an update is available."""
+        return self.manager.is_newer_version_available(latest_version)
+
+    def get_installation_method(self) -> str:
+        """Get detected installation method."""
+        return self.manager.installation_method
+
+    def get_update_instructions(self) -> str:
+        """Get update instructions for current installation method."""
+        return self.manager.get_update_instruction()
+
+    def can_auto_update(self) -> bool:
+        """Check if automatic updates are supported."""
+        return self.manager.can_auto_update()
+
+    def perform_update(self) -> Tuple[bool, str]:
+        """Perform the update."""
+        return self.manager.perform_update()

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from ...config import Config
+from ...services.config_service import Config
 from ...utils.metadata import (
     CLOUD_METADATA_FILE,
     generate_env_var_name,

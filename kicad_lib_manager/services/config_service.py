@@ -1,5 +1,5 @@
 """
-Configuration management
+Configuration management for KiCad Library Manager.
 """
 
 import time
@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, TypedDict, Union, cast
 import click
 import yaml
 
-from .constants import (
+from ..utils.constants import (
     CONFIG_DIR_NAME,
     CONFIG_FILE_NAME,
     DEFAULT_LIBRARIES,
@@ -462,3 +462,64 @@ def _validate_library_entry(
             type_=str(lib["type"]),
         )
     return None
+
+
+class ConfigService:
+    """Service wrapper for managing KiLM configuration."""
+
+    def __init__(self):
+        """Initialize the configuration service."""
+        self._config = Config()
+
+    def get_config_file_path(self) -> Path:
+        """Get the path to the KiLM configuration file."""
+        return self._config._get_config_file()
+
+    def load_config(self) -> Dict:
+        """Load the KiLM configuration."""
+        return self._config._config
+
+    def save_config(self, config: Dict) -> None:
+        """Save the KiLM configuration."""
+        self._config._config = config
+        self._config.save()
+
+    def add_library(self, name: str, path: str, library_type: str) -> None:
+        """Add a library to the configuration."""
+        self._config.add_library(name, path, library_type)
+
+    def remove_library(self, name: str) -> None:
+        """Remove a library from the configuration."""
+        self._config.remove_library(name)
+
+    def get_libraries(self) -> List[LibraryDict]:
+        """Get all configured libraries."""
+        return self._config.get_libraries()
+
+    def get_library_by_name(self, name: str) -> Optional[LibraryDict]:
+        """Get a specific library by name."""
+        libraries = self.get_libraries()
+        for lib in libraries:
+            if lib.get("name") == name:
+                return lib
+        return None
+
+    def get_current_library(self) -> Optional[str]:
+        """Get the current active library path."""
+        return self._config.get_current_library()
+
+    def set_current_library(self, path: str) -> None:
+        """Set the current active library."""
+        self._config.set_current_library(path)
+
+    def get_max_backups(self) -> int:
+        """Get the maximum number of backups to keep."""
+        value = self._config.get("max_backups", 5)
+        if isinstance(value, int):
+            return value
+        return 5
+
+    def set_max_backups(self, count: int) -> None:
+        """Set the maximum number of backups to keep."""
+        self._config.set("max_backups", count)
+        self._config.save()

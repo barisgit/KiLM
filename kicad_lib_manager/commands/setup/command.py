@@ -10,8 +10,8 @@ from typing import Dict, List
 import click
 
 # TODO: Use full path (kicad_lib_manager...)
-from ...config import Config, LibraryDict
-from ...library_manager import add_libraries, find_kicad_config
+from ...services.config_service import Config, LibraryDict
+from ...services.library_service import LibraryService
 from ...utils.backup import create_backup
 from ...utils.env_vars import (
     expand_user_path,
@@ -367,7 +367,7 @@ def setup(
 
     # Find KiCad configuration
     try:
-        kicad_config = find_kicad_config()
+        kicad_config = LibraryService.find_kicad_config()
         click.echo(f"Found KiCad configuration at: {kicad_config}")
 
         # Fix any invalid URIs in existing library entries
@@ -436,7 +436,7 @@ def setup(
             three_d_dirs["KICAD_3D_LIB"] = kicad_3d_dir
 
         # Call add_libraries with the main library and all 3D libraries
-        added_libraries, changes_needed = add_libraries(
+        added_libraries, changes_needed = LibraryService.add_libraries(
             kicad_lib_dir,
             kicad_config,
             kicad_3d_dir=kicad_3d_dir,

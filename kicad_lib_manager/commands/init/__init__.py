@@ -1,4 +1,5 @@
 import typer
+
 from .command import init
 
 # Create Typer app and add the init command as callback

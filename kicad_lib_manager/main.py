@@ -12,6 +12,7 @@ from rich.traceback import install
 
 from .commands.init import init_app
 from .commands.list_libraries import list_app
+from .commands.pin import pin_app
 from .commands.status import status_app
 
 # Install rich traceback handler for better error display
@@ -36,7 +37,7 @@ def version_callback(value: bool) -> None:
     """Print version information and exit."""
     if value:
         version = importlib.metadata.version("kilm")
-        console.print(f"KiCad Library Manager (KiLM) version {version}")
+        console.print(f"KiCad Library Manager (KiLM) version [cyan]{version}[/cyan]")
         raise typer.Exit()
 
 
@@ -72,10 +73,11 @@ def main(
 app.add_typer(status_app, name="status", help="Show current library configuration")
 app.add_typer(list_app, name="list", help="List available KiCad libraries")
 app.add_typer(init_app, name="init", help="Initialize library configuration")
+app.add_typer(pin_app, name="pin", help="Pin favorite libraries")
 
 # TODO: Migrate remaining commands to Typer
 # - setup: Configure KiCad to use libraries
-# - pin/unpin: Pin/unpin favorite libraries
+# - unpin: Unpin favorite libraries
 # - add-3d: Add 3D model libraries
 # - config: Manage configuration settings
 # - sync: Update/sync library content

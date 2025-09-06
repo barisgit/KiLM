@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from kicad_lib_manager.cli import main
-from kicad_lib_manager.config import Config, LibraryDict
+from kicad_lib_manager.services.config_service import Config, LibraryDict
 
 # Sample test data
 TEST_LIBRARIES: List[LibraryDict] = [

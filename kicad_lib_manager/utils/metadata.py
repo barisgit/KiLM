@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
-from ..constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
+from .constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 
 def read_github_metadata(

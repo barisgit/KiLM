@@ -7,7 +7,7 @@ import importlib.metadata
 
 import click
 
-from ...auto_update import UpdateManager
+from ...services.update_service import UpdateManager
 
 
 @click.command()

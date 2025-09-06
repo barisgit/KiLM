@@ -17,7 +17,7 @@ import jinja2
 import pathspec
 import yaml
 
-from ..constants import (
+from .constants import (
     HOOKS_DIR,
     TEMPLATE_CONTENT_DIR,
     TEMPLATE_METADATA,

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from kicad_lib_manager.library_manager import (
+from kicad_lib_manager.services.library_service import (
     add_entries_to_table,
     add_libraries,
     format_uri,

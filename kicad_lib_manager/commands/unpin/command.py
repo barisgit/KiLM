@@ -7,7 +7,7 @@ import sys
 
 import click
 
-from ...library_manager import find_kicad_config
+from ...services.library_service import LibraryService
 from ...utils.backup import create_backup
 
 
@@ -56,7 +56,7 @@ def unpin(symbols, footprints, all, dry_run, max_backups, verbose):
 
     # Find KiCad configuration
     try:
-        kicad_config = find_kicad_config()
+        kicad_config = LibraryService.find_kicad_config()
         if verbose:
             click.echo(f"Found KiCad configuration at: {kicad_config}")
     except Exception as e:

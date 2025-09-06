@@ -12,7 +12,7 @@ from typing import List, Optional
 
 # Import Config here, but only use it when needed to avoid circular imports
 try:
-    from ..config import Config
+    from ..services.config_service import Config
 except ImportError:
     Config = None
 

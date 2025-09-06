@@ -73,8 +73,7 @@ Repository = "https://github.com/barisgit/KiLM"
 "Bug Tracker" = "https://github.com/barisgit/KiLM/issues"
 
 [project.scripts]
-kilm = "kicad_lib_manager.cli:main"
-kilm-typer = "kicad_lib_manager.main:app"
+kilm = "kicad_lib_manager.main:app"
 
 
 [tool.hatch.build.targets.wheel]

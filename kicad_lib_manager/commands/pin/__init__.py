@@ -1,4 +1,5 @@
 import typer
+
 from .command import pin
 
 # Create Typer app and add the pin command as callback
