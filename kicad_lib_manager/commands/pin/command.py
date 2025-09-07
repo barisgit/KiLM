@@ -112,7 +112,7 @@ def pin(
             console.print(f"[blue]Found KiCad configuration at:[/blue] {kicad_config}")
     except Exception as e:
         console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     # If --all is specified, get all libraries from the directory
     if all_libs and not symbols and not footprints:
@@ -128,7 +128,7 @@ def pin(
                 )
         except Exception as e:
             console.print(f"[red]Error listing libraries: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     # Ensure we have lists (Typer should already provide lists)
     if not isinstance(symbols, list):
@@ -206,4 +206,4 @@ def pin(
                 console.print(table)
     except Exception as e:
         console.print(f"[red]Error pinning libraries: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

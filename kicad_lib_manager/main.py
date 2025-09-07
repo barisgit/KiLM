@@ -14,6 +14,7 @@ from .commands.init import init_app
 from .commands.list_libraries import list_app
 from .commands.pin import pin_app
 from .commands.status import status_app
+from .utils.banner import show_banner
 
 # Install rich traceback handler for better error display
 install(show_locals=True)
@@ -29,13 +30,16 @@ app = typer.Typer(
     rich_markup_mode="rich",
     pretty_exceptions_enable=True,
     pretty_exceptions_show_locals=False,
-    no_args_is_help=True,
+    invoke_without_command=True,
 )
 
 
 def version_callback(value: bool) -> None:
     """Print version information and exit."""
     if value:
+        show_banner(console, justify="left")
+        console.print()
+
         version = importlib.metadata.version("kilm")
         console.print(f"KiCad Library Manager (KiLM) version [cyan]{version}[/cyan]")
         raise typer.Exit()
@@ -43,7 +47,7 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
-    version: Annotated[
+    _version: Annotated[
         Optional[bool],
         typer.Option(
             "--version",
@@ -66,7 +70,11 @@ def main(
     • [cyan]kilm list[/cyan]       - List available libraries
     • [cyan]kilm sync[/cyan]       - Update library content
     """
-    pass
+    # Show banner when no arguments are provided, centered
+    show_banner(console)
+    console.print()  # Add blank line after banner
+
+    console.print("[dim]Use 'kilm --help' to see all commands.[/dim]", justify="center")
 
 
 # Register command apps (migrated to Typer)
