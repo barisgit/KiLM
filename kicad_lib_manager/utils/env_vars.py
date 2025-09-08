@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 # Import Config here, but only use it when needed to avoid circular imports
 try:
@@ -230,8 +230,8 @@ def update_kicad_env_vars(
 
 def update_pinned_libraries(
     kicad_config: Path,
-    symbol_libs: Optional[List[str]] = None,
-    footprint_libs: Optional[List[str]] = None,
+    symbol_libs: Optional[list[str]] = None,
+    footprint_libs: Optional[list[str]] = None,
     dry_run: bool = False,
     max_backups: int = 5,
 ) -> bool:

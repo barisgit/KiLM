@@ -4,7 +4,7 @@ KiCad service implementation for KiCad Library Manager.
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from ..utils.file_ops import list_configured_libraries
 from .library_service import LibraryService
@@ -17,7 +17,7 @@ class KiCadService:
     def find_kicad_config_dir() -> Path:
         return LibraryService.find_kicad_config()
 
-    def get_environment_variables(self, config_dir: Path) -> Dict[str, str]:
+    def get_environment_variables(self, config_dir: Path) -> dict[str, str]:
         """Get KiCad environment variables from configuration."""
         kicad_common = config_dir / "kicad_common.json"
 
@@ -39,7 +39,7 @@ class KiCadService:
     def set_environment_variables(
         self,
         config_dir: Path,
-        env_vars: Dict[str, str],
+        env_vars: dict[str, str],
         backup: bool = True,
         max_backups: int = 5,
     ) -> bool:
@@ -51,15 +51,15 @@ class KiCadService:
 
     def get_configured_libraries(
         self, config_dir: Path
-    ) -> Tuple[List[Dict], List[Dict]]:
+    ) -> tuple[list[dict], list[dict]]:
         """Get configured symbol and footprint libraries."""
         return list_configured_libraries(config_dir)
 
     def add_libraries_to_kicad(
         self,
         config_dir: Path,
-        symbol_libs: Optional[List[Dict]] = None,
-        footprint_libs: Optional[List[Dict]] = None,
+        symbol_libs: Optional[list[dict]] = None,
+        footprint_libs: Optional[list[dict]] = None,
         backup: bool = True,
         max_backups: int = 5,
     ) -> bool:
@@ -77,7 +77,7 @@ class KiCadService:
         _ = added_libs  # Suppress unused warning
         return changes_needed
 
-    def get_pinned_libraries(self, config_dir: Path) -> Tuple[List[str], List[str]]:
+    def get_pinned_libraries(self, config_dir: Path) -> tuple[list[str], list[str]]:
         """Get pinned libraries from KiCad configuration."""
         kicad_common = config_dir / "kicad_common.json"
 

@@ -4,11 +4,11 @@ File operation utilities
 
 import re
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 
 def read_file_with_encoding(
-    file_path: Path, encodings: Optional[List[str]] = None
+    file_path: Path, encodings: Optional[list[str]] = None
 ) -> str:
     """
     Read a file trying multiple encodings until successful
@@ -190,7 +190,7 @@ def add_footprint_lib(
         )
 
 
-def list_libraries(kicad_lib_dir: str) -> Tuple[List[str], List[str]]:
+def list_libraries(kicad_lib_dir: str) -> tuple[list[str], list[str]]:
     """
     List all available libraries in the repository
 
@@ -224,7 +224,7 @@ def list_libraries(kicad_lib_dir: str) -> Tuple[List[str], List[str]]:
     return symbols, footprints
 
 
-def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict]]:
+def list_configured_libraries(kicad_config: Path) -> tuple[list[dict], list[dict]]:
     """
     List all libraries currently configured in KiCad
 

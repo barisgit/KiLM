@@ -6,7 +6,7 @@ Core functionality for managing KiCad libraries.
 import os
 import platform
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 import yaml
 
@@ -27,7 +27,7 @@ from ..utils.metadata import (
 class LibraryService:
     """Service for managing KiCad libraries."""
 
-    def list_libraries(self, directory: Path) -> Tuple[List[str], List[str]]:
+    def list_libraries(self, directory: Path) -> tuple[list[str], list[str]]:
         """List symbol and footprint libraries in a directory."""
         return list_libraries(str(directory))
 
@@ -39,7 +39,7 @@ class LibraryService:
         env_var: Optional[str] = None,
         force: bool = False,
         no_env_var: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Initialize a library in the given directory."""
         # Check for existing metadata
         metadata = read_github_metadata(directory)
@@ -81,7 +81,7 @@ class LibraryService:
         self._create_library_structure(directory)
 
         # Update capabilities
-        capabilities: Dict[str, bool] = {
+        capabilities: dict[str, bool] = {
             "symbols": (directory / "symbols").exists(),
             "footprints": (directory / "footprints").exists(),
             "templates": (directory / "templates").exists(),
@@ -91,14 +91,14 @@ class LibraryService:
 
         return metadata
 
-    def get_library_metadata(self, directory: Path) -> Optional[Dict]:
+    def get_library_metadata(self, directory: Path) -> Optional[dict]:
         """Get metadata for a library directory."""
         return read_github_metadata(directory)
 
     def pin_libraries(
         self,
-        symbol_libs: List[str],
-        footprint_libs: List[str],
+        symbol_libs: list[str],
+        footprint_libs: list[str],
         kicad_config_dir: Path,
         dry_run: bool = False,
         max_backups: int = 5,
@@ -114,8 +114,8 @@ class LibraryService:
 
     def unpin_libraries(
         self,
-        symbol_libs: List[str],
-        footprint_libs: List[str],
+        symbol_libs: list[str],
+        footprint_libs: list[str],
         kicad_config_dir: Path,
         dry_run: bool = False,
         max_backups: int = 5,
@@ -127,7 +127,7 @@ class LibraryService:
         _ = symbol_libs, footprint_libs, kicad_config_dir, dry_run, max_backups
         return False
 
-    def _create_library_structure(self, directory: Path) -> Tuple[List[str], List[str]]:
+    def _create_library_structure(self, directory: Path) -> tuple[list[str], list[str]]:
         """Create the required directory structure for a library."""
         required_folders = ["symbols", "footprints", "templates"]
         existing_folders = []
@@ -148,9 +148,9 @@ class LibraryService:
         kicad_lib_dir: str,
         kicad_config: Path,
         kicad_3d_dir: Optional[str] = None,
-        additional_3d_dirs: Optional[Dict[str, str]] = None,
+        additional_3d_dirs: Optional[dict[str, str]] = None,
         dry_run: bool = False,
-    ) -> Tuple[Set[str], bool]:
+    ) -> tuple[set[str], bool]:
         """
         Add KiCad libraries to the configuration.
 
@@ -474,7 +474,7 @@ class LibraryService:
             return f"{base_path}/footprints/{lib_name}.pretty"
 
     @staticmethod
-    def add_entries_to_table(table_path: Path, entries: List[Dict[str, str]]) -> None:
+    def add_entries_to_table(table_path: Path, entries: list[dict[str, str]]) -> None:
         """
         Add entries to a KiCad library table file
 

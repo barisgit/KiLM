@@ -5,7 +5,7 @@ Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
 
 import subprocess
 from pathlib import Path
-from typing import Annotated, List, Tuple
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -59,7 +59,7 @@ def sync(
         failed_count = 0  # Git pull failed
 
         # Track libraries that have changes that might require setup
-        libraries_with_changes: List[Tuple[str, Path, List[str]]] = []
+        libraries_with_changes: list[tuple[str, Path, list[str]]] = []
 
         for lib in libraries:
             lib_name = lib.get("name", "unnamed")
@@ -197,7 +197,7 @@ def sync(
 
 
 # TODO: Should be in services or utils
-def check_for_library_changes(lib_path: Path) -> List[str]:
+def check_for_library_changes(lib_path: Path) -> list[str]:
     """
     Check if git pull changes indicate new libraries that would require setup.
     Uses git diff to analyze what files were added/changed in the pull.
@@ -282,7 +282,7 @@ def _is_template_change(path: str) -> bool:
     return path.startswith("templates/") and path.endswith("metadata.yaml")
 
 
-def _check_current_library_state(lib_path: Path) -> List[str]:
+def _check_current_library_state(lib_path: Path) -> list[str]:
     """
     Fallback method to check current library state when git diff is not available.
     This is used when we can't determine what changed in the pull.

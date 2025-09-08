@@ -4,14 +4,14 @@ Library service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, Tuple, Union
+from typing import Optional, Protocol, Union
 
 
 class LibraryServiceProtocol(Protocol):
     """Protocol for library management services."""
 
     @abstractmethod
-    def list_libraries(self, directory: Path) -> Tuple[List[str], List[str]]:
+    def list_libraries(self, directory: Path) -> tuple[list[str], list[str]]:
         """
         List symbol and footprint libraries in a directory.
 
@@ -29,22 +29,22 @@ class LibraryServiceProtocol(Protocol):
         env_var: Optional[str] = None,
         force: bool = False,
         no_env_var: bool = False,
-    ) -> Dict[str, Union[str, bool, Dict[str, bool]]]:
+    ) -> dict[str, Union[str, bool, dict[str, bool]]]:
         """Initialize a library in the given directory."""
         ...
 
     @abstractmethod
     def get_library_metadata(
         self, directory: Path
-    ) -> Optional[Dict[str, Union[str, bool, Dict[str, bool]]]]:
+    ) -> Optional[dict[str, Union[str, bool, dict[str, bool]]]]:
         """Get metadata for a library directory."""
         ...
 
     @abstractmethod
     def pin_libraries(
         self,
-        symbol_libs: List[str],
-        footprint_libs: List[str],
+        symbol_libs: list[str],
+        footprint_libs: list[str],
         kicad_config_dir: Path,
         dry_run: bool = False,
         max_backups: int = 5,
@@ -60,8 +60,8 @@ class LibraryServiceProtocol(Protocol):
     @abstractmethod
     def unpin_libraries(
         self,
-        symbol_libs: List[str],
-        footprint_libs: List[str],
+        symbol_libs: list[str],
+        footprint_libs: list[str],
         kicad_config_dir: Path,
         dry_run: bool = False,
         max_backups: int = 5,

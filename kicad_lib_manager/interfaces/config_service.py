@@ -4,7 +4,7 @@ Configuration service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol
+from typing import Optional, Protocol
 
 
 class ConfigServiceProtocol(Protocol):
@@ -15,11 +15,11 @@ class ConfigServiceProtocol(Protocol):
         """Get the path to the KiLM configuration file."""
 
     @abstractmethod
-    def load_config(self) -> Dict:
+    def load_config(self) -> dict:
         """Load the KiLM configuration."""
 
     @abstractmethod
-    def save_config(self, config: Dict) -> None:
+    def save_config(self, config: dict) -> None:
         """Save the KiLM configuration."""
 
     @abstractmethod
@@ -31,11 +31,11 @@ class ConfigServiceProtocol(Protocol):
         """Remove a library from the configuration."""
 
     @abstractmethod
-    def get_libraries(self) -> List[Dict]:
+    def get_libraries(self) -> list[dict]:
         """Get all configured libraries."""
 
     @abstractmethod
-    def get_library_by_name(self, name: str) -> Optional[Dict]:
+    def get_library_by_name(self, name: str) -> Optional[dict]:
         """Get a specific library by name."""
 
     @abstractmethod

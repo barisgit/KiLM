@@ -9,7 +9,7 @@ import shutil
 import sys
 import traceback
 from pathlib import Path
-from typing import Annotated, List, Optional
+from typing import Annotated, Optional
 
 import jinja2
 import pathspec
@@ -63,7 +63,7 @@ def create(
         Optional[str], typer.Option(help="Name of the library containing the template")
     ] = None,
     set_var: Annotated[
-        Optional[List[str]],
+        Optional[list[str]],
         typer.Option("--set-var", help="Set template variable in key=value format"),
     ] = None,
     dry_run: Annotated[
@@ -506,11 +506,11 @@ def make(
         ),
     ] = None,
     exclude: Annotated[
-        Optional[List[str]],
+        Optional[list[str]],
         typer.Option(help="Additional patterns to exclude (gitignore format)"),
     ] = None,
     variable: Annotated[
-        Optional[List[str]],
+        Optional[list[str]],
         typer.Option(help="Define a template variable in name=value format"),
     ] = None,
     extends: Annotated[

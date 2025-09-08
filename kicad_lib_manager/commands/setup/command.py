@@ -4,7 +4,7 @@ Setup command implementation for KiCad Library Manager (Typer version).
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -162,9 +162,9 @@ def setup(
             console.print(f"Requested symbol libraries: {symbol_lib_names}")
 
     # Check Config file for library paths
-    config_lib_paths: Dict[str, str] = {}
-    config_3d_libs: List[LibraryDict] = []
-    config_symbol_libs: List[LibraryDict] = []
+    config_lib_paths: dict[str, str] = {}
+    config_3d_libs: list[LibraryDict] = []
+    config_symbol_libs: list[LibraryDict] = []
     config_obj = None
 
     try:

@@ -4,7 +4,7 @@ Configuration management for KiCad Library Manager.
 
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TypedDict, Union, cast
+from typing import Optional, TypedDict, Union, cast
 
 import click
 import yaml
@@ -25,9 +25,9 @@ class LibraryDict(TypedDict):
     type: str
 
 
-ConfigValue = Union[str, int, List[LibraryDict]]
+ConfigValue = Union[str, int, list[LibraryDict]]
 
-DEFAULT_CONFIG: Dict[str, ConfigValue] = {
+DEFAULT_CONFIG: dict[str, ConfigValue] = {
     "max_backups": DEFAULT_MAX_BACKUPS,
     "libraries": DEFAULT_LIBRARIES,
     "update_check": True,
@@ -138,7 +138,7 @@ class Config:
 
         return removed
 
-    def get_libraries(self, library_type: Optional[str] = None) -> List[LibraryDict]:
+    def get_libraries(self, library_type: Optional[str] = None) -> list[LibraryDict]:
         """
         Get libraries from configuration
 
@@ -176,7 +176,7 @@ class Config:
 
         return None
 
-    def get_current_library_paths(self) -> Tuple[Optional[str], Optional[str]]:
+    def get_current_library_paths(self) -> tuple[Optional[str], Optional[str]]:
         """
         Get paths for the current active libraries
 
@@ -276,7 +276,7 @@ class Config:
             return
 
         # Validate and clean up each library entry
-        normalized_libraries: List[LibraryDict] = []
+        normalized_libraries: list[LibraryDict] = []
         for lib in libraries:
             validated_lib = _validate_library_entry(lib)
             if validated_lib is not None:
@@ -286,7 +286,7 @@ class Config:
 
         self._config["libraries"] = normalized_libraries
 
-    def _get_normalized_libraries(self) -> List[LibraryDict]:
+    def _get_normalized_libraries(self) -> list[LibraryDict]:
         """
         Get libraries ensuring they are properly normalized.
 
@@ -305,7 +305,7 @@ class Config:
             return []
 
         # Validate and normalize each library entry
-        normalized_libraries: List[LibraryDict] = []
+        normalized_libraries: list[LibraryDict] = []
         needs_save = False
 
         for lib in libraries_raw:
@@ -365,7 +365,7 @@ class Config:
         last_check_file = cache_dir / "last_update_check"
         last_check_file.write_text(str(time.time()))
 
-    def get_update_preferences(self) -> Dict[str, Union[bool, str]]:
+    def get_update_preferences(self) -> dict[str, Union[bool, str]]:
         """
         Get update-related preferences.
 
@@ -452,7 +452,7 @@ def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:
 
 
 def _validate_library_entry(
-    lib: Union[Dict[str, str], LibraryDict],
+    lib: Union[dict[str, str], LibraryDict],
 ) -> Optional[LibraryDict]:
     """Validate and normalize a library entry."""
     if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
@@ -475,11 +475,11 @@ class ConfigService:
         """Get the path to the KiLM configuration file."""
         return self._config._get_config_file()
 
-    def load_config(self) -> Dict:
+    def load_config(self) -> dict:
         """Load the KiLM configuration."""
         return self._config._config
 
-    def save_config(self, config: Dict) -> None:
+    def save_config(self, config: dict) -> None:
         """Save the KiLM configuration."""
         self._config._config = config
         self._config.save()
@@ -492,7 +492,7 @@ class ConfigService:
         """Remove a library from the configuration."""
         self._config.remove_library(name)
 
-    def get_libraries(self) -> List[LibraryDict]:
+    def get_libraries(self) -> list[LibraryDict]:
         """Get all configured libraries."""
         return self._config.get_libraries()
 

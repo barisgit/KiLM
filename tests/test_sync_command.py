@@ -237,9 +237,11 @@ def test_check_for_library_changes_fallback():
         mock_run.return_value = result
 
         # Mock file existence with a patch for fallback behavior
-        with patch.object(Path, "exists", return_value=True), patch.object(
-            Path, "is_dir", return_value=True
-        ), patch.object(Path, "glob") as mock_glob:
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "is_dir", return_value=True),
+            patch.object(Path, "glob") as mock_glob,
+        ):
             # Setup mock glob to return symbol files
             def mock_glob_func(pattern):
                 if "**/*.kicad_sym" in pattern:

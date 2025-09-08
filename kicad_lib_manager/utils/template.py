@@ -9,8 +9,9 @@ import os
 import re
 import shutil
 import traceback
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, TypedDict, Union, cast
+from typing import Any, Optional, TypedDict, Union, cast
 
 import click
 import jinja2
@@ -59,7 +60,7 @@ class TemplateVariable(TypedDict):
 class TemplateDependencies(TypedDict):
     """Template dependencies definition."""
 
-    recommended: List[str]
+    recommended: list[str]
 
 
 class TemplateMetadata(TypedDict, total=False):
@@ -69,7 +70,7 @@ class TemplateMetadata(TypedDict, total=False):
     description: str
     use_case: str
     version: str
-    variables: Dict[str, TemplateVariable]
+    variables: dict[str, TemplateVariable]
     extends: str
     dependencies: TemplateDependencies
     path: str
@@ -123,7 +124,7 @@ def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
         return None
 
 
-def list_templates_in_directory(directory: Path) -> List[TemplateMetadata]:
+def list_templates_in_directory(directory: Path) -> list[TemplateMetadata]:
     """
     List all templates in a given directory.
 
@@ -137,7 +138,7 @@ def list_templates_in_directory(directory: Path) -> List[TemplateMetadata]:
     if not templates_dir.exists() or not templates_dir.is_dir():
         return []
 
-    templates: List[TemplateMetadata] = []
+    templates: list[TemplateMetadata] = []
 
     for template_dir in templates_dir.iterdir():
         if not template_dir.is_dir():
@@ -169,8 +170,8 @@ def list_templates_in_directory(directory: Path) -> List[TemplateMetadata]:
 
 
 def find_potential_variables(
-    directory: Path, patterns: Optional[List[str]] = None
-) -> Dict[str, List[str]]:
+    directory: Path, patterns: Optional[list[str]] = None
+) -> dict[str, list[str]]:
     """
     Scan files in a directory for potential template variables.
 
@@ -238,9 +239,9 @@ def create_template_metadata(
     name: str,
     description: Optional[str] = None,
     use_case: Optional[str] = None,
-    variables: Optional[Dict[str, TemplateVariable]] = None,
+    variables: Optional[dict[str, TemplateVariable]] = None,
     extends: Optional[str] = None,
-    dependencies: Optional[List[str]] = None,
+    dependencies: Optional[list[str]] = None,
 ) -> TemplateMetadata:
     """
     Create template metadata dictionary.
@@ -327,7 +328,7 @@ def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None
 
 
 def process_markdown_file(
-    source_file: Path, target_file: Path, variables: Dict[str, TemplateVariable]
+    source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
     """
     Process a Markdown file to add a template header with available variables.
@@ -377,7 +378,7 @@ def create_template_structure(
     template_directory: Path,
     metadata: TemplateMetadata,
     gitignore_spec: Optional[pathspec.PathSpec] = None,
-    additional_excludes: Optional[List[str]] = None,
+    additional_excludes: Optional[list[str]] = None,
 ) -> None:
     """
     Create template structure from source directory.
@@ -666,7 +667,7 @@ def post_create(context):
 
 
 def process_kicad_project_file(
-    source_file: Path, target_file: Path, variables: Dict[str, TemplateVariable]
+    source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
     """
     Process a KiCad project file (.kicad_pro).
@@ -858,7 +859,7 @@ def render_filename_custom(
         Rendered filename
     """
 
-    def transform_value(value: str, transformations: List[str]) -> str:
+    def transform_value(value: str, transformations: list[str]) -> str:
         """Apply a chain of transformations to a value."""
         result = value
 
@@ -965,7 +966,7 @@ def render_filename(
     return filename
 
 
-def find_all_templates(config: Any) -> Dict[str, TemplateMetadata]:
+def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
     """
     Find all templates in all configured libraries.
 
@@ -1093,7 +1094,7 @@ def create_project_from_template(
     template_dir: Path,
     project_dir: Path,
     variables: Mapping[str, Union[str, int, bool]],
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[dict[str, Any]] = None,
     dry_run: bool = False,
     skip_hooks: bool = False,
 ) -> bool:
@@ -1270,7 +1271,7 @@ def run_post_create_hook(
     hook_script: Path,
     project_dir: Path,
     variables: Mapping[str, Union[str, int, bool]],
-    template_metadata: Dict[str, Any],
+    template_metadata: dict[str, Any],
 ) -> None:
     """
     Run a post-creation hook script.

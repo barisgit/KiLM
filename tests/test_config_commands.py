@@ -2,8 +2,6 @@
 Tests for KiCad Library Manager config commands.
 """
 
-from typing import List
-
 import pytest
 from typer.testing import CliRunner
 
@@ -11,7 +9,7 @@ from kicad_lib_manager.main import app as main
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 
 # Sample test data
-TEST_LIBRARIES: List[LibraryDict] = [
+TEST_LIBRARIES: list[LibraryDict] = [
     LibraryDict(name="test-github-lib", path="/path/to/github/library", type="github"),
     LibraryDict(name="test-cloud-lib", path="/path/to/cloud/library", type="cloud"),
 ]

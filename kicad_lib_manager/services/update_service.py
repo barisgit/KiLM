@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import requests
 from packaging.version import InvalidVersion, Version
@@ -101,7 +101,7 @@ class PyPIVersionChecker:
 
         return None
 
-    def _load_cache(self) -> Optional[Dict]:
+    def _load_cache(self) -> Optional[dict]:
         """Load cached version data."""
         if self.cache_file.exists():
             try:
@@ -114,7 +114,7 @@ class PyPIVersionChecker:
                 pass
         return None
 
-    def _save_cache(self, data: Dict):
+    def _save_cache(self, data: dict):
         """Save version data to cache."""
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
         with Path(self.cache_file).open("w") as f:
@@ -198,7 +198,7 @@ class UpdateManager:
         """Check if automatic update is possible for this installation method."""
         return self.installation_method in ["pipx", "pip", "pip-venv", "uv"]
 
-    def perform_update(self) -> Tuple[bool, str]:
+    def perform_update(self) -> tuple[bool, str]:
         """
         Execute update using detected installation method.
         Returns: (success: bool, message: str)
@@ -256,6 +256,6 @@ class UpdateService:
         """Check if automatic updates are supported."""
         return self.manager.can_auto_update()
 
-    def perform_update(self) -> Tuple[bool, str]:
+    def perform_update(self) -> tuple[bool, str]:
         """Perform the update."""
         return self.manager.perform_update()
