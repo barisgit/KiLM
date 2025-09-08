@@ -21,7 +21,39 @@ KiLM automatically detects KiCad installations and configuration paths across di
 
 You can install KiLM using several methods:
 
-### Method 1: Using pipx (Recommended)
+### Method 1: Using uv <span class="ml-2 inline-flex items-center rounded-md bg-green-600/15 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-400/15 dark:text-green-300 align-middle">Recommended</span>
+
+[`uv`](https://github.com/astral-sh/uv) is an extremely fast Python package installer:
+
+```bash
+# Install uv (Linux/macOS) if you don't have it
+curl -sSf https://astral.sh/uv/install.sh | sh
+
+# Install KiLM using uv
+uv tool install kilm
+```
+
+#### Alternative
+
+Using uv you can run KiLM without installing it:
+
+```bash
+# Install uv (Linux/macOS) if you don't have it
+curl -sSf https://astral.sh/uv/install.sh | sh
+
+# Run KiLM using uv
+uvx kilm
+```
+
+<Aside type="note">
+Using uvx is not recommended for production use as it is not as fast as installing KiLM.
+</Aside>
+
+<Aside type="tip">
+Using uvx is a great way to try KiLM without installing it.
+</Aside>
+
+### Method 2: Using pipx
 
 [`pipx`](https://pypa.github.io/pipx/) installs CLI tools in isolated environments, preventing dependency conflicts:
 
@@ -32,18 +64,6 @@ python -m pipx ensurepath
 
 # Install KiLM using pipx
 pipx install kilm
-```
-
-### Method 2: Using uv (Fastest)
-
-[`uv`](https://github.com/astral-sh/uv) is an extremely fast Python package installer:
-
-```bash
-# Install uv (Linux/macOS)
-curl -sSf https://astral.sh/uv/install.sh | sh
-
-# Install KiLM using uv
-uv pip install kilm
 ```
 
 ### Method 3: Using pip (Traditional)
