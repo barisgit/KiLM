@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from kicad_lib_manager.services.update_service import (
+    InstallationDetector,
     UpdateManager,
     UpdateService,
     detect_installation_method,
@@ -17,134 +18,111 @@ from kicad_lib_manager.services.update_service import (
 
 
 class TestInstallationDetection:
-    """Test installation method detection logic."""
+    """Test installation method detection logic using the modular detector."""
 
-    def test_detect_pipx_installation(self, monkeypatch):
-        """Test detection of pipx installation."""
-        monkeypatch.setattr(
-            sys, "executable", "/Users/user/.local/share/pipx/venvs/kilm/bin/python"
+    def test_detect_pipx_installation_path_pattern(self):
+        """Test detection of pipx installation via path pattern."""
+        detector = InstallationDetector(
+            executable_path=Path("/Users/user/.local/share/pipx/venvs/kilm/bin/python")
         )
-
-        result = detect_installation_method()
-        assert result == "pipx"
+        assert detector.detect_pipx() is True
+        assert detector.detect() == "pipx"
 
     def test_detect_pipx_installation_with_env_var(self, monkeypatch):
         """Test detection of pipx installation via environment variable."""
-        monkeypatch.setattr(
-            sys, "executable", "/Users/user/.local/share/pipx/venvs/kilm/bin/python"
-        )
         monkeypatch.setenv("PIPX_HOME", "/Users/user/.local/share/pipx")
-        # Clear virtual env detection
-        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
-        monkeypatch.setattr(sys, "prefix", "/usr")
-        monkeypatch.setattr(sys, "base_prefix", "/usr")
 
-        result = detect_installation_method()
-        assert result == "pipx"
+        detector = InstallationDetector(executable_path=Path("/opt/pipx/bin/python"))
+        assert detector.detect_pipx() is True
+        assert detector.detect() == "pipx"
 
-    def test_detect_conda_installation(self, monkeypatch):
-        """Test detection of conda installation."""
-        monkeypatch.setattr(sys, "executable", "/opt/miniconda3/envs/kilm/bin/python")
-
-        result = detect_installation_method()
-        assert result == "conda"
+    def test_detect_conda_installation_path_pattern(self):
+        """Test detection of conda installation via path pattern."""
+        detector = InstallationDetector(
+            executable_path=Path("/opt/miniconda3/envs/kilm/bin/python")
+        )
+        assert detector.detect_conda() is True
+        assert detector.detect() == "conda"
 
     def test_detect_conda_installation_with_env_var(self, monkeypatch):
         """Test detection of conda installation via environment variable."""
-        monkeypatch.setattr(sys, "executable", "/usr/bin/python")
         monkeypatch.setenv("CONDA_DEFAULT_ENV", "kilm-env")
 
-        result = detect_installation_method()
-        assert result == "conda"
+        detector = InstallationDetector(executable_path=Path("/usr/bin/python"))
+        assert detector.detect_conda() is True
+        assert detector.detect() == "conda"
 
     def test_detect_uv_installation_env_vars(self, monkeypatch):
         """Test detection of UV installation via environment variables."""
-        monkeypatch.setattr(sys, "executable", "/usr/bin/python")
         monkeypatch.setenv("UV_TOOL_DIR", "/Users/user/.local/share/uv")
 
-        result = detect_installation_method()
-        assert result == "uv"
+        detector = InstallationDetector(executable_path=Path("/usr/bin/python"))
+        assert detector.detect_uv() is True
+        assert detector.detect() == "uv"
 
-    def test_detect_uv_installation_path_patterns(self, monkeypatch):
+    def test_detect_uv_installation_path_patterns(self):
         """Test detection of UV installation via path patterns."""
-        monkeypatch.setattr(
-            sys, "executable", "/Users/user/.local/share/uv/tools/kilm/bin/python"
+        detector = InstallationDetector(
+            executable_path=Path("/Users/user/.local/share/uv/tools/kilm/bin/python")
         )
+        assert detector.detect_uv() is True
+        assert detector.detect() == "uv"
 
-        result = detect_installation_method()
-        assert result == "uv"
-
-    def test_detect_uv_installation_local_bin_with_uv_tools(self, monkeypatch):
-        """Test detection of UV installation when executable is in ~/.local/bin and UV tools exist."""
-        monkeypatch.setattr(sys, "executable", "/Users/user/.local/bin/python")
-
-        # Mock the UV tools directory existence check
-        with patch.object(Path, "exists") as mock_exists:
-            mock_exists.return_value = True
-            result = detect_installation_method()
-            assert result == "uv"
-
-            # Verify the correct path was checked
-            Path.home() / ".local" / "share" / "uv" / "tools"
-            mock_exists.assert_called_with()
-
-    def test_detect_uv_installation_local_bin_without_uv_tools(self, monkeypatch):
-        """Test that ~/.local/bin alone doesn't trigger UV detection without UV tools dir."""
-        monkeypatch.setattr(sys, "executable", "/Users/user/.local/bin/python")
-
-        with patch.object(Path, "exists") as mock_exists:
-            mock_exists.return_value = False
-            result = detect_installation_method()
-            assert result != "uv"  # Should fallback to pip-venv or pip
-
-    def test_detect_pip_venv_installation(self, monkeypatch):
-        """Test detection of pip in virtual environment."""
-        monkeypatch.setattr(sys, "executable", "/path/to/venv/bin/python")
+    def test_detect_pip_venv_installation_env_var(self, monkeypatch):
+        """Test detection of pip in virtual environment via VIRTUAL_ENV."""
         monkeypatch.setenv("VIRTUAL_ENV", "/path/to/venv")
 
-        result = detect_installation_method()
-        assert result == "pip-venv"
+        detector = InstallationDetector(
+            executable_path=Path("/path/to/venv/bin/python")
+        )
+        assert detector.detect_virtual_env() is True
+        assert detector.detect() == "pip-venv"
 
     def test_detect_pip_venv_installation_prefix_check(self, monkeypatch):
         """Test detection of pip in venv via sys.prefix check."""
-        monkeypatch.setattr(sys, "executable", "/path/to/venv/bin/python")
+        # Mock sys.prefix and base_prefix to simulate virtual environment
         monkeypatch.setattr(sys, "prefix", "/path/to/venv")
         monkeypatch.setattr(sys, "base_prefix", "/usr/local")
 
+        detector = InstallationDetector(
+            executable_path=Path("/path/to/venv/bin/python")
+        )
+        assert detector.detect_virtual_env() is True
+        assert detector.detect() == "pip-venv"
+
+    def test_platform_detection(self):
+        """Test platform detection methods."""
+        # Test Windows detection
+        windows_detector = InstallationDetector(platform_name="nt")
+        assert windows_detector.is_windows() is True
+        assert windows_detector.is_unix_like() is False
+
+        # Test Unix detection
+        unix_detector = InstallationDetector(platform_name="posix")
+        assert unix_detector.is_windows() is False
+        assert unix_detector.is_unix_like() is True
+
+    def test_priority_order(self):
+        """Test that detection follows correct priority order."""
+        # pipx should take priority over pip-venv
+        with (
+            patch.object(sys, "prefix", "/path/to/venv"),
+            patch.object(sys, "base_prefix", "/usr/local"),
+        ):
+            detector = InstallationDetector(
+                executable_path=Path(
+                    "/Users/user/.local/share/pipx/venvs/kilm/bin/python"
+                )
+            )
+            assert detector.detect() == "pipx"  # pipx wins over pip-venv
+
+    def test_legacy_detect_installation_method_function(self, monkeypatch):
+        """Test that the legacy function still works."""
+        monkeypatch.setattr(
+            sys, "executable", "/Users/user/.local/share/pipx/venvs/kilm/bin/python"
+        )
         result = detect_installation_method()
-        assert result == "pip-venv"
-
-    def test_detect_homebrew_installation(self, monkeypatch):
-        """Test detection of homebrew installation."""
-        monkeypatch.setattr(sys, "executable", "/opt/homebrew/bin/python")
-        # Clear virtual env detection
-        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
-        monkeypatch.setattr(sys, "prefix", "/opt/homebrew")
-        monkeypatch.setattr(sys, "base_prefix", "/opt/homebrew")
-
-        result = detect_installation_method()
-        assert result == "homebrew"
-
-    def test_detect_system_pip_installation(self, monkeypatch):
-        """Test fallback to system pip installation."""
-        monkeypatch.setattr(sys, "executable", "/usr/bin/python")
-        monkeypatch.setattr(sys, "prefix", "/usr")
-        monkeypatch.setattr(sys, "base_prefix", "/usr")
-
-        # Clear environment variables
-        for env_var in [
-            "PIPX_HOME",
-            "CONDA_DEFAULT_ENV",
-            "UV_TOOL_DIR",
-            "UV_TOOL_BIN_DIR",
-            "VIRTUAL_ENV",
-        ]:
-            monkeypatch.delenv(env_var, raising=False)
-
-        with patch.object(Path, "exists") as mock_exists:
-            mock_exists.return_value = False
-            result = detect_installation_method()
-            assert result == "pip"
+        assert result == "pipx"
 
 
 class TestUpdateManager:

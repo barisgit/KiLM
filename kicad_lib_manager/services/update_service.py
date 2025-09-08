@@ -15,54 +15,116 @@ import requests
 from packaging.version import InvalidVersion, Version
 
 
+class InstallationDetector:
+    """Platform-aware installation method detector."""
+
+    def __init__(
+        self,
+        executable_path: Optional[Path] = None,
+        platform_name: Optional[str] = None,
+    ):
+        self.executable_path = executable_path or Path(sys.executable)
+        self.platform_name = platform_name or os.name
+        self.executable_str = str(self.executable_path)
+
+    def is_windows(self) -> bool:
+        """Check if running on Windows."""
+        return self.platform_name == "nt"
+
+    def is_unix_like(self) -> bool:
+        """Check if running on Unix-like system."""
+        return not self.is_windows()
+
+    def detect_pipx(self) -> bool:
+        """Detect pipx installation."""
+        # Check for pipx path patterns
+        pipx_patterns = [".local/share/pipx", "pipx/venvs"]
+        if any(part in self.executable_str for part in pipx_patterns):
+            return True
+
+        # Check for pipx environment variable
+        pipx_home = os.environ.get("PIPX_HOME")
+        return bool(pipx_home and "pipx" in self.executable_str)
+
+    def detect_conda(self) -> bool:
+        """Detect conda installation."""
+        return bool(
+            os.environ.get("CONDA_DEFAULT_ENV") or "conda" in self.executable_str
+        )
+
+    def detect_uv(self) -> bool:
+        """Detect UV tool installation."""
+        # Check environment variables
+        uv_env_vars = bool(
+            os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
+        )
+
+        # Check for explicit UV path patterns
+        uv_path_patterns = any(
+            part in self.executable_str for part in [".local/share/uv", "uv/tools"]
+        )
+
+        # Check local bin with UV tools (Unix-like only)
+        local_bin_with_uv = False
+        if self.is_unix_like():
+            local_bin_path = Path.home() / ".local" / "bin"
+            uv_tools_path = Path.home() / ".local" / "share" / "uv" / "tools"
+            local_bin_with_uv = (
+                str(local_bin_path) in self.executable_str and uv_tools_path.exists()
+            )
+
+        return uv_env_vars or uv_path_patterns or local_bin_with_uv
+
+    def detect_virtual_env(self) -> bool:
+        """Detect virtual environment (pip in venv)."""
+        # Check VIRTUAL_ENV environment variable
+        if os.environ.get("VIRTUAL_ENV"):
+            return True
+
+        # Check sys.prefix vs base_prefix
+        base_prefix = getattr(sys, "base_prefix", sys.prefix)
+        return sys.prefix != base_prefix
+
+    def detect_homebrew(self) -> bool:
+        """Detect homebrew installation (macOS/Linux)."""
+        if self.is_windows():
+            return False
+
+        homebrew_paths = ["/opt/homebrew/", "/usr/local/Cellar/"]
+        return any(self.executable_str.startswith(path) for path in homebrew_paths)
+
+    def detect(self) -> str:
+        """
+        Detect installation method with priority order.
+        Returns: 'pipx' | 'conda' | 'uv' | 'pip-venv' | 'homebrew' | 'pip'
+        """
+        # Priority order matters - more specific first
+        if self.detect_pipx():
+            return "pipx"
+
+        if self.detect_conda():
+            return "conda"
+
+        if self.detect_uv():
+            return "uv"
+
+        if self.detect_virtual_env():
+            return "pip-venv"
+
+        if self.detect_homebrew():
+            return "homebrew"
+
+        return "pip"
+
+
+# TODO: Add strong typing
 def detect_installation_method() -> str:
     """
     Detect how KiLM was installed to determine appropriate update strategy.
-    Returns: 'pipx' | 'pip' | 'pip-venv' | 'uv' | 'conda'
+    Returns: 'pipx' | 'pip' | 'pip-venv' | 'uv' | 'conda' | 'homebrew'
     """
-    executable_path = Path(sys.executable)
-
-    # Check for pipx installation
-    if any(
-        part in str(executable_path) for part in [".local/share/pipx", "pipx/venvs"]
-    ):
-        return "pipx"
-
-    if os.environ.get("PIPX_HOME") and "pipx" in str(executable_path):
-        return "pipx"
-
-    # Check for conda installation
-    if os.environ.get("CONDA_DEFAULT_ENV") or "conda" in str(executable_path):
-        return "conda"
-
-    # Check for uv installation - check both environment variables and path patterns
-    executable_str = str(executable_path)
-    uv_env_vars = os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
-    uv_path_patterns = any(
-        part in executable_str for part in [".local/share/uv", "uv/tools"]
-    )
-
-    # Also check if executable is in ~/.local/bin and uv tools directory exists
-    local_bin_with_uv = (
-        ".local/bin" in executable_str
-        and (Path.home() / ".local" / "share" / "uv" / "tools").exists()
-    )
-
-    if uv_env_vars or uv_path_patterns or local_bin_with_uv:
-        return "uv"
-
-    # Check for virtual environment (pip in venv)
-    if os.environ.get("VIRTUAL_ENV") or sys.prefix != getattr(
-        sys, "base_prefix", sys.prefix
-    ):
-        return "pip-venv"
-
-    # Check for homebrew installation (strict path check)
-    if str(executable_path).startswith(("/opt/homebrew/", "/usr/local/Cellar/")):
-        return "homebrew"
-
-    # Default to system pip
-    return "pip"
+    detector = InstallationDetector()
+    return detector.detect()
 
 
 class PyPIVersionChecker:

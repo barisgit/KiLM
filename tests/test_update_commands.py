@@ -410,7 +410,8 @@ class TestUpdateCommandGroup:
         """Test that running update with no args shows help."""
         result = runner.invoke(update_app, [])
 
-        assert result.exit_code == 2  # CLI standard: missing args = error code
+        # Different Typer/Click versions may return 0 or 2 for no_args_is_help
+        assert result.exit_code in [0, 2]
         assert "Usage:" in result.stdout
         assert "Commands" in result.stdout  # Rich formatting uses "╭─ Commands ───"
 
