@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kilm"
-version = "0.4.2"
+version = "0.5.0"
 description = "A command-line tool for managing KiCad libraries across projects and workstations"
 readme = "README.md"
 license = "MIT"
@@ -21,7 +21,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -41,9 +40,11 @@ keywords = [
     "pcb-design",
     "cli",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "click>=8.0",
+    "typer>=0.17.4",
+    "rich>=14.0.0",
     "packaging>=25.0",
     "pyyaml>=6.0",
     "pathlib>=1.0.1",
@@ -71,8 +72,7 @@ Repository = "https://github.com/barisgit/KiLM"
 "Bug Tracker" = "https://github.com/barisgit/KiLM/issues"
 
 [project.scripts]
-kilm = "kicad_lib_manager.cli:main"
-kicad-lib-manager = "kicad_lib_manager.cli:main"
+kilm = "kicad_lib_manager.main:app"
 
 
 [tool.hatch.build.targets.wheel]
@@ -80,7 +80,7 @@ packages = ["kicad_lib_manager"]
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py39']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"] 
@@ -97,7 +97,7 @@ addopts = [
 ]
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 line-length = 88
 
 [tool.ruff.lint]
@@ -125,7 +125,7 @@ ignore = [
 "tests/**/*" = ["ARG", "S101"]
 
 [tool.pyrefly]
-python-version = "3.8"
+python-version = "3.9"
 
 [tool.coverage.run]
 source = ["kicad_lib_manager"]

@@ -1,17 +1,18 @@
 """
-Setup command implementation for KiCad Library Manager.
+Setup command implementation for KiCad Library Manager (Typer version).
 """
 
 import re
-import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Optional
 
-import click
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
-# TODO: Use full path (kicad_lib_manager...)
-from ...config import Config, LibraryDict
-from ...library_manager import add_libraries, find_kicad_config
+from ...services.config_service import Config, LibraryDict
+from ...services.library_service import LibraryService
 from ...utils.backup import create_backup
 from ...utils.env_vars import (
     expand_user_path,
@@ -21,6 +22,8 @@ from ...utils.env_vars import (
 )
 from ...utils.file_ops import list_libraries
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
+
+console = Console()
 
 
 def fix_invalid_uris(
@@ -74,65 +77,49 @@ def fix_invalid_uris(
     return changes_made
 
 
-@click.command()
-@click.option(
-    "--kicad-lib-dir",
-    envvar="KICAD_USER_LIB",
-    help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
-)
-@click.option(
-    "--kicad-3d-dir",
-    envvar="KICAD_3D_LIB",
-    help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not specified)",
-)
-@click.option(
-    "--threed-lib-dirs",
-    help="Names of 3D model libraries to use (comma-separated, uses all if not specified)",
-)
-@click.option(
-    "--symbol-lib-dirs",
-    help="Names of symbol libraries to use (comma-separated, uses current if not specified)",
-)
-@click.option(
-    "--all-libraries",
-    is_flag=True,
-    default=False,
-    help="Set up all configured libraries (both symbols and 3D models)",
-)
-@click.option(
-    "--max-backups",
-    default=5,
-    show_default=True,
-    help="Maximum number of backups to keep",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show what would be done without making changes",
-)
-@click.option(
-    "--pin-libraries/--no-pin-libraries",
-    default=True,
-    show_default=True,
-    help="Add libraries to KiCad pinned libraries for quick access",
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Show more information for debugging",
-)
 def setup(
-    kicad_lib_dir,
-    kicad_3d_dir,
-    threed_lib_dirs,
-    symbol_lib_dirs,
-    all_libraries,
-    max_backups,
-    dry_run,
-    pin_libraries,
-    verbose,
-):
+    kicad_lib_dir: Optional[str] = typer.Option(
+        None,
+        "--kicad-lib-dir",
+        envvar="KICAD_USER_LIB",
+        help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
+    ),
+    kicad_3d_dir: Optional[str] = typer.Option(
+        None,
+        "--kicad-3d-dir",
+        envvar="KICAD_3D_LIB",
+        help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not specified)",
+    ),
+    threed_lib_dirs: Optional[str] = typer.Option(
+        None,
+        "--threed-lib-dirs",
+        help="Names of 3D model libraries to use (comma-separated, uses all if not specified)",
+    ),
+    symbol_lib_dirs: Optional[str] = typer.Option(
+        None,
+        "--symbol-lib-dirs",
+        help="Names of symbol libraries to use (comma-separated, uses current if not specified)",
+    ),
+    all_libraries: bool = typer.Option(
+        False,
+        "--all-libraries",
+        help="Set up all configured libraries (both symbols and 3D models)",
+    ),
+    max_backups: int = typer.Option(
+        5, "--max-backups", help="Maximum number of backups to keep"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
+    pin_libraries: bool = typer.Option(
+        True,
+        "--pin-libraries/--no-pin-libraries",
+        help="Add libraries to KiCad pinned libraries for quick access",
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show more information for debugging"
+    ),
+) -> None:
     """Configure KiCad to use libraries in the specified directory
 
     This command sets up KiCad to use your configured libraries. It will:
@@ -150,30 +137,34 @@ def setup(
     if kicad_lib_dir:
         cmd_line_lib_paths["symbols"] = kicad_lib_dir
         if verbose:
-            click.echo(f"Symbol library specified on command line: {kicad_lib_dir}")
+            console.print(
+                f"Symbol library specified on command line: [blue]{kicad_lib_dir}[/blue]"
+            )
 
     if kicad_3d_dir:
         cmd_line_lib_paths["3d"] = kicad_3d_dir
         if verbose:
-            click.echo(f"3D model library specified on command line: {kicad_3d_dir}")
+            console.print(
+                f"3D model library specified on command line: [blue]{kicad_3d_dir}[/blue]"
+            )
 
     # Split library names if provided
     threed_lib_names = None
     if threed_lib_dirs:
         threed_lib_names = [name.strip() for name in threed_lib_dirs.split(",")]
         if verbose:
-            click.echo(f"Requested 3D model libraries: {threed_lib_names}")
+            console.print(f"Requested 3D model libraries: {threed_lib_names}")
 
     symbol_lib_names = None
     if symbol_lib_dirs:
         symbol_lib_names = [name.strip() for name in symbol_lib_dirs.split(",")]
         if verbose:
-            click.echo(f"Requested symbol libraries: {symbol_lib_names}")
+            console.print(f"Requested symbol libraries: {symbol_lib_names}")
 
     # Check Config file for library paths
-    config_lib_paths: Dict[str, str] = {}
-    config_3d_libs: List[LibraryDict] = []
-    config_symbol_libs: List[LibraryDict] = []
+    config_lib_paths: dict[str, str] = {}
+    config_3d_libs: list[LibraryDict] = []
+    config_symbol_libs: list[LibraryDict] = []
     config_obj = None
 
     try:
@@ -182,18 +173,18 @@ def setup(
         # Display configuration file location if verbose
         if verbose:
             config_file = config_obj._get_config_file()
-            click.echo(f"Looking for configuration in: {config_file}")
+            console.print(f"Looking for configuration in: {config_file}")
             if config_file.exists():
-                click.echo("Configuration file exists")
+                console.print("Configuration file exists")
             else:
-                click.echo("Configuration file does not exist")
+                console.print("Configuration file does not exist")
 
         # Get all configured libraries
         all_symbol_libs = config_obj.get_libraries("github")
         all_3d_libs = config_obj.get_libraries("cloud")
 
         if verbose:
-            click.echo(
+            console.print(
                 f"Found {len(all_symbol_libs)} symbol libraries and {len(all_3d_libs)} 3D model libraries in config"
             )
 
@@ -238,11 +229,20 @@ def setup(
 
         # Print what we're setting up
         if config_symbol_libs:
-            click.echo("\nSetting up symbol libraries:")
+            console.print()
+            table = Table(
+                title="[bold cyan]Setting up symbol libraries[/bold cyan]",
+                show_header=True,
+                header_style="bold magenta",
+            )
+            table.add_column("Library", style="cyan", no_wrap=True)
+            table.add_column("Path", style="blue")
+            table.add_column("Environment Variable", style="green")
+
             for lib in config_symbol_libs:
                 lib_name = lib.get("name", "unnamed")
                 lib_path = lib.get("path", "unknown")
-                click.echo(f"  - {lib_name}: {lib_path}")
+                env_var_display = "None"
 
                 # Read metadata to get environment variable name
                 try:
@@ -252,14 +252,15 @@ def setup(
                         if env_var and isinstance(env_var, str):
                             # Store all GitHub libraries with their env vars
                             config_lib_paths[env_var] = lib_path
-                            click.echo(f"    Using environment variable: {env_var}")
+                            env_var_display = f"[green]{env_var}[/green]"
                         else:
-                            click.echo("    No environment variable configured")
+                            env_var_display = "[yellow]Not configured[/yellow]"
                     else:
-                        click.echo("    No metadata or environment variable found")
+                        env_var_display = "[yellow]No metadata[/yellow]"
                 except Exception as e:
-                    if verbose:
-                        click.echo(f"    Error reading metadata: {e}")
+                    env_var_display = (
+                        f"[red]Error: {e}[/red]" if verbose else "[red]Error[/red]"
+                    )
 
                 # If we're using the first symbol library as the main library
                 if not kicad_lib_dir and lib == config_symbol_libs[0]:
@@ -268,12 +269,25 @@ def setup(
                     if "KICAD_USER_LIB" not in config_lib_paths:
                         config_lib_paths["KICAD_USER_LIB"] = lib_path
 
+                table.add_row(f"[bold]{lib_name}[/bold]", lib_path, env_var_display)
+
+            console.print(table)
+
         if config_3d_libs:
-            click.echo("\nSetting up 3D model libraries:")
+            console.print()
+            table = Table(
+                title="[bold cyan]Setting up 3D model libraries[/bold cyan]",
+                show_header=True,
+                header_style="bold magenta",
+            )
+            table.add_column("Library", style="cyan", no_wrap=True)
+            table.add_column("Path", style="blue")
+            table.add_column("Environment Variable", style="green")
+
             for lib in config_3d_libs:
                 lib_name = lib.get("name", "unnamed")
                 lib_path = lib.get("path", "unknown")
-                click.echo(f"  - {lib_name}: {lib_path}")
+                env_var_display = "None"
 
                 # Read metadata to get environment variable name
                 try:
@@ -283,26 +297,31 @@ def setup(
                         if env_var and isinstance(env_var, str):
                             # Store all 3D libraries with their env vars
                             config_lib_paths[env_var] = lib_path
-                            click.echo(f"    Using environment variable: {env_var}")
+                            env_var_display = f"[green]{env_var}[/green]"
                         else:
-                            click.echo("    No environment variable configured")
+                            env_var_display = "[yellow]Not configured[/yellow]"
                     else:
-                        click.echo("    No metadata or environment variable found")
+                        env_var_display = "[yellow]No metadata[/yellow]"
                 except Exception as e:
-                    if verbose:
-                        click.echo(f"    Error reading metadata: {e}")
+                    env_var_display = (
+                        f"[red]Error: {e}[/red]" if verbose else "[red]Error[/red]"
+                    )
 
                 # Use the first 3D library as the default if not specified
                 if not kicad_3d_dir and lib == config_3d_libs[0]:
                     kicad_3d_dir = lib_path
 
+                table.add_row(f"[bold]{lib_name}[/bold]", lib_path, env_var_display)
+
+            console.print(table)
+
     except Exception as e:
         # If there's any issue with config, continue with environment variables
         if verbose:
-            click.echo(f"Error reading from config: {e}")
+            console.print(f"Error reading from config: {e}")
             import traceback
 
-            click.echo(traceback.format_exc())
+            console.print(traceback.format_exc())
 
     # Fall back to environment variables if still not found
     env_lib_paths = {}
@@ -311,75 +330,96 @@ def setup(
         if env_var:
             kicad_lib_dir = env_var
             env_lib_paths["KICAD_USER_LIB"] = env_var
-            click.echo(
-                f"Using KiCad library from environment variable: {kicad_lib_dir}"
+            console.print(
+                f"[green]Using KiCad library from environment variable:[/green] [blue]{kicad_lib_dir}[/blue]"
             )
         else:
-            click.echo("Error: KICAD_USER_LIB not set and not provided", err=True)
-            click.echo(
-                "Consider initializing a library with 'kilm init' first.", err=True
+            console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
+            console.print(
+                "[yellow]Consider initializing a library with 'kilm init' first.[/yellow]"
             )
-            sys.exit(1)
+            raise typer.Exit(1)
 
     if not kicad_3d_dir:
         env_var = find_environment_variables("KICAD_3D_LIB")
         if env_var:
             kicad_3d_dir = env_var
             env_lib_paths["KICAD_3D_LIB"] = env_var
-            click.echo(
-                f"Using 3D model library from environment variable: {kicad_3d_dir}"
+            console.print(
+                f"[green]Using 3D model library from environment variable:[/green] [blue]{kicad_3d_dir}[/blue]"
             )
         else:
-            click.echo(
-                "Warning: KICAD_3D_LIB not set, 3D models might not work correctly",
-                err=True,
+            console.print(
+                "[yellow]Warning: KICAD_3D_LIB not set, 3D models might not work correctly[/yellow]"
             )
-            click.echo(
-                "Consider adding a 3D model directory with 'kilm add-3d'", err=True
+            console.print(
+                "[yellow]Consider adding a 3D model directory with 'kilm add-3d'[/yellow]"
             )
 
     # Show summary of where libraries are coming from
     if verbose:
-        click.echo("\nSummary of library sources:")
+        console.print("\nSummary of library sources:")
         if cmd_line_lib_paths:
-            click.echo("  From command line:")
+            console.print("  From command line:")
             for lib_type, path in cmd_line_lib_paths.items():
-                click.echo(f"    - {lib_type}: {path}")
+                console.print(f"    - {lib_type}: {path}")
 
         if config_lib_paths:
-            click.echo("  From config file:")
+            console.print("  From config file:")
             for lib_type, path in config_lib_paths.items():
-                click.echo(f"    - {lib_type}: {path}")
+                console.print(f"    - {lib_type}: {path}")
 
         if env_lib_paths:
-            click.echo("  From environment variables:")
+            console.print("  From environment variables:")
             for lib_type, path in env_lib_paths.items():
-                click.echo(f"    - {lib_type}: {path}")
+                console.print(f"    - {lib_type}: {path}")
 
     # Expand user home directory if needed
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
     if kicad_3d_dir:
         kicad_3d_dir = expand_user_path(kicad_3d_dir)
 
-    click.echo(f"\nUsing KiCad symbol library directory: {kicad_lib_dir}")
+    # Create configuration summary panel
+    config_content = (
+        f"[green]Symbol library directory:[/green] [blue]{kicad_lib_dir}[/blue]\n"
+    )
     if kicad_3d_dir:
-        click.echo(f"Using KiCad main 3D models directory: {kicad_3d_dir}")
+        config_content += (
+            f"[green]3D models directory:[/green]\n[blue]{kicad_3d_dir}[/blue]"
+        )
+    else:
+        config_content += "[yellow]3D models directory: Not configured[/yellow]"
+
+    console.print()
+    console.print(
+        Panel(
+            config_content,
+            title="[bold cyan]Configuration Summary[/bold cyan]",
+            border_style="cyan",
+        )
+    )
 
     # Find KiCad configuration
     try:
-        kicad_config = find_kicad_config()
-        click.echo(f"Found KiCad configuration at: {kicad_config}")
+        kicad_config = LibraryService.find_kicad_config()
+        console.print(
+            f"[green]Found KiCad configuration at:[/green] [blue]{kicad_config}[/blue]"
+        )
 
         # Fix any invalid URIs in existing library entries
         uri_changes = fix_invalid_uris(kicad_config, True, max_backups, dry_run)
         if uri_changes:
             if dry_run:
-                click.echo("Would fix invalid library URIs in KiCad configuration")
+                console.print(
+                    "[yellow]Would fix invalid library URIs in KiCad configuration[/yellow]"
+                )
             else:
-                click.echo("Fixed invalid library URIs in KiCad configuration")
+                console.print(
+                    "[green]Fixed invalid library URIs in KiCad configuration[/green]"
+                )
     except Exception as e:
-        click.echo(f"Error finding KiCad configuration: {e}", err=True)
-        sys.exit(1)
+        console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
+        raise typer.Exit(1) from e
 
     # Prepare environment variables dictionary
     env_vars = {}
@@ -406,21 +446,27 @@ def setup(
         )
         if env_changes_needed:
             if dry_run:
-                click.echo("Would update environment variables in KiCad configuration")
+                console.print(
+                    "[yellow]Would update environment variables in KiCad configuration[/yellow]"
+                )
             else:
-                click.echo("Updated environment variables in KiCad configuration")
-                click.echo("Created backup of kicad_common.json")
+                console.print(
+                    "[green]Updated environment variables in KiCad configuration[/green]"
+                )
+                console.print("[blue]Created backup of kicad_common.json[/blue]")
 
                 # Show all environment variables that were set
-                click.echo("\nEnvironment variables set in KiCad:")
+                console.print(
+                    "\n[bold cyan]Environment variables set in KiCad:[/bold cyan]"
+                )
                 for var_name, value in env_vars.items():
-                    click.echo(f"  {var_name} = {value}")
+                    console.print(f"  [cyan]{var_name}[/cyan] = [blue]{value}[/blue]")
         else:
-            click.echo(
-                "Environment variables already up to date in KiCad configuration"
+            console.print(
+                "[blue]Environment variables already up to date in KiCad configuration[/blue]"
             )
     except Exception as e:
-        click.echo(f"Error updating environment variables: {e}", err=True)
+        console.print(f"[red]Error updating environment variables: {e}[/red]")
         # Continue with the rest of the setup, but don't set env_changes_needed to True
 
     # Add libraries
@@ -436,7 +482,7 @@ def setup(
             three_d_dirs["KICAD_3D_LIB"] = kicad_3d_dir
 
         # Call add_libraries with the main library and all 3D libraries
-        added_libraries, changes_needed = add_libraries(
+        added_libraries, changes_needed = LibraryService.add_libraries(
             kicad_lib_dir,
             kicad_config,
             kicad_3d_dir=kicad_3d_dir,
@@ -451,23 +497,23 @@ def setup(
 
             if sym_table.exists():
                 create_backup(sym_table, max_backups)
-                click.echo("Created backup of symbol library table")
+                console.print("[blue]Created backup of symbol library table[/blue]")
 
             if fp_table.exists():
                 create_backup(fp_table, max_backups)
-                click.echo("Created backup of footprint library table")
+                console.print("[blue]Created backup of footprint library table[/blue]")
 
         if added_libraries:
             if dry_run:
-                click.echo(
-                    f"Would add {len(added_libraries)} libraries to KiCad configuration"
+                console.print(
+                    f"[yellow]Would add {len(added_libraries)} libraries to KiCad configuration[/yellow]"
                 )
             else:
-                click.echo(
-                    f"Added {len(added_libraries)} libraries to KiCad configuration"
+                console.print(
+                    f"[green]Added {len(added_libraries)} libraries to KiCad configuration[/green]"
                 )
         else:
-            click.echo("No new libraries to add")
+            console.print("[blue]No new libraries to add[/blue]")
 
         # Pin libraries if requested
         pinned_changes_needed = False
@@ -483,11 +529,11 @@ def setup(
                 footprint_libs = existing_footprints
 
                 if verbose:
-                    click.echo(
+                    console.print(
                         f"Found {len(symbol_libs)} symbol libraries and {len(footprint_libs)} footprint libraries to pin"
                     )
             except Exception as e:
-                click.echo(f"Error listing libraries to pin: {e}", err=True)
+                console.print(f"[red]Error listing libraries to pin: {e}[/red]")
 
             try:
                 pinned_changes_needed = update_pinned_libraries(
@@ -499,29 +545,36 @@ def setup(
 
                 if pinned_changes_needed:
                     if dry_run:
-                        click.echo(
-                            f"Would pin {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad"
+                        console.print(
+                            f"[yellow]Would pin {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad[/yellow]"
                         )
                     else:
-                        click.echo(
-                            f"Pinned {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad"
+                        console.print(
+                            f"[green]Pinned {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad[/green]"
                         )
                 else:
-                    click.echo("All libraries already pinned in KiCad")
+                    console.print("[blue]All libraries already pinned in KiCad[/blue]")
             except Exception as e:
-                click.echo(f"Error pinning libraries: {e}", err=True)
+                console.print(f"[red]Error pinning libraries: {e}[/red]")
 
         if not changes_needed and not env_changes_needed and not pinned_changes_needed:
-            click.echo("No changes needed, configuration is up to date")
+            console.print("[blue]No changes needed, configuration is up to date[/blue]")
         elif dry_run:
-            click.echo("Dry run: No changes were made")
+            console.print("[yellow]Dry run: No changes were made[/yellow]")
     except Exception as e:
-        click.echo(f"Error adding libraries: {e}", err=True)
+        console.print(f"[red]Error adding libraries: {e}[/red]")
         if verbose:
             import traceback
 
-            click.echo(traceback.format_exc())
-        sys.exit(1)
+            console.print(traceback.format_exc())
+        raise typer.Exit(1) from None
 
     if not dry_run and (changes_needed or env_changes_needed or pinned_changes_needed):
-        click.echo("Setup complete! Restart KiCad for changes to take effect.")
+        console.print()
+        console.print(
+            Panel(
+                "[bold green]Setup complete! Restart KiCad for changes to take effect.[/bold green]",
+                title="[bold green]✅ Success[/bold green]",
+                border_style="green",
+            )
+        )

@@ -1,31 +1,28 @@
 """
-Update command implementation for KiCad Library Manager.
+Update command implementation for KiCad Library Manager (Typer version).
 Updates KiLM itself to the latest version.
 """
 
 import importlib.metadata
+from typing import Annotated
 
-import click
+import typer
+from rich.console import Console
+from rich.panel import Panel
 
-from ...auto_update import UpdateManager
+from ...services.update_service import UpdateManager
+
+console = Console()
 
 
-@click.command()
-@click.option(
-    "--check",
-    is_flag=True,
-    default=False,
-    help="Check for updates without installing",
-    show_default=True,
-)
-@click.option(
-    "--force",
-    is_flag=True,
-    default=False,
-    help="Force update even if already up to date",
-    show_default=True,
-)
-def update(check, force):
+def update(
+    check: Annotated[
+        bool, typer.Option(help="Check for updates without installing")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option(help="Force update even if already up to date")
+    ] = False,
+) -> None:
     """Update KiLM to the latest version.
 
     This command updates KiLM itself by downloading and installing the latest
@@ -39,59 +36,77 @@ def update(check, force):
 
     Use --check to see if updates are available without installing.
     """
-    # Display deprecation notice prominently
-    click.echo("\n" + "=" * 70)
-    click.echo("⚠️  BREAKING CHANGE NOTICE (KiLM 0.4.0)")
-    click.echo("=" * 70)
-    click.echo("The 'kilm update' command now updates KiLM itself.")
-    click.echo("To update library content, use 'kilm sync' instead.")
-    click.echo("This notice will be removed in a future version.")
-    click.echo("=" * 70 + "\n")
+
+    deprecation_notice = (
+        "[bold yellow]⚠️  BREAKING CHANGE NOTICE (KiLM 0.4.0)[/bold yellow]\n\n"
+        "The [bold]kilm update[/bold] command now updates KiLM itself.\n"
+        "To update library content, use [bold cyan]kilm sync[/bold cyan] instead.\n"
+        "This notice will be removed in a future version."
+    )
+    console.print(Panel(deprecation_notice, expand=False, border_style="yellow"))
 
     version = importlib.metadata.version("kilm")
 
     update_manager = UpdateManager(version)
 
-    click.echo(f"Current KiLM version: {version}")
-    click.echo(f"Installation method: {update_manager.installation_method}")
-    click.echo("\nChecking for updates...")
+    console.print(
+        f"[blue]Current KiLM version:[/blue] [bold cyan]v{version}[/bold cyan]"
+    )
+    console.print(
+        f"[blue]Installation method:[/blue] {update_manager.installation_method}"
+    )
+    console.print("\n[bold cyan]Checking for updates...[/bold cyan]")
 
     latest_version = update_manager.check_latest_version()
 
     if latest_version is None:
-        click.echo("Could not check for updates. Please try again later.")
+        console.print("[red]Could not check for updates. Please try again later.[/red]")
         return
 
     if not update_manager.is_newer_version_available(latest_version):
         if not force:
-            click.echo(f"KiLM is up to date (v{version})")
+            console.print(
+                f"[green]KiLM is up to date[/green] [bold green]v{version}[/bold green]"
+            )
             return
         else:
-            click.echo(f"Forcing update to v{latest_version} (current: v{version})")
+            console.print(
+                f"[yellow]Forcing update to v{latest_version}[/yellow] (current: v{version})"
+            )
     else:
-        click.echo(f"New version available: {latest_version}")
+        console.print(
+            f"[green]New version available:[/green] [bold green]v{latest_version}[/bold green]"
+        )
 
     if check:
         if update_manager.is_newer_version_available(latest_version):
-            click.echo(f"\nUpdate available: {latest_version}")
-            click.echo(f"To update, run: {update_manager.get_update_instruction()}")
+            console.print(
+                f"\n[green]Update available:[/green] [bold green]v{latest_version}[/bold green]"
+            )
+            console.print(
+                f"[blue]To update, run:[/blue] [cyan]{update_manager.get_update_instruction()}[/cyan]"
+            )
         else:
-            click.echo("No updates available.")
+            console.print("[green]No updates available[/green]")
         return
 
     # Perform the update
     if update_manager.can_auto_update():
-        click.echo(f"\nUpdating KiLM to version {latest_version}...")
+        console.print(
+            f"\n[bold cyan]Updating KiLM to version {latest_version}...[/bold cyan]"
+        )
         success, message = update_manager.perform_update()
 
         if success:
-            click.echo(f"✅ {message}")
-            click.echo(f"KiLM has been updated to version {latest_version}")
+            console.print(f"[bold green]✅ {message}[/bold green]")
+            console.print(
+                f"[green]KiLM has been updated to version {latest_version}[/green]"
+            )
         else:
-            click.echo(f"❌ {message}")
+            console.print(f"[bold red]❌ {message}[/bold red]")
     else:
         instruction = update_manager.get_update_instruction()
-        click.echo(
-            f"\nManual update required for {update_manager.installation_method} installation."
+        console.print(
+            f"\n[yellow]Manual update required for {update_manager.installation_method} installation.[/yellow]"
         )
-        click.echo(f"Please run: {instruction}")
+        console.print(f"[blue]Please run:[/blue] [cyan]{instruction}[/cyan]")

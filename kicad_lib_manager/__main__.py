@@ -2,7 +2,7 @@
 Entry point for running the package as a module
 """
 
-from .cli import main
+from .main import app
 
 if __name__ == "__main__":
-    main()
+    app()

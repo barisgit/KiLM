@@ -9,15 +9,16 @@ import os
 import re
 import shutil
 import traceback
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional, TypedDict, Union, cast
 
 import click
 import jinja2
 import pathspec
 import yaml
 
-from ..constants import (
+from .constants import (
     HOOKS_DIR,
     TEMPLATE_CONTENT_DIR,
     TEMPLATE_METADATA,
@@ -47,6 +48,34 @@ KICAD_PRL_EXT = ".kicad_prl"  # Project local settings file
 
 # Windows-compatible filename templating constants
 FILENAME_VAR_PATTERN = re.compile(r"%\{([^}]+)\}")
+
+
+class TemplateVariable(TypedDict):
+    """Template variable definition."""
+
+    description: str
+    default: str
+
+
+class TemplateDependencies(TypedDict):
+    """Template dependencies definition."""
+
+    recommended: list[str]
+
+
+class TemplateMetadata(TypedDict, total=False):
+    """Template metadata structure."""
+
+    name: str
+    description: str
+    use_case: str
+    version: str
+    variables: dict[str, TemplateVariable]
+    extends: str
+    dependencies: TemplateDependencies
+    path: str
+    source_library: str
+    library_path: str
 
 
 def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
@@ -95,7 +124,7 @@ def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
         return None
 
 
-def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
+def list_templates_in_directory(directory: Path) -> list[TemplateMetadata]:
     """
     List all templates in a given directory.
 
@@ -109,7 +138,7 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
     if not templates_dir.exists() or not templates_dir.is_dir():
         return []
 
-    templates = []
+    templates: list[TemplateMetadata] = []
 
     for template_dir in templates_dir.iterdir():
         if not template_dir.is_dir():
@@ -130,7 +159,7 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
             metadata["path"] = str(template_dir)
             metadata["source_library"] = directory.name
 
-            templates.append(metadata)
+            templates.append(cast("TemplateMetadata", metadata))
         except Exception as e:
             # Use click.echo for warnings/errors
             click.echo(
@@ -141,8 +170,8 @@ def list_templates_in_directory(directory: Path) -> List[Dict[str, Any]]:
 
 
 def find_potential_variables(
-    directory: Path, patterns: Optional[List[str]] = None
-) -> Dict[str, List[str]]:
+    directory: Path, patterns: Optional[list[str]] = None
+) -> dict[str, list[str]]:
     """
     Scan files in a directory for potential template variables.
 
@@ -210,10 +239,10 @@ def create_template_metadata(
     name: str,
     description: Optional[str] = None,
     use_case: Optional[str] = None,
-    variables: Optional[Dict[str, Dict[str, Any]]] = None,
+    variables: Optional[dict[str, TemplateVariable]] = None,
     extends: Optional[str] = None,
-    dependencies: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    dependencies: Optional[list[str]] = None,
+) -> TemplateMetadata:
     """
     Create template metadata dictionary.
 
@@ -231,40 +260,40 @@ def create_template_metadata(
     # Default variables if none provided
     if not variables:
         variables = {
-            "project_name": {
-                "description": "Project name (used in documentation and KiCad files)",
-                "default": name,
-            },
-            "directory_name": {
-                "description": "Directory/repository name (used for folder structure)",
-                "default": "%{project_name.lower.replace(' ', '-')}",
-            },
-            "project_filename": {
-                "description": "Main KiCad project filename (without extension)",
-                "default": "%{project_name}",
-            },
+            "project_name": TemplateVariable(
+                description="Project name (used in documentation and KiCad files)",
+                default=name,
+            ),
+            "directory_name": TemplateVariable(
+                description="Directory/repository name (used for folder structure)",
+                default="%{project_name.lower.replace(' ', '-')}",
+            ),
+            "project_filename": TemplateVariable(
+                description="Main KiCad project filename (without extension)",
+                default="%{project_name}",
+            ),
         }
     else:
         # Make sure we have the predefined variables
         if not any(k.lower() == "project_name" for k in variables):
-            variables["project_name"] = {
-                "description": "Project name (used in documentation and KiCad files)",
-                "default": name,
-            }
+            variables["project_name"] = TemplateVariable(
+                description="Project name (used in documentation and KiCad files)",
+                default=name,
+            )
 
         if not any(k.lower() == "directory_name" for k in variables):
-            variables["directory_name"] = {
-                "description": "Directory/repository name (used for folder structure)",
-                "default": "%{project_name.lower.replace(' ', '-')}",
-            }
+            variables["directory_name"] = TemplateVariable(
+                description="Directory/repository name (used for folder structure)",
+                default="%{project_name.lower.replace(' ', '-')}",
+            )
 
         if not any(k.lower() == "project_filename" for k in variables):
-            variables["project_filename"] = {
-                "description": "Main KiCad project filename (without extension)",
-                "default": "%{project_name}",
-            }
+            variables["project_filename"] = TemplateVariable(
+                description="Main KiCad project filename (without extension)",
+                default="%{project_name}",
+            )
 
-    metadata = {
+    metadata: TemplateMetadata = {
         "name": name,
         "description": description or f"KiCad project template for {name}",
         "use_case": use_case or "",
@@ -276,13 +305,12 @@ def create_template_metadata(
         metadata["extends"] = extends
 
     if dependencies:
-        deps_dict: Dict[str, Any] = {"recommended": dependencies}
-        metadata["dependencies"] = deps_dict
+        metadata["dependencies"] = TemplateDependencies(recommended=dependencies)
 
     return metadata
 
 
-def write_template_metadata(directory: Path, metadata: Dict[str, Any]) -> None:
+def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None:
     """
     Write template metadata to a file.
 
@@ -300,7 +328,7 @@ def write_template_metadata(directory: Path, metadata: Dict[str, Any]) -> None:
 
 
 def process_markdown_file(
-    source_file: Path, target_file: Path, variables: Dict[str, Dict[str, Any]]
+    source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
     """
     Process a Markdown file to add a template header with available variables.
@@ -348,9 +376,9 @@ def process_markdown_file(
 def create_template_structure(
     source_directory: Path,
     template_directory: Path,
-    metadata: Dict[str, Any],
+    metadata: TemplateMetadata,
     gitignore_spec: Optional[pathspec.PathSpec] = None,
-    additional_excludes: Optional[List[str]] = None,
+    additional_excludes: Optional[list[str]] = None,
 ) -> None:
     """
     Create template structure from source directory.
@@ -626,8 +654,8 @@ def post_create(context):
     # readme_path = os.path.join(context["project_dir"], "README.md")
     # if not os.path.exists(readme_path):
     #     with Path(readme_path).open("w") as f:
-    #         f.write(f"# {context['variables']['project_name']}\\n\\n")
-    #         f.write("Created with KiCad Library Manager\\n")
+    #         f.write(f"# {context['variables']['project_name']}\n\n")
+    #         f.write("Created with KiCad Library Manager\n")
 
     # Print message to user
     click.echo(f"Project {context['variables']['project_name']} created successfully!")
@@ -639,7 +667,7 @@ def post_create(context):
 
 
 def process_kicad_project_file(
-    source_file: Path, target_file: Path, variables: Dict[str, Dict[str, Any]]
+    source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
     """
     Process a KiCad project file (.kicad_pro).
@@ -782,7 +810,9 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
 
 
 # Add new functions for rendering templates and creating projects from templates
-def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
+def render_template_string(
+    template_str: str, variables: Mapping[str, Union[str, int, bool]]
+) -> str:
     """
     Render a template string using Jinja2 or custom Windows-compatible templating.
 
@@ -808,7 +838,9 @@ def render_template_string(template_str: str, variables: Dict[str, Any]) -> str:
         return template_str
 
 
-def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
+def render_filename_custom(
+    filename: str, variables: Mapping[str, Union[str, int, bool]]
+) -> str:
     """
     Render a filename using a custom Windows-compatible templating system.
 
@@ -827,7 +859,7 @@ def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
         Rendered filename
     """
 
-    def transform_value(value: str, transformations: List[str]) -> str:
+    def transform_value(value: str, transformations: list[str]) -> str:
         """Apply a chain of transformations to a value."""
         result = value
 
@@ -902,7 +934,9 @@ def render_filename_custom(filename: str, variables: Dict[str, Any]) -> str:
     return filename
 
 
-def render_filename(filename: str, variables: Dict[str, Any]) -> str:
+def render_filename(
+    filename: str, variables: Mapping[str, Union[str, int, bool]]
+) -> str:
     """
     Render a filename using either Jinja2 or custom Windows-compatible templating.
 
@@ -932,7 +966,7 @@ def render_filename(filename: str, variables: Dict[str, Any]) -> str:
     return filename
 
 
-def find_all_templates(config: Any) -> Dict[str, Dict[str, Any]]:
+def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
     """
     Find all templates in all configured libraries.
 
@@ -943,7 +977,7 @@ def find_all_templates(config: Any) -> Dict[str, Dict[str, Any]]:
         Dictionary mapping template names to template metadata
     """
     all_templates = {}
-    all_libraries = config.get_libraries()
+    all_libraries = config.get_libraries()  # type: ignore[attr-defined]
 
     for library in all_libraries:
         library_path = library.get("path")
@@ -977,7 +1011,7 @@ def find_all_templates(config: Any) -> Dict[str, Dict[str, Any]]:
 def render_template_file(
     source_file: Path,
     target_file: Path,
-    variables: Dict[str, Any],
+    variables: Mapping[str, Union[str, int, bool]],
     is_binary: bool = False,
 ) -> bool:
     """
@@ -1059,8 +1093,8 @@ def render_template_file(
 def create_project_from_template(
     template_dir: Path,
     project_dir: Path,
-    variables: Dict[str, Any],
-    metadata: Optional[Dict[str, Any]] = None,
+    variables: Mapping[str, Union[str, int, bool]],
+    metadata: Optional[dict[str, Any]] = None,
     dry_run: bool = False,
     skip_hooks: bool = False,
 ) -> bool:
@@ -1236,8 +1270,8 @@ def create_project_from_template(
 def run_post_create_hook(
     hook_script: Path,
     project_dir: Path,
-    variables: Dict[str, Any],
-    template_metadata: Dict[str, Any],
+    variables: Mapping[str, Union[str, int, bool]],
+    template_metadata: dict[str, Any],
 ) -> None:
     """
     Run a post-creation hook script.

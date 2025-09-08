@@ -9,7 +9,7 @@ This guide covers setting up a professional development environment for KiLM wit
 
 ## Prerequisites
 
-- **Python 3.8+**: Required for KiLM development
+- **Python 3.9+**: Required for KiLM development
 - **Git**: For version control and contribution workflow
 - **KiCad 6.x+**: For testing KiLM integration (run at least once)
 
@@ -136,7 +136,7 @@ KiLM follows a **type-first development** approach. All code must have proper ty
 ## Project Architecture
 
 ### Core Modules
-- **`cli.py`**: Click-based command interface
+- **`cli.py`**: Typer-based command interface (modern CLI with better help/UX)
 - **`commands/`**: Individual command implementations  
 - **`library_manager.py`**: Core library management logic
 - **`config.py`**: KiCad configuration handling

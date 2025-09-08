@@ -15,6 +15,9 @@ kilm status [OPTIONS]
 
 ## Options
 
+- `-v, --verbose`:
+  Show detailed configured library tables (symbol and footprint tables from KiCad). Without this flag, only the high-level sections are shown.
+
 - `--help`:
   Show the help message and exit.
 
@@ -26,7 +29,7 @@ The command gathers and displays information about:
 - **KiCad Configuration Directory:** The location KiLM detected for KiCad's configuration files.
 - **KiCad Environment Variables:** Lists the environment variables currently set within KiCad's `kicad_common.json` file.
 - **KiCad Pinned Libraries:** Shows the symbol and footprint libraries currently marked as favorites (pinned) in `kicad_common.json`.
-- **KiCad Configured Libraries:** Lists the symbol and footprint libraries currently present in KiCad's `sym-lib-table` and `fp-lib-table`.
+- **KiCad Configured Libraries:** Lists the symbol and footprint libraries currently present in KiCad's `sym-lib-table` and `fp-lib-table`. Requires `-v/--verbose`.
 
 ## Example
 

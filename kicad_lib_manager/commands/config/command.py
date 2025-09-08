@@ -5,10 +5,14 @@ Provides commands for managing KiCad Library Manager configuration.
 
 import sys
 from pathlib import Path
+from typing import Annotated, Optional
 
-import click
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
-from ...config import Config
+from ...services.config_service import Config
 from ...utils.metadata import (
     CLOUD_METADATA_FILE,
     GITHUB_METADATA_FILE,
@@ -16,33 +20,22 @@ from ...utils.metadata import (
     read_github_metadata,
 )
 
-
-@click.group()
-def config():
-    """Manage KiCad Library Manager configuration.
-
-    This command group allows you to list, set defaults, and remove
-    configuration entries for KiCad Library Manager.
-    """
-    pass
+console = Console()
 
 
-@config.command()
-@click.option(
-    "--type",
-    "library_type",
-    type=click.Choice(["github", "cloud", "all"]),
-    default="all",
-    help="Type of libraries to list (github=symbols/footprints, cloud=3D models)",
-    show_default=True,
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Show more information about libraries",
-)
-def list(library_type, verbose):
+def list_config(
+    library_type: Annotated[
+        str,
+        typer.Option(
+            "--type",
+            help="Type of libraries to list (github=symbols/footprints, cloud=3D models)",
+        ),
+    ] = "all",
+    verbose: Annotated[
+        bool,
+        typer.Option("-v", "--verbose", help="Show more information about libraries"),
+    ] = False,
+) -> None:
     """List all configured libraries in kilm.
 
     This shows all libraries stored in the kilm configuration file.
@@ -66,12 +59,19 @@ def list(library_type, verbose):
         current_library = config.get_current_library()
 
         if not libraries:
-            click.echo("No libraries configured.")
-            click.echo("Use 'kilm init' to initialize a GitHub library.")
-            click.echo("Use 'kilm add-3d' to add a cloud-based 3D model library.")
+            console.print()
+            console.print(
+                Panel(
+                    "[yellow]No libraries configured.[/yellow]\n\n"
+                    "[cyan]Get Started:[/cyan]\n"
+                    "• Initialize GitHub library: [blue]kilm init[/blue]\n"
+                    "• Add 3D model library: [blue]kilm add-3d[/blue]\n"
+                    "• Check status: [blue]kilm status[/blue]",
+                    title="[bold yellow]⚠️ No Libraries[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
             return
-
-        click.echo("Configured Libraries:")
 
         # Group libraries by type
         types = {"github": [], "cloud": []}
@@ -80,127 +80,255 @@ def list(library_type, verbose):
             if lib_type in types:
                 types[lib_type].append(lib)
 
-        # Print libraries grouped by type
+        console.print()
+
+        # Display GitHub Libraries
         if library_type in ["all", "github"] and types["github"]:
-            click.echo("\nGitHub Libraries (symbols, footprints, templates):")
-            for lib in types["github"]:
-                name = lib.get("name", "unnamed")
-                path = lib.get("path", "unknown")
-                path_obj = Path(path)
+            console.print(
+                "\n[bold cyan]GitHub Libraries[/bold cyan] [dim](symbols, footprints, templates)[/dim]"
+            )
+            console.print()
 
-                # Mark current library
-                current_marker = ""
-                if path == current_library:
-                    current_marker = " (current)"
+            if verbose:
+                # Verbose mode: Individual panels for each library
+                for lib in types["github"]:
+                    name = lib.get("name", "unnamed")
+                    path = lib.get("path", "unknown")
+                    path_obj = Path(path)
 
-                if verbose:
-                    click.echo(f"  - {name}{current_marker}:")
-                    click.echo(f"      Path: {path}")
-
-                    # Show metadata if available
+                    # Get metadata
                     metadata = read_github_metadata(path_obj)
+
+                    # Build content
+                    content = f"[blue]Path:[/blue] {path}\n"
+
                     if metadata:
-                        click.echo(f"      Metadata: {GITHUB_METADATA_FILE} present")
                         if "description" in metadata:
-                            click.echo(f"      Description: {metadata['description']}")
+                            content += f"[green]Description:[/green] {metadata['description']}\n"
                         if "version" in metadata:
-                            click.echo(f"      Version: {metadata['version']}")
-                        if "env_var" in metadata and metadata["env_var"]:
-                            click.echo(
-                                f"      Environment Variable: {metadata['env_var']}"
+                            content += (
+                                f"[yellow]Version:[/yellow] {metadata['version']}\n"
                             )
+                        if "env_var" in metadata and metadata["env_var"]:
+                            content += f"[magenta]Environment Variable:[/magenta] {metadata['env_var']}\n"
+
+                        # Capabilities with clear labels
                         if "capabilities" in metadata:
                             caps = metadata["capabilities"]
                             if isinstance(caps, dict):
-                                click.echo(
-                                    "      Capabilities: "
-                                    + f"symbols={'✓' if caps.get('symbols') else '✗'}, "
-                                    + f"footprints={'✓' if caps.get('footprints') else '✗'}, "
-                                    + f"templates={'✓' if caps.get('templates') else '✗'}"
-                                )
+                                content += "[white]Features:[/white] "
+                                features = []
+                                if caps.get("symbols"):
+                                    features.append("[green]✓ Symbols[/green]")
+                                else:
+                                    features.append("[red]✗ Symbols[/red]")
+                                if caps.get("footprints"):
+                                    features.append("[green]✓ Footprints[/green]")
+                                else:
+                                    features.append("[red]✗ Footprints[/red]")
+                                if caps.get("templates"):
+                                    features.append("[green]✓ Templates[/green]")
+                                else:
+                                    features.append("[red]✗ Templates[/red]")
+                                content += " | ".join(features)
                     else:
-                        click.echo(f"      Metadata: No {GITHUB_METADATA_FILE} file")
+                        content += (
+                            f"[dim]No {GITHUB_METADATA_FILE} metadata file found[/dim]"
+                        )
 
-                    # Check for existence of key folders
-                    folders = []
-                    if (path_obj / "symbols").exists():
-                        folders.append("symbols")
-                    if (path_obj / "footprints").exists():
-                        folders.append("footprints")
-                    if (path_obj / "templates").exists():
-                        folders.append("templates")
-                    click.echo(
-                        f"      Folders: {', '.join(folders) if folders else 'none'}"
+                    # Status indicator
+                    status = (
+                        "[green]✓ CURRENT[/green]"
+                        if path == current_library
+                        else "[dim]Available[/dim]"
                     )
-                else:
-                    click.echo(f"  - {name}: {path}{current_marker}")
+                    title = f"[bold cyan]{name}[/bold cyan] [{status}]"
 
+                    console.print(
+                        Panel(
+                            content,
+                            title=title,
+                            border_style="cyan" if path == current_library else "dim",
+                        )
+                    )
+                    console.print()
+            else:
+                # Compact mode: Simple table
+                table = Table(
+                    show_header=True, header_style="bold magenta", border_style="cyan"
+                )
+
+                table.add_column("Library", style="cyan", no_wrap=True)
+                table.add_column("Status", justify="center", style="green", width=12)
+                table.add_column("Path", style="blue")
+
+                for lib in types["github"]:
+                    name = lib.get("name", "unnamed")
+                    path = lib.get("path", "unknown")
+
+                    status = (
+                        "[green]✓ Current[/green]"
+                        if path == current_library
+                        else "[dim]Available[/dim]"
+                    )
+
+                    table.add_row(f"[bold]{name}[/bold]", status, path)
+
+                console.print(table)
+                console.print()
+
+        # Display Cloud Libraries
         if library_type in ["all", "cloud"] and types["cloud"]:
-            click.echo("\nCloud Libraries (3D models):")
-            for lib in types["cloud"]:
-                name = lib.get("name", "unnamed")
-                path = lib.get("path", "unknown")
-                path_obj = Path(path)
+            console.print(
+                "\n[bold cyan]Cloud Libraries[/bold cyan] [dim](3D models)[/dim]"
+            )
+            console.print()
 
-                # Mark current library
-                current_marker = ""
-                if path == current_library:
-                    current_marker = " (current)"
+            if verbose:
+                # Verbose mode: Individual panels for each library
+                for lib in types["cloud"]:
+                    name = lib.get("name", "unnamed")
+                    path = lib.get("path", "unknown")
+                    path_obj = Path(path)
 
-                if verbose:
-                    click.echo(f"  - {name}{current_marker}:")
-                    click.echo(f"      Path: {path}")
-
-                    # Show metadata if available
+                    # Get metadata
                     metadata = read_cloud_metadata(path_obj)
-                    if metadata:
-                        click.echo(f"      Metadata: {CLOUD_METADATA_FILE} present")
-                        if "description" in metadata:
-                            click.echo(f"      Description: {metadata['description']}")
-                        if "version" in metadata:
-                            click.echo(f"      Version: {metadata['version']}")
-                        if "env_var" in metadata and metadata["env_var"]:
-                            click.echo(
-                                f"      Environment Variable: {metadata['env_var']}"
-                            )
-                        if "model_count" in metadata:
-                            click.echo(f"      3D Models: {metadata['model_count']}")
-                    else:
-                        click.echo(f"      Metadata: No {CLOUD_METADATA_FILE} file")
 
-                    # Count 3D model files if metadata not available or to verify
-                    if not metadata or "model_count" not in metadata:
-                        model_count = 0
+                    # Build content
+                    content = f"[blue]Path:[/blue] {path}\n"
+
+                    if metadata:
+                        if "description" in metadata:
+                            content += f"[green]Description:[/green] {metadata['description']}\n"
+                        if "version" in metadata:
+                            content += (
+                                f"[yellow]Version:[/yellow] {metadata['version']}\n"
+                            )
+                        if "env_var" in metadata and metadata["env_var"]:
+                            content += f"[magenta]Environment Variable:[/magenta] {metadata['env_var']}\n"
+
+                        # Model count
+                        if "model_count" in metadata:
+                            content += (
+                                f"[white]3D Models:[/white] {metadata['model_count']}"
+                            )
+                        else:
+                            # Count models
+                            count = 0
+                            for ext in [".step", ".stp", ".wrl", ".wings"]:
+                                count += len(list(path_obj.glob(f"**/*{ext}")))
+                            content += f"[white]3D Models:[/white] {count} [dim](counted)[/dim]"
+                    else:
+                        content += (
+                            f"[dim]No {CLOUD_METADATA_FILE} metadata file found[/dim]"
+                        )
+                        # Still count models
+                        count = 0
                         for ext in [".step", ".stp", ".wrl", ".wings"]:
-                            model_count += len(list(path_obj.glob(f"**/*{ext}")))
-                        click.echo(f"      3D Models: {model_count} (counted)")
-                else:
-                    click.echo(f"  - {name}: {path}{current_marker}")
+                            count += len(list(path_obj.glob(f"**/*{ext}")))
+                        content += (
+                            f"\n[white]3D Models:[/white] {count} [dim](counted)[/dim]"
+                        )
+
+                    # Status indicator
+                    status = (
+                        "[green]✓ CURRENT[/green]"
+                        if path == current_library
+                        else "[dim]Available[/dim]"
+                    )
+                    title = f"[bold cyan]{name}[/bold cyan] [{status}]"
+
+                    console.print(
+                        Panel(
+                            content,
+                            title=title,
+                            border_style="cyan" if path == current_library else "dim",
+                        )
+                    )
+                    console.print()
+            else:
+                # Compact mode: Simple table
+                table = Table(
+                    show_header=True, header_style="bold magenta", border_style="cyan"
+                )
+
+                table.add_column("Library", style="cyan", no_wrap=True)
+                table.add_column("Status", justify="center", style="green", width=12)
+                table.add_column("Path", style="blue")
+
+                for lib in types["cloud"]:
+                    name = lib.get("name", "unnamed")
+                    path = lib.get("path", "unknown")
+
+                    status = (
+                        "[green]✓ Current[/green]"
+                        if path == current_library
+                        else "[dim]Available[/dim]"
+                    )
+
+                    table.add_row(f"[bold]{name}[/bold]", status, path)
+
+                console.print(table)
+                console.print()
+
+        # Add summary panel
+        total_libs = len(libraries)
+        github_count = len(types["github"])
+        cloud_count = len(types["cloud"])
+
+        summary_content = f"[green]Total Libraries:[/green] {total_libs}\n"
+        summary_content += (
+            f"[cyan]GitHub:[/cyan] {github_count}  [blue]Cloud:[/blue] {cloud_count}"
+        )
+
+        console.print(
+            Panel(
+                summary_content,
+                title="[bold cyan]Summary[/bold cyan]",
+                border_style="cyan",
+                width=35,
+            )
+        )
 
         # Print helpful message if no libraries match the filter
         if library_type == "github" and not types["github"]:
-            click.echo("No GitHub libraries configured.")
-            click.echo("Use 'kilm init' to initialize a GitHub library.")
+            console.print(
+                Panel(
+                    "[yellow]No GitHub libraries configured.[/yellow]\n\n"
+                    "[cyan]Get Started:[/cyan]\n"
+                    "• Initialize a GitHub library: [blue]kilm init[/blue]",
+                    title="[bold yellow]⚠️ No GitHub Libraries[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
         elif library_type == "cloud" and not types["cloud"]:
-            click.echo("No cloud libraries configured.")
-            click.echo("Use 'kilm add-3d' to add a cloud-based 3D model library.")
+            console.print(
+                Panel(
+                    "[yellow]No cloud libraries configured.[/yellow]\n\n"
+                    "[cyan]Get Started:[/cyan]\n"
+                    "• Add a 3D model library: [blue]kilm add-3d[/blue]",
+                    title="[bold yellow]⚠️ No Cloud Libraries[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
 
     except Exception as e:
-        click.echo(f"Error listing configurations: {e}", err=True)
+        console.print(f"[red]Error listing configurations: {e}[/red]")
         sys.exit(1)
 
 
-@config.command()
-@click.argument("library_name", required=False)
-@click.option(
-    "--type",
-    "library_type",
-    type=click.Choice(["github", "cloud"]),
-    default="github",
-    help="Type of library to set as default (github=symbols/footprints, cloud=3D models)",
-    show_default=True,
-)
-def set_default(library_name, library_type):
+def set_default(
+    library_name: Annotated[
+        Optional[str], typer.Argument(help="Name of library to set as default")
+    ] = None,
+    library_type: Annotated[
+        str,
+        typer.Option(
+            "--type",
+            help="Type of library to set as default (github=symbols/footprints, cloud=3D models)",
+        ),
+    ] = "github",
+) -> None:
     """Set a library as the default for operations.
 
     Sets the specified library as the default for future operations.
@@ -234,11 +362,13 @@ def set_default(library_name, library_type):
         libraries = config.get_libraries(library_type)
 
         if not libraries:
-            click.echo(f"No {library_type} libraries configured.")
+            console.print(f"No {library_type} libraries configured.")
             if library_type == "github":
-                click.echo("Use 'kilm init' to initialize a GitHub library.")
+                console.print("Use 'kilm init' to initialize a GitHub library.")
             else:
-                click.echo("Use 'kilm add-3d' to add a cloud-based 3D model library.")
+                console.print(
+                    "Use 'kilm add-3d' to add a cloud-based 3D model library."
+                )
             sys.exit(1)
 
         # Get current library path
@@ -246,7 +376,7 @@ def set_default(library_name, library_type):
 
         # If library name not provided, prompt for selection
         if not library_name:
-            click.echo(f"\nAvailable {library_type} libraries:")
+            console.print(f"\nAvailable {library_type} libraries:")
 
             # Show numbered list of libraries
             for i, lib in enumerate(libraries):
@@ -258,12 +388,12 @@ def set_default(library_name, library_type):
                 if path == current_library:
                     current_marker = " (current)"
 
-                click.echo(f"{i + 1}. {name}{current_marker}")
+                console.print(f"{i + 1}. {name}{current_marker}")
 
             # Get selection
             while True:
                 try:
-                    selection = click.prompt(
+                    selection = typer.prompt(
                         "Select library (number)", type=int, default=1
                     )
                     if 1 <= selection <= len(libraries):
@@ -272,11 +402,11 @@ def set_default(library_name, library_type):
                         library_path = selected_lib.get("path")
                         break
                     else:
-                        click.echo(
+                        console.print(
                             f"Please enter a number between 1 and {len(libraries)}"
                         )
                 except ValueError:
-                    click.echo("Please enter a valid number")
+                    console.print("Please enter a valid number")
         else:
             # Find the library by name
             library_path = None
@@ -286,41 +416,40 @@ def set_default(library_name, library_type):
                     break
 
             if not library_path:
-                click.echo(f"No {library_type} library named '{library_name}' found.")
-                click.echo("Use 'kilm config list' to see available libraries.")
+                console.print(
+                    f"No {library_type} library named '{library_name}' found."
+                )
+                console.print("Use 'kilm config list' to see available libraries.")
                 sys.exit(1)
 
         # Set as current library
         if library_path is None:
-            click.echo(
-                f"Error: Could not find path for library '{library_name}'", err=True
+            console.print(
+                f"[red]Error: Could not find path for library '{library_name}'[/red]"
             )
             sys.exit(1)
         config.set_current_library(library_path)
-        click.echo(f"Set {library_type} library '{library_name}' as default.")
-        click.echo(f"Path: {library_path}")
+        console.print(f"Set {library_type} library '{library_name}' as default.")
+        console.print(f"Path: {library_path}")
 
     except Exception as e:
-        click.echo(f"Error setting default library: {e}", err=True)
+        console.print(f"[red]Error setting default library: {e}[/red]")
         sys.exit(1)
 
 
-@config.command()
-@click.argument("library_name", required=True)
-@click.option(
-    "--type",
-    "library_type",
-    type=click.Choice(["github", "cloud", "all"]),
-    default="all",
-    help="Type of library to remove (all=remove from both types)",
-    show_default=True,
-)
-@click.option(
-    "--force",
-    is_flag=True,
-    help="Force removal without confirmation",
-)
-def remove(library_name, library_type, force):
+def remove(
+    library_name: Annotated[str, typer.Argument(help="Name of library to remove")],
+    library_type: Annotated[
+        str,
+        typer.Option(
+            "--type",
+            help="Type of library to remove (all=remove from both types)",
+        ),
+    ] = "all",
+    force: Annotated[
+        bool, typer.Option("--force", help="Force removal without confirmation")
+    ] = False,
+) -> None:
     """Remove a library from the configuration.
 
     Removes the specified library from the KiCad Library Manager configuration.
@@ -359,10 +488,12 @@ def remove(library_name, library_type, force):
 
         if not matching_libraries:
             if library_type == "all":
-                click.echo(f"No library named '{library_name}' found.")
+                console.print(f"No library named '{library_name}' found.")
             else:
-                click.echo(f"No {library_type} library named '{library_name}' found.")
-            click.echo("Use 'kilm config list' to see available libraries.")
+                console.print(
+                    f"No {library_type} library named '{library_name}' found."
+                )
+            console.print("Use 'kilm config list' to see available libraries.")
             sys.exit(1)
 
         # Confirm removal
@@ -370,16 +501,16 @@ def remove(library_name, library_type, force):
             for lib in matching_libraries:
                 lib_type = lib.get("type", "unknown")
                 lib_path = lib.get("path", "unknown")
-                click.echo(
+                console.print(
                     f"Will remove {lib_type} library '{library_name}' from configuration."
                 )
-                click.echo(f"Path: {lib_path}")
+                console.print(f"Path: {lib_path}")
 
                 if lib_path == current_library:
-                    click.echo("Warning: This is the current default library.")
+                    console.print("Warning: This is the current default library.")
 
-            if not click.confirm("Continue?"):
-                click.echo("Operation cancelled.")
+            if not typer.confirm("Continue?"):
+                console.print("Operation cancelled.")
                 return
 
         # Remove libraries
@@ -392,26 +523,21 @@ def remove(library_name, library_type, force):
 
         if removed_count > 0:
             if removed_count == 1:
-                click.echo(f"Removed library '{library_name}' from configuration.")
+                console.print(f"Removed library '{library_name}' from configuration.")
             else:
-                click.echo(
+                console.print(
                     f"Removed {removed_count} instances of library '{library_name}' from configuration."
                 )
 
             # Check if we removed the current library
             current_library_new = config.get_current_library()
             if current_library and current_library != current_library_new:
-                click.echo(
+                console.print(
                     "Note: Default library was changed as the previous default was removed."
                 )
         else:
-            click.echo("No libraries were removed.")
+            console.print("No libraries were removed.")
 
     except Exception as e:
-        click.echo(f"Error removing library: {e}", err=True)
+        console.print(f"[red]Error removing library: {e}[/red]")
         sys.exit(1)
-
-
-# Register the config command
-if __name__ == "__main__":
-    config()

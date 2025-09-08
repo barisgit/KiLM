@@ -1,124 +1,163 @@
 """
-Pin command implementation for KiCad Library Manager.
+Pin command implementation for KiCad Library Manager (Typer version).
 """
 
-import sys
+from pathlib import Path
+from typing import Annotated, Optional
 
-import click
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
-from ...library_manager import find_kicad_config, list_libraries
+from ...services.kicad_service import KiCadService
+from ...services.library_service import LibraryService
 from ...utils.env_vars import (
     expand_user_path,
     find_environment_variables,
     update_pinned_libraries,
 )
 
+console = Console()
 
-@click.command()
-@click.option(
-    "--kicad-lib-dir",
-    envvar="KICAD_USER_LIB",
-    help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
-)
-@click.option(
-    "--symbols",
-    "-s",
-    multiple=True,
-    help="Symbol libraries to pin (can be specified multiple times)",
-)
-@click.option(
-    "--footprints",
-    "-f",
-    multiple=True,
-    help="Footprint libraries to pin (can be specified multiple times)",
-)
-@click.option(
-    "--all/--selected",
-    default=True,
-    show_default=True,
-    help="Pin all available libraries or only selected ones",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show what would be done without making changes",
-)
-@click.option(
-    "--max-backups",
-    default=5,
-    show_default=True,
-    help="Maximum number of backups to keep",
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Show verbose output for debugging",
-)
-def pin(kicad_lib_dir, symbols, footprints, all, dry_run, max_backups, verbose):
-    """Pin libraries in KiCad for quick access"""
+
+def pin(
+    kicad_lib_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            "--kicad-lib-dir",
+            envvar="KICAD_USER_LIB",
+            help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
+        ),
+    ] = None,
+    symbols: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--symbols",
+            "-s",
+            help="Symbol libraries to pin (can be specified multiple times)",
+        ),
+    ] = None,
+    footprints: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--footprints",
+            "-f",
+            help="Footprint libraries to pin (can be specified multiple times)",
+        ),
+    ] = None,
+    all_libs: Annotated[
+        bool,
+        typer.Option(
+            "--all/--selected",
+            help="Pin all available libraries or only selected ones",
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Show what would be done without making changes",
+        ),
+    ] = False,
+    max_backups: Annotated[
+        int,
+        typer.Option(
+            "--max-backups",
+            help="Maximum number of backups to keep",
+        ),
+    ] = 5,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show verbose output for debugging",
+        ),
+    ] = False,
+) -> None:
+    """
+    Pin libraries in KiCad for quick access.
+
+    This command pins libraries in KiCad's interface for quick access.
+    You can pin specific symbol and footprint libraries or all available libraries.
+    """
+    # Initialize default values for mutable types
+    if symbols is None:
+        symbols = []
+    if footprints is None:
+        footprints = []
+
     # Find environment variables if not provided
     if not kicad_lib_dir:
         kicad_lib_dir = find_environment_variables("KICAD_USER_LIB")
         if not kicad_lib_dir:
-            click.echo("Error: KICAD_USER_LIB not set and not provided", err=True)
-            sys.exit(1)
+            console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
+            raise typer.Exit(1)
 
     # Expand user home directory if needed
     kicad_lib_dir = expand_user_path(kicad_lib_dir)
 
     if verbose:
-        click.echo(f"Using KiCad library directory: {kicad_lib_dir}")
+        console.print(f"[blue]Using KiCad library directory:[/blue] {kicad_lib_dir}")
+
+    # Initialize services
+    library_service = LibraryService()
+    kicad_service = KiCadService()
 
     # Find KiCad configuration
     try:
-        kicad_config = find_kicad_config()
+        kicad_config = kicad_service.find_kicad_config_dir()
         if verbose:
-            click.echo(f"Found KiCad configuration at: {kicad_config}")
+            console.print(f"[blue]Found KiCad configuration at:[/blue] {kicad_config}")
     except Exception as e:
-        click.echo(f"Error finding KiCad configuration: {e}", err=True)
-        sys.exit(1)
+        console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
+        raise typer.Exit(1) from e
 
     # If --all is specified, get all libraries from the directory
-    if all and not symbols and not footprints:
+    if all_libs and not symbols and not footprints:
         try:
-            symbol_libs, footprint_libs = list_libraries(kicad_lib_dir)
-            symbols = symbol_libs
-            footprints = footprint_libs
+            symbol_libs, footprint_libs = library_service.list_libraries(
+                Path(kicad_lib_dir)
+            )
+            symbols = list(symbol_libs)
+            footprints = list(footprint_libs)
             if verbose:
-                click.echo(
-                    f"Found {len(symbols)} symbol libraries and {len(footprints)} footprint libraries"
+                console.print(
+                    f"[green]Found {len(symbols)} symbol libraries and {len(footprints)} footprint libraries[/green]"
                 )
         except Exception as e:
-            click.echo(f"Error listing libraries: {e}", err=True)
-            sys.exit(1)
+            console.print(f"[red]Error listing libraries: {e}[/red]")
+            raise typer.Exit(1) from e
 
-    # Convert tuples to lists if needed
-    if isinstance(symbols, tuple):
-        symbols = list(symbols)
-    if isinstance(footprints, tuple):
-        footprints = list(footprints)
+    # Ensure we have lists (Typer should already provide lists)
+    if not isinstance(symbols, list):
+        symbols = list(symbols) if symbols else []
+    if not isinstance(footprints, list):
+        footprints = list(footprints) if footprints else []
 
     # Validate that libraries exist
-    if not all and (symbols or footprints):
+    if not all_libs and (symbols or footprints):
         try:
-            available_symbols, available_footprints = list_libraries(kicad_lib_dir)
+            available_symbols, available_footprints = library_service.list_libraries(
+                Path(kicad_lib_dir)
+            )
 
             # Check symbols
             for symbol in symbols:
                 if symbol not in available_symbols:
-                    click.echo(
-                        f"Warning: Symbol library '{symbol}' not found", err=True
+                    console.print(
+                        f"[yellow]Warning: Symbol library '{symbol}' not found[/yellow]"
                     )
 
             # Check footprints
             for footprint in footprints:
                 if footprint not in available_footprints:
-                    click.echo(
-                        f"Warning: Footprint library '{footprint}' not found", err=True
+                    console.print(
+                        f"[yellow]Warning: Footprint library '{footprint}' not found[/yellow]"
                     )
         except Exception as e:
-            click.echo(f"Error validating libraries: {e}", err=True)
+            console.print(f"[yellow]Error validating libraries: {e}[/yellow]")
             # Continue anyway, in case the libraries are configured but not in the directory
 
     try:
@@ -132,28 +171,39 @@ def pin(kicad_lib_dir, symbols, footprints, all, dry_run, max_backups, verbose):
 
         if changes_needed:
             if dry_run:
-                click.echo(
-                    f"Would pin {len(symbols)} symbol and {len(footprints)} footprint libraries in KiCad"
+                console.print(
+                    f"[yellow]Would pin {len(symbols)} symbol and {len(footprints)} footprint libraries in KiCad[/yellow]"
                 )
             else:
-                click.echo(
-                    f"Pinned {len(symbols)} symbol and {len(footprints)} footprint libraries in KiCad"
+                success_msg = f"[green]Pinned {len(symbols)} symbol and {len(footprints)} footprint libraries in KiCad[/green]"
+                console.print(
+                    Panel(
+                        f"{success_msg}\n\n"
+                        f"[blue]• Created backup of kicad_common.json[/blue]\n"
+                        f"[yellow]• Restart KiCad for changes to take effect[/yellow]",
+                        title="✅ Libraries Pinned",
+                        border_style="green",
+                    )
                 )
-                click.echo("Created backup of kicad_common.json")
-                click.echo("Restart KiCad for changes to take effect")
         else:
-            click.echo("No changes needed, libraries already pinned in KiCad")
+            console.print(
+                "[blue]No changes needed, libraries already pinned in KiCad[/blue]"
+            )
 
         if verbose:
             if symbols:
-                click.echo("\nPinned Symbol Libraries:")
+                table = Table(title="Pinned Symbol Libraries")
+                table.add_column("Library", style="cyan")
                 for symbol in sorted(symbols):
-                    click.echo(f"  - {symbol}")
+                    table.add_row(symbol)
+                console.print(table)
 
             if footprints:
-                click.echo("\nPinned Footprint Libraries:")
+                table = Table(title="Pinned Footprint Libraries")
+                table.add_column("Library", style="magenta")
                 for footprint in sorted(footprints):
-                    click.echo(f"  - {footprint}")
+                    table.add_row(footprint)
+                console.print(table)
     except Exception as e:
-        click.echo(f"Error pinning libraries: {e}", err=True)
-        sys.exit(1)
+        console.print(f"[red]Error pinning libraries: {e}[/red]")
+        raise typer.Exit(1) from e
