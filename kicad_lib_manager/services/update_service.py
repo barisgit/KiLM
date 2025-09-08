@@ -54,26 +54,32 @@ class InstallationDetector:
 
     def detect_uv(self) -> bool:
         """Detect UV tool installation."""
-        # Check environment variables
-        uv_env_vars = bool(
-            os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
-        )
-
-        # Check for explicit UV path patterns
+        # Check for explicit UV path patterns in the executable path - most reliable
         uv_path_patterns = any(
             part in self.executable_str for part in [".local/share/uv", "uv/tools"]
         )
 
-        # Check local bin with UV tools (Unix-like only)
-        local_bin_with_uv = False
+        # More specific check: only if executable is actually within uv tools directory
+        uv_tools_executable = False
         if self.is_unix_like():
-            local_bin_path = Path.home() / ".local" / "bin"
             uv_tools_path = Path.home() / ".local" / "share" / "uv" / "tools"
-            local_bin_with_uv = (
-                str(local_bin_path) in self.executable_str and uv_tools_path.exists()
+            # Only consider it uv if the executable is actually within the uv tools directory
+            try:
+                self.executable_path.relative_to(uv_tools_path)
+                uv_tools_executable = True
+            except ValueError:
+                # executable_path is not within uv_tools_path
+                uv_tools_executable = False
+
+        # Check environment variables only if no explicit path evidence
+        # This prevents false positives when uv is installed system-wide but we're in a venv
+        uv_env_vars = False
+        if not uv_path_patterns and not uv_tools_executable:
+            uv_env_vars = bool(
+                os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
             )
 
-        return uv_env_vars or uv_path_patterns or local_bin_with_uv
+        return uv_path_patterns or uv_tools_executable or uv_env_vars
 
     def detect_virtual_env(self) -> bool:
         """Detect virtual environment (pip in venv)."""
