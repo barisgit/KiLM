@@ -514,10 +514,10 @@ class ConfigService:
 
     def get_max_backups(self) -> int:
         """Get the maximum number of backups to keep."""
-        value = self._config.get("max_backups", 5)
+        value = self._config.get("max_backups", DEFAULT_MAX_BACKUPS)
         if isinstance(value, int):
             return value
-        return 5
+        return DEFAULT_MAX_BACKUPS
 
     def set_max_backups(self, count: int) -> None:
         """Set the maximum number of backups to keep."""

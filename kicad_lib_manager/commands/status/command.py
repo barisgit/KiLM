@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ...services.kicad_service import KiCadService
+from ...utils.constants import CONFIG_DIR_NAME, CONFIG_FILE_NAME
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 console = Console()
@@ -60,7 +61,7 @@ def status(
 def _show_kilm_configuration() -> None:
     """Show KILM configuration section"""
     try:
-        config_file = Path.home() / ".config" / "kicad-lib-manager" / "config.yaml"
+        config_file = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
         if config_file.exists():
             console.print("[bold cyan]KILM Configuration[/bold cyan]")
             try:

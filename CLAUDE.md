@@ -119,7 +119,7 @@ kilm                    # Main CLI entry point
 - **Professional UX**: Non-intrusive notifications with method-specific guidance
 
 ### Core Modules
-- **CLI Layer** (`cli.py`): Click-based command interface
+- **CLI Layer** (`main.py`): Typer-based command interface with Rich output
 - **Commands** (`commands/`): Individual command implementations
 - **Library Manager** (`library_manager.py`): Core library management logic
 - **Configuration** (`config.py`): KiCad configuration handling with update preferences
@@ -220,24 +220,30 @@ class LibraryManager(Protocol):
 
 **Step 1**: Create command module
 ```python
-# commands/new_command.py
-import click
-from typing import Optional
+# commands/new_command/command.py
+from typing import Annotated, Optional
+import typer
+from rich.console import Console
 
-@click.command()
-@click.option('--option', help='Command option')
-def new_command(option: Optional[str]) -> None:
+console = Console()
+
+def new_command(
+    option: Annotated[
+        Optional[str], 
+        typer.Option("--option", help="Command option")
+    ] = None,
+) -> None:
     """New command description."""
-    # Implementation with proper type hints
-    pass
+    # Implementation with proper type hints and Rich output
+    console.print("Command executed successfully!")
 ```
 
 **Step 2**: Register in CLI
 ```python
-# cli.py
-from .commands.new_command import new_command
+# main.py - Add to the CLI app
+from .commands.new_command.command import new_command
 
-main.add_command(new_command)
+app.command("new-command")(new_command)
 ```
 
 **Step 3**: Add tests

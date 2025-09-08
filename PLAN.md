@@ -65,7 +65,7 @@ KiLM follows a **simple, focused command structure**:
 - **`kilm pin <library>`** - Pin favorite libraries for quick access
 - **`kilm unpin <library>`** - Unpin libraries
 - **`kilm add-3d <path>`** - Add 3D model libraries
-- **`kilm update`** - Update library definitions
+- **`kilm sync`** - Update library definitions
 
 ### Configuration & Templates
 - **`kilm config`** - Manage configuration settings

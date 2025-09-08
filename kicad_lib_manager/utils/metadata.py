@@ -5,7 +5,7 @@ Metadata management utilities for KiCad Library Manager.
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import yaml
 
@@ -14,7 +14,7 @@ from .constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 def read_github_metadata(
     directory: Path,
-) -> Optional[Dict[str, Union[str, List, Dict]]]:
+) -> Optional[Dict[str, Any]]:
     """
     Read metadata from a GitHub library directory.
 
@@ -63,7 +63,7 @@ def write_github_metadata(directory: Path, metadata: Dict[str, Any]) -> bool:
         return False
 
 
-def read_cloud_metadata(directory: Path) -> Optional[Dict[str, Any]]:
+def read_cloud_metadata(directory: Path) -> Optional[Dict[str, Union[str, int, None]]]:
     """
     Read metadata from a cloud 3D model directory.
 
@@ -90,7 +90,9 @@ def read_cloud_metadata(directory: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def write_cloud_metadata(directory: Path, metadata: Dict[str, Any]) -> bool:
+def write_cloud_metadata(
+    directory: Path, metadata: Dict[str, Union[str, int, None]]
+) -> bool:
     """
     Write metadata to a cloud 3D model directory.
 
@@ -141,7 +143,9 @@ def generate_env_var_name(name: str, prefix: str = "") -> str:
     return clean_name
 
 
-def get_default_github_metadata(directory: Path) -> Dict[str, Any]:
+def get_default_github_metadata(
+    directory: Path,
+) -> Dict[str, Any]:
     """
     Generate default metadata for a GitHub library.
 
@@ -178,7 +182,7 @@ def get_default_github_metadata(directory: Path) -> Dict[str, Any]:
     }
 
 
-def get_default_cloud_metadata(directory: Path) -> Dict[str, Any]:
+def get_default_cloud_metadata(directory: Path) -> Dict[str, Union[str, int, None]]:
     """
     Generate default metadata for a cloud 3D model directory.
 

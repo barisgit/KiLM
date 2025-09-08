@@ -81,7 +81,7 @@ class LibraryService:
         self._create_library_structure(directory)
 
         # Update capabilities
-        capabilities = {
+        capabilities: Dict[str, bool] = {
             "symbols": (directory / "symbols").exists(),
             "footprints": (directory / "footprints").exists(),
             "templates": (directory / "templates").exists(),

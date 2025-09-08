@@ -197,10 +197,15 @@ def add_3d(
         # Add as a cloud-based 3D model library
         if library_name is None:
             library_name = metadata.get("name", directory.name)
-        config.add_library(library_name, str(directory), "cloud")
+
+        # Ensure library_name is a string
+        final_library_name = (
+            str(library_name) if library_name is not None else directory.name
+        )
+        config.add_library(final_library_name, str(directory), "cloud")
 
         console.print(
-            f"[bold green]3D models directory '{library_name}' added successfully![/bold green]"
+            f"[bold green]3D models directory '{final_library_name}' added successfully![/bold green]"
         )
         console.print(f"[blue]Path:[/blue] {directory}")
         if model_count > 0:
@@ -211,7 +216,9 @@ def add_3d(
                 f"[yellow]Assigned environment variable:[/yellow] {library_env_var}"
             )
             console.print("\n[bold]You can use this directory with:[/bold]")
-            console.print(f"  [cyan]kilm setup --3d-lib-dirs '{library_name}'[/cyan]")
+            console.print(
+                f"  [cyan]kilm setup --threed-lib-dirs '{library_name}'[/cyan]"
+            )
             console.print("  [dim]# or by setting the environment variable[/dim]")
             console.print(f"  [cyan]export {library_env_var}='{directory}'[/cyan]")
 

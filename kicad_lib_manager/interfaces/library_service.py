@@ -4,7 +4,7 @@ Library service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Dict, List, Optional, Protocol, Tuple, Union
 
 
 class LibraryServiceProtocol(Protocol):
@@ -18,6 +18,7 @@ class LibraryServiceProtocol(Protocol):
         Returns:
             Tuple of (symbol_libraries, footprint_libraries)
         """
+        ...
 
     @abstractmethod
     def initialize_library(
@@ -28,12 +29,16 @@ class LibraryServiceProtocol(Protocol):
         env_var: Optional[str] = None,
         force: bool = False,
         no_env_var: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, bool, Dict[str, bool]]]:
         """Initialize a library in the given directory."""
+        ...
 
     @abstractmethod
-    def get_library_metadata(self, directory: Path) -> Optional[Dict[str, Any]]:
+    def get_library_metadata(
+        self, directory: Path
+    ) -> Optional[Dict[str, Union[str, bool, Dict[str, bool]]]]:
         """Get metadata for a library directory."""
+        ...
 
     @abstractmethod
     def pin_libraries(
@@ -50,6 +55,7 @@ class LibraryServiceProtocol(Protocol):
         Returns:
             True if changes were made, False otherwise
         """
+        ...
 
     @abstractmethod
     def unpin_libraries(
@@ -66,3 +72,4 @@ class LibraryServiceProtocol(Protocol):
         Returns:
             True if changes were made, False otherwise
         """
+        ...
