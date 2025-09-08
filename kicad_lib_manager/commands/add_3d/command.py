@@ -1,11 +1,12 @@
 """
-Add cloud-based 3D models directory command for KiCad Library Manager.
+Add cloud-based 3D models directory command for KiCad Library Manager (Typer version).
 """
 
-import sys
 from pathlib import Path
+from typing import Annotated, Optional
 
-import click
+import typer
+from rich.console import Console
 
 from ...services.config_service import Config
 from ...utils.metadata import (
@@ -16,43 +17,46 @@ from ...utils.metadata import (
     write_cloud_metadata,
 )
 
+console = Console()
 
-@click.command()
-@click.option(
-    "--name",
-    help="Name for this 3D models collection (automatic if not provided)",
-    default=None,
-)
-@click.option(
-    "--directory",
-    help="Directory containing 3D models (default: current directory)",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, resolve_path=True),
-)
-@click.option(
-    "--description",
-    help="Description for this 3D models collection",
-    default=None,
-)
-@click.option(
-    "--env-var",
-    help="Custom environment variable name for this 3D model library",
-    default=None,
-)
-@click.option(
-    "--force",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing metadata file if present",
-    show_default=True,
-)
-@click.option(
-    "--no-env-var",
-    is_flag=True,
-    default=False,
-    help="Don't assign an environment variable to this library",
-    show_default=True,
-)
-def add_3d(name, directory, description, env_var, force, no_env_var):
+
+def add_3d(
+    name: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Name for this 3D models collection (automatic if not provided)"
+        ),
+    ] = None,
+    directory: Annotated[
+        Optional[Path],
+        typer.Option(
+            help="Directory containing 3D models (default: current directory)",
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    description: Annotated[
+        Optional[str], typer.Option(help="Description for this 3D models collection")
+    ] = None,
+    env_var: Annotated[
+        Optional[str],
+        typer.Option(
+            "--env-var",
+            help="Custom environment variable name for this 3D model library",
+        ),
+    ] = None,
+    force: Annotated[
+        bool, typer.Option(help="Overwrite existing metadata file if present")
+    ] = False,
+    no_env_var: Annotated[
+        bool,
+        typer.Option(
+            "--no-env-var", help="Don't assign an environment variable to this library"
+        ),
+    ] = False,
+) -> None:
     """Add a cloud-based 3D models directory to the configuration.
 
     This command registers a directory containing 3D models that are typically
@@ -68,41 +72,51 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
     If no directory is specified, the current directory will be used.
     """
     # Use current directory if not specified
-    directory = Path.cwd().resolve() if not directory else Path(directory).resolve()
+    directory = Path.cwd().resolve() if directory is None else directory.resolve()
 
-    click.echo(f"Adding cloud-based 3D models directory: {directory}")
+    console.print(
+        f"[bold cyan]Adding cloud-based 3D models directory:[/bold cyan] {directory}"
+    )
 
     # Check for existing metadata
     metadata = read_cloud_metadata(directory)
 
     if metadata and not force:
-        click.echo(f"Found existing metadata file ({CLOUD_METADATA_FILE}).")
+        console.print(
+            f"[green]Found existing metadata file[/green] ({CLOUD_METADATA_FILE})"
+        )
         library_name = metadata.get("name")
         library_description = metadata.get("description")
         library_env_var = metadata.get("env_var")
-        click.echo(f"Using existing name: {library_name}")
+        console.print(f"Using existing name: [blue]{library_name}[/blue]")
 
         # Show environment variable if present
         if library_env_var and not no_env_var:
-            click.echo(f"Using existing environment variable: {library_env_var}")
+            console.print(
+                f"Using existing environment variable: [yellow]{library_env_var}[/yellow]"
+            )
 
         # Override with command line parameters if provided
         if name:
             library_name = name
-            click.echo(f"Overriding with provided name: {library_name}")
+            console.print(f"Overriding with provided name: [blue]{library_name}[/blue]")
 
         if description:
             library_description = description
-            click.echo(f"Overriding with provided description: {library_description}")
+            console.print(
+                f"Overriding with provided description: [blue]{library_description}[/blue]"
+            )
 
         if env_var:
             library_env_var = env_var
-            click.echo(
-                f"Overriding with provided environment variable: {library_env_var}"
+            console.print(
+                f"Overriding with provided environment variable: [yellow]{library_env_var}[/yellow]"
             )
         elif no_env_var:
             library_env_var = None
-            click.echo("Disabling environment variable as requested")
+            console.print(
+                "[yellow]Disabling environment variable as requested[/yellow]"
+            )
 
         # Update metadata if command line parameters were provided
         if name or description or env_var or no_env_var:
@@ -114,13 +128,17 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
                 metadata["env_var"] = None
             metadata["updated_with"] = "kilm"
             write_cloud_metadata(directory, metadata)
-            click.echo("Updated metadata file with new information.")
+            console.print("[green]Updated metadata file with new information[/green]")
     else:
         # Create a new metadata file
         if metadata and force:
-            click.echo(f"Overwriting existing metadata file ({CLOUD_METADATA_FILE}).")
+            console.print(
+                f"[yellow]Overwriting existing metadata file[/yellow] ({CLOUD_METADATA_FILE})"
+            )
         else:
-            click.echo(f"Creating new metadata file ({CLOUD_METADATA_FILE}).")
+            console.print(
+                f"[green]Creating new metadata file[/green] ({CLOUD_METADATA_FILE})"
+            )
 
         # Generate metadata
         metadata = get_default_cloud_metadata(directory)
@@ -142,7 +160,7 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
 
         # Write metadata file
         write_cloud_metadata(directory, metadata)
-        click.echo("Metadata file created.")
+        console.print("[green]Metadata file created[/green]")
 
         library_name = metadata["name"]
         library_env_var = metadata.get("env_var")
@@ -158,10 +176,12 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
             break
 
     if not found_models:
-        click.echo("Warning: No 3D model files found in this directory.")
-        if not click.confirm("Continue anyway?", default=True):
-            click.echo("Operation cancelled.")
-            sys.exit(0)
+        console.print(
+            "[yellow]Warning: No 3D model files found in this directory[/yellow]"
+        )
+        if not typer.confirm("Continue anyway?", default=True):
+            console.print("[red]Operation cancelled[/red]")
+            raise typer.Exit(0)
 
     # Update metadata with actual model count
     model_count = 0
@@ -179,22 +199,28 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
             library_name = metadata.get("name", directory.name)
         config.add_library(library_name, str(directory), "cloud")
 
-        click.echo(f"3D models directory '{library_name}' added successfully!")
-        click.echo(f"Path: {directory}")
+        console.print(
+            f"[bold green]3D models directory '{library_name}' added successfully![/bold green]"
+        )
+        console.print(f"[blue]Path:[/blue] {directory}")
         if model_count > 0:
-            click.echo(f"Found {model_count} 3D model files.")
+            console.print(f"[green]Found {model_count} 3D model files[/green]")
 
         if library_env_var:
-            click.echo(f"Assigned environment variable: {library_env_var}")
-            click.echo("\nYou can use this directory with:")
-            click.echo(f"  kilm setup --3d-lib-dirs '{library_name}'")
-            click.echo("  # or by setting the environment variable")
-            click.echo(f"  export {library_env_var}='{directory}'")
+            console.print(
+                f"[yellow]Assigned environment variable:[/yellow] {library_env_var}"
+            )
+            console.print("\n[bold]You can use this directory with:[/bold]")
+            console.print(f"  [cyan]kilm setup --3d-lib-dirs '{library_name}'[/cyan]")
+            console.print("  [dim]# or by setting the environment variable[/dim]")
+            console.print(f"  [cyan]export {library_env_var}='{directory}'[/cyan]")
 
         # Show current cloud libraries
         libraries = config.get_libraries("cloud")
         if len(libraries) > 1:
-            click.echo("\nAll registered cloud-based 3D model directories:")
+            console.print(
+                "\n[bold]All registered cloud-based 3D model directories:[/bold]"
+            )
             for lib in libraries:
                 lib_name = lib.get("name", "unnamed")
                 lib_path = lib.get("path", "unknown")
@@ -209,9 +235,11 @@ def add_3d(name, directory, description, env_var, force, no_env_var):
                     pass
 
                 if lib_env_var:
-                    click.echo(f"  - {lib_name}: {lib_path} (ENV: {lib_env_var})")
+                    console.print(
+                        f"  - [cyan]{lib_name}[/cyan]: {lib_path} [yellow](ENV: {lib_env_var})[/yellow]"
+                    )
                 else:
-                    click.echo(f"  - {lib_name}: {lib_path}")
+                    console.print(f"  - [cyan]{lib_name}[/cyan]: {lib_path}")
     except Exception as e:
-        click.echo(f"Error adding 3D models directory: {e}", err=True)
-        sys.exit(1)
+        console.print(f"[red]Error adding 3D models directory: {e}[/red]")
+        raise typer.Exit(1) from e

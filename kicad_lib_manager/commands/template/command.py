@@ -9,12 +9,16 @@ import shutil
 import sys
 import traceback
 from pathlib import Path
+from typing import Annotated, List, Optional
 
-import click
 import jinja2
 import pathspec
 import questionary
+import typer
 import yaml
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from ...services.config_service import Config
 from ...utils.template import (
@@ -32,9 +36,11 @@ from ...utils.template import (
     render_template_string,
 )
 
+console = Console()
+err_console = Console(stderr=True)
 
-@click.group()
-def template():
+
+def main_callback() -> None:
     """Manage KiCad project templates.
 
     This command group allows you to create new KiCad projects from templates,
@@ -43,39 +49,33 @@ def template():
     pass
 
 
-@template.command()
-@click.argument("name", required=False)
-@click.argument("directory", required=False, type=click.Path())
-@click.option(
-    "--template",
-    help="Name of the template to use",
-    default=None,
-)
-@click.option(
-    "--library",
-    help="Name of the library containing the template",
-    default=None,
-)
-@click.option(
-    "--set-var",
-    multiple=True,
-    help="Set template variable in key=value format",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    default=False,
-    help="Show what would be created without making changes",
-    show_default=True,
-)
-@click.option(
-    "--skip-hooks",
-    is_flag=True,
-    default=False,
-    help="Skip post-creation hooks",
-    show_default=True,
-)
-def create(name, directory, template, library, set_var, dry_run, skip_hooks):
+def create(
+    name: Annotated[
+        Optional[str], typer.Argument(help="Name of the project to create")
+    ] = None,
+    directory: Annotated[
+        Optional[str], typer.Argument(help="Directory to create project in")
+    ] = None,
+    template: Annotated[
+        Optional[str], typer.Option(help="Name of the template to use")
+    ] = None,
+    library: Annotated[
+        Optional[str], typer.Option(help="Name of the library containing the template")
+    ] = None,
+    set_var: Annotated[
+        Optional[List[str]],
+        typer.Option("--set-var", help="Set template variable in key=value format"),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", help="Show what would be created without making changes"
+        ),
+    ] = False,
+    skip_hooks: Annotated[
+        bool, typer.Option("--skip-hooks", help="Skip post-creation hooks")
+    ] = False,
+) -> None:
     """Create a new KiCad project from a template.
 
     Creates a new KiCad project from a template in one of the configured libraries.
@@ -114,8 +114,8 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
     all_templates = find_all_templates(config)
 
     if not all_templates:
-        click.echo("No templates found in any configured libraries.")
-        click.echo("Use 'kilm template make' to create a template first.")
+        console.print("No templates found in any configured libraries.")
+        console.print("Use 'kilm template make' to create a template first.")
         return
 
     # Parse name and directory
@@ -153,12 +153,12 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                     break
 
             if not selected_template:
-                click.echo(f"Template '{template}' not found.")
-                click.echo("Available templates:")
+                console.print(f"Template '{template}' not found.")
+                console.print("Available templates:")
                 for t_name, t_data in all_templates.items():
                     library = t_data.get("source_library", "unknown")
                     description = t_data.get("description", "")
-                    click.echo(f"  {t_name} ({library}): {description}")
+                    console.print(f"  {t_name} ({library}): {description}")
                 return
     else:
         # Interactive template selection using questionary
@@ -175,22 +175,21 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
         ).ask()
 
         if selected_template_name is None:  # Handle cancellation
-            click.echo("Template selection cancelled.")
+            console.print("Template selection cancelled.")
             return
 
         selected_template = all_templates.get(selected_template_name)
 
     # Ensure selected_template is not None before proceeding
     if not selected_template:
-        click.echo("Error: No template selected.", err=True)
+        console.print("[red]Error: No template selected.[/red]")
         return
 
     # Get template directory
     template_path_str = selected_template.get("path")
     if not template_path_str:
-        click.echo(
-            f"Error: Template metadata for '{selected_template.get('name')}' is missing the 'path'.",
-            err=True,
+        err_console.print(
+            f"Error: Template metadata for '{selected_template.get('name')}' is missing the 'path'."
         )
         return
     template_dir = Path(template_path_str)
@@ -201,12 +200,12 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
         with metadata_file.open() as f:
             metadata = yaml.safe_load(f)
         if not metadata:  # Handle empty metadata file
-            click.echo(
-                f"Warning: Template metadata file is empty: {metadata_file}", err=True
+            err_console.print(
+                f"Warning: Template metadata file is empty: {metadata_file}"
             )
             metadata = {}  # Use empty dict to avoid downstream errors
     except Exception as e:
-        click.echo(f"Error reading template metadata {metadata_file}: {e}", err=True)
+        err_console.print(f"Error reading template metadata {metadata_file}: {e}")
         return
 
     # Get template variables from metadata
@@ -217,7 +216,7 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
     command_line_vars = {}  # Variables set via --set-var
 
     # Parse --set-var options first
-    for var in set_var:
+    for var in set_var or []:
         if "=" in var:
             key, value = var.split("=", 1)
             command_line_vars[key.strip()] = value.strip()
@@ -238,14 +237,14 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
             variables["project_name"] = name
 
     # Show template info
-    click.echo()
-    click.echo(f"Using Template: {metadata.get('name', 'Unknown')}")
-    click.echo(f"Description: {metadata.get('description', 'N/A')}")
+    console.print()
+    console.print(f"Using Template: {metadata.get('name', 'Unknown')}")
+    console.print(f"Description: {metadata.get('description', 'N/A')}")
     if metadata.get("use_case"):
-        click.echo(f"Use case: {metadata.get('use_case')}")
+        console.print(f"Use case: {metadata.get('use_case')}")
 
-    click.echo()
-    click.echo("Template Variables:")
+    console.print()
+    console.print("Template Variables:")
 
     # Combine initial variables from args and --set-var
     variables.update(command_line_vars)
@@ -263,7 +262,7 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                 else "--set-var"
             )
             if var_name in command_line_vars or (var_name == "project_name" and name):
-                click.echo(
+                console.print(
                     f"  {var_name}: {variables[var_name]} (from {source}) - {description}"
                 )
             continue  # Skip prompting
@@ -281,16 +280,15 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
             except jinja2.exceptions.UndefinedError as e:
                 # If a variable needed for the default hasn't been entered yet,
                 # keep the original template string or empty if undefined errors occur early
-                click.echo(
-                    f"Debug: Undefined variable for default of {var_name}: {e}. Default might be incomplete.",
-                    err=True,
+                err_console.print(
+                    f"Debug: Undefined variable for default of {var_name}: {e}. Default might be incomplete."
                 )
                 rendered_default = (
                     ""  # Or keep 'default'? Better to show empty than half-rendered?
                 )
             except Exception as e:
-                click.echo(
-                    f"Warning: Could not render default for {var_name}: {e}", err=True
+                err_console.print(
+                    f"Warning: Could not render default for {var_name}: {e}"
                 )
                 rendered_default = default  # Use original default on other errors
 
@@ -302,7 +300,7 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
         ).ask()
 
         if answer is None:  # Handle Ctrl+C or cancellation
-            click.echo("Variable input cancelled.")
+            console.print("Variable input cancelled.")
             return  # Exit the command gracefully
 
         # Store the answer for use in subsequent default renderings
@@ -340,9 +338,8 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                     original_default_template, variables
                 )
             except Exception as e:
-                click.echo(
-                    f"Warning: Could not re-render default for {var_name}: {e}",
-                    err=True,
+                err_console.print(
+                    f"Warning: Could not re-render default for {var_name}: {e}"
                 )
                 correct_default = variables[var_name]  # Keep existing value on error
 
@@ -352,14 +349,14 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                 variables[var_name] == shown_default
                 and variables[var_name] != correct_default
             ):
-                click.echo(
+                console.print(
                     f"Updating default for '{var_name}': '{shown_default}' -> '{correct_default}'"
                 )
                 variables[var_name] = correct_default
     # --- End Post-processing ---
 
-    click.echo()
-    click.echo(
+    console.print()
+    console.print(
         f"Final variables: {json.dumps(variables, indent=2)}"
     )  # Changed message for clarity
 
@@ -381,9 +378,8 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
             )
             final_project_dir = project_dir / dir_name_rendered
         except Exception as e:
-            click.echo(
-                f"Warning: Could not render default directory_name '{directory_name_template}': {e}",
-                err=True,
+            err_console.print(
+                f"Warning: Could not render default directory_name '{directory_name_template}': {e}"
             )
             # Fallback below
 
@@ -391,47 +387,45 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
     if not final_project_dir and "project_name" in variables:
         project_name_sanitized = variables["project_name"].lower().replace(" ", "-")
         final_project_dir = project_dir / project_name_sanitized
-        click.echo(f"Using project_name to determine directory: {final_project_dir}")
+        console.print(f"Using project_name to determine directory: {final_project_dir}")
 
     # Final check if we have a directory
     if not final_project_dir:
-        click.echo(
-            "Error: Cannot determine project directory. Ensure 'project_name' or 'directory_name' variable is properly handled.",
-            err=True,
+        err_console.print(
+            "Error: Cannot determine project directory. Ensure 'project_name' or 'directory_name' variable is properly handled."
         )
         return
     # --- End Directory Determination ---
 
-    click.echo()
-    click.echo(f"Project will be created in: {final_project_dir}")
+    console.print()
+    console.print(f"Project will be created in: {final_project_dir}")
 
     # --- Execution ---
     if dry_run:
-        click.echo("Dry run enabled. No changes will be made.")
+        console.print("Dry run enabled. No changes will be made.")
         # Optionally, list files that *would* be created here
     else:
         # Check if target directory exists and handle overwrite
         if final_project_dir.exists():
-            if not click.confirm(
+            if not typer.confirm(
                 f"Directory '{final_project_dir}' already exists. Overwrite?"
             ):
-                click.echo("Aborted.")
+                console.print("Aborted.")
                 return
             else:
-                click.echo(f"Removing existing directory: {final_project_dir}")
+                console.print(f"Removing existing directory: {final_project_dir}")
                 try:
                     shutil.rmtree(final_project_dir)
                 except Exception as e:
-                    click.echo(f"Error removing existing directory: {e}", err=True)
+                    err_console.print(f"Error removing existing directory: {e}")
                     return
 
         # Create parent directories if they don't exist
         try:
             final_project_dir.parent.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            click.echo(
-                f"Error creating parent directories for {final_project_dir}: {e}",
-                err=True,
+            err_console.print(
+                f"Error creating parent directories for {final_project_dir}: {e}"
             )
             return
 
@@ -448,31 +442,25 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
                             old_syntax_files.append(file)
 
                 if old_syntax_files:
-                    click.echo()
-                    click.echo("WARNING: Windows Compatibility Notice:", err=True)
-                    click.echo(
-                        "This template uses the old {{variable}} syntax in filenames, which may not work on Windows.",
-                        err=True,
+                    console.print()
+                    err_console.print("WARNING: Windows Compatibility Notice:")
+                    err_console.print(
+                        "This template uses the old {{variable}} syntax in filenames, which may not work on Windows."
                     )
-                    click.echo(
-                        "Consider updating the template to use the new Windows-compatible %{variable} syntax.",
-                        err=True,
+                    err_console.print(
+                        "Consider updating the template to use the new Windows-compatible %{variable} syntax."
                     )
-                    click.echo("Files with old syntax:", err=True)
+                    err_console.print("Files with old syntax:")
                     for file in old_syntax_files[:3]:  # Show first 3 files
-                        click.echo(f"  - {file}", err=True)
+                        err_console.print(f"  - {file}")
                     if len(old_syntax_files) > 3:
-                        click.echo(
-                            f"  ... and {len(old_syntax_files) - 3} more", err=True
-                        )
-                    click.echo()
-                    click.echo("New syntax examples:", err=True)
-                    click.echo("  - %{project_name}.kicad_pro", err=True)
-                    click.echo("  - %{project_name.lower}.kicad_sch", err=True)
-                    click.echo(
-                        "  - %{project_name.replace(' ', '-')}.kicad_pcb", err=True
-                    )
-                    click.echo()
+                        err_console.print(f"  ... and {len(old_syntax_files) - 3} more")
+                    console.print()
+                    err_console.print("New syntax examples:")
+                    err_console.print("  - %{project_name}.kicad_pro")
+                    err_console.print("  - %{project_name.lower}.kicad_sch")
+                    err_console.print("  - %{project_name.replace(' ', '-')}.kicad_pcb")
+                    console.print()
 
         success = create_project_from_template(
             template_dir=template_dir,
@@ -483,93 +471,68 @@ def create(name, directory, template, library, set_var, dry_run, skip_hooks):
             metadata=metadata,  # Pass metadata for post-hook if needed
         )
     except Exception as e:
-        click.echo(f"Error during project creation: {e}", err=True)
+        err_console.print(f"Error during project creation: {e}")
         traceback.print_exc()  # Print traceback for debugging
         success = False
 
     if success:
         if not dry_run:
-            click.echo()
-            click.echo(
+            console.print()
+            console.print(
                 f"Project '{variables.get('project_name', name)}' created successfully in '{final_project_dir}'"
             )
     else:
-        click.echo()
-        click.echo("Project creation failed.", err=True)
+        console.print()
+        err_console.print("Project creation failed.")
 
 
-@template.command()
-@click.argument("name", required=False)
-@click.argument(
-    "source_directory",
-    required=False,
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-)
-@click.option(
-    "--description",
-    help="Template description",
-    default=None,
-)
-@click.option(
-    "--use-case",
-    help="Template use case description",
-    default=None,
-)
-@click.option(
-    "--output-directory",
-    help="Directory where the template will be created",
-    type=click.Path(),
-    default=None,
-)
-@click.option(
-    "--exclude",
-    multiple=True,
-    help="Additional patterns to exclude (gitignore format)",
-)
-@click.option(
-    "--variable",
-    multiple=True,
-    help="Define a template variable in name=value format",
-)
-@click.option(
-    "--extends",
-    help="Parent template that this template extends",
-    default=None,
-)
-@click.option(
-    "--non-interactive",
-    is_flag=True,
-    default=False,
-    help="Non-interactive mode (don't prompt for variables or configuration)",
-    show_default=True,
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    default=False,
-    help="Show what would be created without making changes",
-    show_default=True,
-)
-@click.option(
-    "--force",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing template if it exists",
-    show_default=True,
-)
 def make(
-    name,
-    source_directory,
-    description,
-    use_case,
-    output_directory,
-    exclude,
-    variable,
-    extends,
-    non_interactive,
-    dry_run,
-    force,
-):
+    name: Annotated[
+        Optional[str], typer.Argument(help="Name of the template to create")
+    ] = None,
+    source_directory: Annotated[
+        Optional[Path], typer.Argument(help="Source project directory")
+    ] = None,
+    description: Annotated[
+        Optional[str], typer.Option(help="Template description")
+    ] = None,
+    use_case: Annotated[
+        Optional[str], typer.Option("--use-case", help="Template use case description")
+    ] = None,
+    output_directory: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output-directory", help="Directory where the template will be created"
+        ),
+    ] = None,
+    exclude: Annotated[
+        Optional[List[str]],
+        typer.Option(help="Additional patterns to exclude (gitignore format)"),
+    ] = None,
+    variable: Annotated[
+        Optional[List[str]],
+        typer.Option(help="Define a template variable in name=value format"),
+    ] = None,
+    extends: Annotated[
+        Optional[str], typer.Option(help="Parent template that this template extends")
+    ] = None,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive",
+            help="Non-interactive mode (don't prompt for variables or configuration)",
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", help="Show what would be created without making changes"
+        ),
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite existing template if it exists")
+    ] = False,
+) -> None:
     """Create a template from an existing project.
 
     Creates a new KiCad project template from an existing project. If NAME
@@ -616,7 +579,7 @@ def make(
     library_paths = {lib["name"]: lib["path"] for lib in all_libraries}
 
     if not library_names:
-        click.echo(
+        console.print(
             "No GitHub libraries configured. Use 'kilm init' to create one first."
         )
         sys.exit(1)
@@ -629,39 +592,39 @@ def make(
         # Ask for source directory if not specified
         if not source_directory:
             default_dir = str(Path.cwd())
-            source_dir_input = click.prompt(
+            source_dir_input = typer.prompt(
                 "Source project directory", default=default_dir
             )
             # Handle relative paths
             if not Path(source_dir_input).is_absolute():
-                source_directory = str(Path.cwd() / source_dir_input)
+                source_directory = Path.cwd() / source_dir_input
             else:
-                source_directory = source_dir_input
+                source_directory = Path(source_dir_input)
 
         # Ask for template name if not specified
         if not name:
-            default_name = Path(source_directory).name
-            name = click.prompt("Template name", default=default_name)
+            default_name = source_directory.name if source_directory else "template"
+            name = typer.prompt("Template name", default=default_name)
 
         # Ask for description and use case if not specified
         if not description:
-            description = click.prompt(
+            description = typer.prompt(
                 "Template description", default=f"{name} template"
             )
         if not use_case:
-            use_case = click.prompt("Template use case", default="")
+            use_case = typer.prompt("Template use case", default="")
 
         # Ask for output directory if not specified
         if not output_directory:
             # Show numbered list of libraries
-            click.echo("\nChoose a library to store the template:")
+            console.print("\nChoose a library to store the template:")
             for i, lib_name in enumerate(library_names):
-                click.echo(f"{i + 1}. {lib_name} ({library_paths[lib_name]})")
+                console.print(f"{i + 1}. {lib_name} ({library_paths[lib_name]})")
 
             # Get selection
             while True:
                 try:
-                    lib_selection = click.prompt(
+                    lib_selection = typer.prompt(
                         "Select library (number)", type=int, default=1
                     )
                     if 1 <= lib_selection <= len(library_names):
@@ -669,65 +632,68 @@ def make(
                         library_path = library_paths[selected_lib]
                         break
                     else:
-                        click.echo(
+                        console.print(
                             f"Please enter a number between 1 and {len(library_names)}"
                         )
                 except ValueError:
-                    click.echo("Please enter a valid number")
+                    console.print("Please enter a valid number")
 
             output_directory = Path(library_path) / TEMPLATES_DIR / name
-            click.echo(f"Template will be created in: {output_directory}")
+            console.print(f"Template will be created in: {output_directory}")
     else:
         # Non-interactive mode - use current directory if not specified
         if not source_directory:
-            source_directory = str(Path.cwd())
+            source_directory = Path.cwd()
 
         # If name is not provided, use the directory name
         if not name:
-            name = Path(source_directory).name
+            name = source_directory.name
 
         # Determine the output directory
         if not output_directory:
             # Find the library to add the template to
             library_path = config.get_symbol_library_path()
             if not library_path:
-                click.echo(
+                console.print(
                     "No library configured. Use 'kilm init' to create one first."
                 )
                 return
 
             output_directory = Path(library_path) / TEMPLATES_DIR / name
 
-    # Convert source_directory to Path object
-    source_directory = Path(source_directory)
+    # Ensure source_directory is a Path object
+    if source_directory is None:
+        source_directory = Path.cwd()
+    elif not isinstance(source_directory, Path):
+        source_directory = Path(source_directory)
 
     # Check if template already exists
-    if output_directory and Path(output_directory).exists() and not force:
-        click.echo(f"Template '{name}' already exists at {output_directory}")
-        click.echo("Use --force to overwrite.")
+    if output_directory and output_directory.exists() and not force:
+        console.print(f"Template '{name}' already exists at {output_directory}")
+        console.print("Use --force to overwrite.")
         return
 
     # Get gitignore spec
     gitignore_spec = get_gitignore_spec(source_directory)
 
     # Show what we're going to do
-    click.echo(f"Creating template '{name}' from {source_directory}")
-    click.echo(f"Output directory: {output_directory}")
+    console.print(f"Creating template '{name}' from {source_directory}")
+    console.print(f"Output directory: {output_directory}")
 
     if description:
-        click.echo(f"Description: {description}")
+        console.print(f"Description: {description}")
     if use_case:
-        click.echo(f"Use case: {use_case}")
+        console.print(f"Use case: {use_case}")
     if exclude:
-        click.echo("Additional exclusions:")
+        console.print("Additional exclusions:")
         for pattern in exclude:
-            click.echo(f"  {pattern}")
+            console.print(f"  {pattern}")
     if extends:
-        click.echo(f"Extends: {extends}")
+        console.print(f"Extends: {extends}")
 
     # Parse variables from command line
     variable_dict = {}
-    for var in variable:
+    for var in variable or []:
         if "=" in var:
             key, value = var.split("=", 1)
             variable_dict[key.strip()] = {
@@ -736,27 +702,27 @@ def make(
             }
 
     if variable_dict:
-        click.echo("\nTemplate variables:")
+        console.print("\nTemplate variables:")
         for key, value in variable_dict.items():
-            click.echo(f"  {key}: {value['default']} - {value['description']}")
+            console.print(f"  {key}: {value['default']} - {value['description']}")
 
     # If interactive mode is enabled, scan for potential variables
     detected_variables = {}
     if interactive:
         potential_vars = find_potential_variables(source_directory)
         if potential_vars:
-            click.echo("\nFound potential template variables:")
+            console.print("\nFound potential template variables:")
             for var_name, values in potential_vars.items():
                 value_str = ", ".join(values)
-                click.echo(f"  {var_name}: {value_str}")
+                console.print(f"  {var_name}: {value_str}")
 
                 # Ask if the user wants to use this variable
-                if click.confirm(
+                if typer.confirm(
                     f"  Use '{var_name}' as a template variable?", default=True
                 ):
                     # Use the first value as default
                     default_value = values[0] if values else ""
-                    description = click.prompt(
+                    description = typer.prompt(
                         "  Description", default=f"Value for {var_name}"
                     )
 
@@ -766,12 +732,12 @@ def make(
                     }
 
         # Always ask if the user wants to define additional variables
-        while click.confirm(
+        while typer.confirm(
             "Would you like to define additional template variables?", default=False
         ):
-            var_name = click.prompt("Variable name")
-            var_default = click.prompt("Default value", default="")
-            var_description = click.prompt(
+            var_name = typer.prompt("Variable name")
+            var_default = typer.prompt("Default value", default="")
+            var_description = typer.prompt(
                 "Description", default=f"Value for {var_name}"
             )
 
@@ -849,16 +815,16 @@ def make(
         included_files.sort()
         excluded_files.sort()
 
-        click.echo("\nFiles that will be included in the template:")
+        console.print("\nFiles that will be included in the template:")
         for file in included_files:
-            click.echo(f"  + {file}")
+            console.print(f"  + {file}")
 
         # Show which Markdown files will be templated
         md_files = [f for f in included_files if f.lower().endswith(".md")]
         if md_files:
-            click.echo("\nMarkdown files that will be converted to Jinja templates:")
+            console.print("\nMarkdown files that will be converted to Jinja templates:")
             for file in md_files:
-                click.echo(f"  * {file}")
+                console.print(f"  * {file}")
 
         # Show which KiCad project files will be templated
         kicad_files = [
@@ -867,7 +833,7 @@ def make(
             if f.lower().endswith((".kicad_pro", ".kicad_sch", ".kicad_pcb"))
         ]
         if kicad_files:
-            click.echo("\nKiCad project files that will be templated:")
+            console.print("\nKiCad project files that will be templated:")
             for file in kicad_files:
                 # Show the templated filename that will be used
                 if file.lower().endswith(".kicad_pro"):
@@ -879,21 +845,22 @@ def make(
                 else:
                     templated_name = file
 
-                click.echo(f"  * {file} → {templated_name}")
+                console.print(f"  * {file} → {templated_name}")
 
-        click.echo("\nFiles that will be excluded from the template:")
+        console.print("\nFiles that will be excluded from the template:")
         for file in excluded_files:
-            click.echo(f"  - {file}")
+            console.print(f"  - {file}")
 
     # If this is a dry run, stop here
     if dry_run:
-        click.echo("\nDry run complete. No changes were made.")
+        console.print("\nDry run complete. No changes were made.")
         return
 
     # Create the template
     try:
         # Create the template directory structure
-        Path(output_directory).mkdir(parents=True, exist_ok=True)
+        if output_directory:
+            output_directory.mkdir(parents=True, exist_ok=True)
 
         # Create template structure with special handling for Markdown files
         create_template_structure(
@@ -904,62 +871,54 @@ def make(
             additional_excludes=exclude or None,
         )
 
-        click.echo(f"\nTemplate '{name}' created successfully at {output_directory}")
+        console.print(f"\nTemplate '{name}' created successfully at {output_directory}")
 
         # Add hints for next steps
-        click.echo("\nNext steps:")
-        click.echo(
-            f"1. Edit {output_directory / TEMPLATE_METADATA} to customize template metadata"
+        console.print("\nNext steps:")
+        console.print(
+            f"1. Edit {output_directory / TEMPLATE_METADATA if output_directory else 'N/A'} to customize template metadata"
         )
-        click.echo(
-            f"2. Customize template files in {output_directory / TEMPLATE_CONTENT_DIR}"
+        console.print(
+            f"2. Customize template files in {output_directory / TEMPLATE_CONTENT_DIR if output_directory else 'N/A'}"
         )
-        click.echo(
-            f"3. Edit post-creation hook in {output_directory / HOOKS_DIR / POST_CREATE_HOOK} if needed"
+        console.print(
+            f"3. Edit post-creation hook in {output_directory / HOOKS_DIR / POST_CREATE_HOOK if output_directory else 'N/A'} if needed"
         )
-        click.echo(
+        console.print(
             f"4. Use your template with: kilm template create MyProject --template {name}"
         )
 
         # Add information about filename templating syntax
-        click.echo("\nFilename Templating:")
-        click.echo("For Windows compatibility, use %{variable} syntax in filenames:")
-        click.echo("  - %{project_name}.kicad_pro")
-        click.echo("  - %{project_name.lower}.kicad_sch")
-        click.echo("  - %{project_name.replace(' ', '-')}.kicad_pcb")
-        click.echo("  - %{project_name.upper.replace(' ', '_')}.md")
-        click.echo(
+        console.print("\nFilename Templating:")
+        console.print("For Windows compatibility, use %{variable} syntax in filenames:")
+        console.print("  - %{project_name}.kicad_pro")
+        console.print("  - %{project_name.lower}.kicad_sch")
+        console.print("  - %{project_name.replace(' ', '-')}.kicad_pcb")
+        console.print("  - %{project_name.upper.replace(' ', '_')}.md")
+        console.print(
             "(Old {{variable}} syntax still works but may cause issues on Windows)"
         )
 
     except Exception as e:
-        click.echo(f"Error creating template: {str(e)}", err=True)
+        err_console.print(f"Error creating template: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
 
 
-@template.command()
-@click.option(
-    "--library",
-    help="Filter templates by library name",
-    default=None,
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    default=False,
-    help="Show detailed information including variables",
-    show_default=True,
-)
-@click.option(
-    "--json",
-    is_flag=True,
-    default=False,
-    help="Output in JSON format",
-    show_default=True,
-)
-def list_templates_cmd(library, verbose, json):
+def list_templates(
+    library: Annotated[
+        Optional[str], typer.Option(help="Filter templates by library name")
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "-v", "--verbose", help="Show detailed information including variables"
+        ),
+    ] = False,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Output in JSON format")
+    ] = False,
+) -> None:
     """List all available templates.
 
     Displays all available templates across all configured libraries,
@@ -989,8 +948,17 @@ def list_templates_cmd(library, verbose, json):
     all_templates = find_all_templates(config)
 
     if not all_templates:
-        click.echo("No templates found in any configured libraries.")
-        click.echo("Use 'kilm template make' to create a template first.")
+        console.print()
+        console.print(
+            Panel(
+                "[yellow]No templates found in any configured libraries.[/yellow]\n\n"
+                "[cyan]💡 Get Started:[/cyan]\n"
+                "• Create a template: [blue]kilm template make[/blue]\n"
+                "• Check library configuration: [blue]kilm list-libraries[/blue]",
+                title="[bold yellow]⚠️ No Templates[/bold yellow]",
+                border_style="yellow",
+            )
+        )
         return
 
     # Filter by library if requested
@@ -1002,14 +970,25 @@ def list_templates_cmd(library, verbose, json):
         }
 
         if not all_templates:
-            click.echo(f"No templates found in library '{library}'.")
+            console.print()
+            console.print(
+                Panel(
+                    f"[yellow]No templates found in library '[cyan]{library}[/cyan]'.[/yellow]\n\n"
+                    "[cyan]💡 Try:[/cyan]\n"
+                    f"• List all libraries: [blue]kilm list-libraries[/blue]\n"
+                    f"• Create template in '{library}': [blue]kilm template make --library {library}[/blue]\n"
+                    "• List all templates: [blue]kilm template list[/blue]",
+                    title="[bold yellow]⚠️ No Templates Found[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
             return
 
     # If JSON output is requested
-    if json:
+    if json_output:
         import json as json_lib
 
-        click.echo(json_lib.dumps(all_templates, indent=2))
+        console.print(json_lib.dumps(all_templates, indent=2))
         return
 
     # Group templates by library for display
@@ -1020,61 +999,85 @@ def list_templates_cmd(library, verbose, json):
             templates_by_library[lib_name] = []
         templates_by_library[lib_name].append((name, data))
 
-    # Display templates
-    click.echo("Available Templates:")
-    click.echo("===================")
-    click.echo()
+    # Display templates in Rich tables organized by library
+    console.print()
 
     for lib_name, templates in templates_by_library.items():
-        click.echo(f"Library: {lib_name}")
-        click.echo("-" * (len(lib_name) + 9))
+        # Create a table for each library
+        table = Table(
+            title=f"[bold cyan]{lib_name}[/bold cyan] Templates",
+            show_header=True,
+            header_style="bold magenta",
+            border_style="cyan",
+        )
 
+        table.add_column("Template", style="cyan", no_wrap=True)
+        table.add_column("Version", justify="center", style="blue", width=8)
+        table.add_column("Description", style="green")
+
+        if verbose:
+            table.add_column("Variables", style="yellow", max_width=30)
+            table.add_column("Extends", style="magenta", max_width=15)
+
+        # Add rows for each template
         for name, data in sorted(templates):
             description = data.get("description", "No description")
-            use_case = data.get("use_case", "")
             version = data.get("version", "1.0.0")
+            extends = data.get("extends", "")
 
-            click.echo()
-            click.echo(f"- {name} (v{version})")
-            click.echo(f"  Description: {description}")
+            row_data = [f"[bold]{name}[/bold]", version, description]
 
-            if use_case:
-                click.echo(f"  Use Case: {use_case}")
-
-            if data.get("extends"):
-                click.echo(f"  Extends: {data.get('extends')}")
-
-            # Show variables if verbose
             if verbose:
+                # Format variables for display
                 variables = data.get("variables", {})
+                var_display = ""
                 if variables:
-                    click.echo()
-                    click.echo("  Variables:")
-                    for var_name, var_info in variables.items():
-                        var_desc = var_info.get("description", "")
-                        var_default = var_info.get("default", "")
-                        click.echo(
-                            f"    {var_name}: {var_desc} (default: '{var_default}')"
-                        )
+                    var_list = [f"{k}" for k in variables]
+                    var_display = ", ".join(var_list[:3])  # Show first 3 variables
+                    if len(var_list) > 3:
+                        var_display += f", +{len(var_list) - 3} more"
+                else:
+                    var_display = "[dim]None[/dim]"
 
-                # Show dependencies if present
-                dependencies = data.get("dependencies", {})
-                if dependencies:
-                    recommended = dependencies.get("recommended", [])
-                    if recommended:
-                        click.echo()
-                        click.echo("  Recommended Dependencies:")
-                        for dep in recommended:
-                            click.echo(f"    - {dep}")
+                row_data.append(var_display)
+                row_data.append(extends if extends else "[dim]None[/dim]")
 
-            click.echo("")  # Empty line between templates
+            table.add_row(*row_data)
 
-        click.echo("")  # Empty line between libraries
+        console.print(table)
+        console.print()
 
-    # Show count
-    click.echo(f"Total: {len(all_templates)} template(s) found")
+    # Add usage hint panel
+    hint_content = (
+        "[cyan]Usage:[/cyan] kilm template create <name> --template <template_name>\n"
+    )
+    hint_content += "[cyan]Verbose:[/cyan] kilm template list --verbose\n"
+    hint_content += "[cyan]Filter:[/cyan] kilm template list --library <library_name>"
+
+    console.print(
+        Panel(
+            hint_content,
+            title="[bold blue]💡 Quick Tips[/bold blue]",
+            border_style="blue",
+        )
+    )
+    # Add summary panel
+    library_count = len(templates_by_library)
+    template_count = len(all_templates)
+
+    summary_content = f"[green]Libraries:[/green] {library_count}\n"
+    summary_content += f"[green]Templates:[/green] {template_count}"
+
+    console.print(
+        Panel(
+            summary_content,
+            title="[bold cyan]📊 Summary[/bold cyan]",
+            border_style="cyan",
+            width=30,
+        )
+    )
 
 
 # Register the template command
 if __name__ == "__main__":
-    template()
+    main_callback()

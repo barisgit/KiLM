@@ -47,4 +47,5 @@ test_template/
 TODO.md
 .claude/settings.local.json
 .claude/doc/
-temp*/
+temp/
+templates/

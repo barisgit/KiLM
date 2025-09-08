@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from ...services.config_service import Config, LibraryDict
 from ...services.library_service import LibraryService
@@ -227,11 +229,20 @@ def setup(
 
         # Print what we're setting up
         if config_symbol_libs:
-            console.print("\nSetting up symbol libraries:")
+            console.print()
+            table = Table(
+                title="[bold cyan]Setting up symbol libraries[/bold cyan]",
+                show_header=True,
+                header_style="bold magenta",
+            )
+            table.add_column("Library", style="cyan", no_wrap=True)
+            table.add_column("Path", style="blue")
+            table.add_column("Environment Variable", style="green")
+
             for lib in config_symbol_libs:
                 lib_name = lib.get("name", "unnamed")
                 lib_path = lib.get("path", "unknown")
-                console.print(f"  - {lib_name}: {lib_path}")
+                env_var_display = "None"
 
                 # Read metadata to get environment variable name
                 try:
@@ -241,14 +252,15 @@ def setup(
                         if env_var and isinstance(env_var, str):
                             # Store all GitHub libraries with their env vars
                             config_lib_paths[env_var] = lib_path
-                            console.print(f"    Using environment variable: {env_var}")
+                            env_var_display = f"[green]{env_var}[/green]"
                         else:
-                            console.print("    No environment variable configured")
+                            env_var_display = "[yellow]Not configured[/yellow]"
                     else:
-                        console.print("    No metadata or environment variable found")
+                        env_var_display = "[yellow]No metadata[/yellow]"
                 except Exception as e:
-                    if verbose:
-                        console.print(f"    Error reading metadata: {e}")
+                    env_var_display = (
+                        f"[red]Error: {e}[/red]" if verbose else "[red]Error[/red]"
+                    )
 
                 # If we're using the first symbol library as the main library
                 if not kicad_lib_dir and lib == config_symbol_libs[0]:
@@ -257,12 +269,25 @@ def setup(
                     if "KICAD_USER_LIB" not in config_lib_paths:
                         config_lib_paths["KICAD_USER_LIB"] = lib_path
 
+                table.add_row(f"[bold]{lib_name}[/bold]", lib_path, env_var_display)
+
+            console.print(table)
+
         if config_3d_libs:
-            console.print("\nSetting up 3D model libraries:")
+            console.print()
+            table = Table(
+                title="[bold cyan]Setting up 3D model libraries[/bold cyan]",
+                show_header=True,
+                header_style="bold magenta",
+            )
+            table.add_column("Library", style="cyan", no_wrap=True)
+            table.add_column("Path", style="blue")
+            table.add_column("Environment Variable", style="green")
+
             for lib in config_3d_libs:
                 lib_name = lib.get("name", "unnamed")
                 lib_path = lib.get("path", "unknown")
-                console.print(f"  - {lib_name}: {lib_path}")
+                env_var_display = "None"
 
                 # Read metadata to get environment variable name
                 try:
@@ -272,18 +297,23 @@ def setup(
                         if env_var and isinstance(env_var, str):
                             # Store all 3D libraries with their env vars
                             config_lib_paths[env_var] = lib_path
-                            console.print(f"    Using environment variable: {env_var}")
+                            env_var_display = f"[green]{env_var}[/green]"
                         else:
-                            console.print("    No environment variable configured")
+                            env_var_display = "[yellow]Not configured[/yellow]"
                     else:
-                        console.print("    No metadata or environment variable found")
+                        env_var_display = "[yellow]No metadata[/yellow]"
                 except Exception as e:
-                    if verbose:
-                        console.print(f"    Error reading metadata: {e}")
+                    env_var_display = (
+                        f"[red]Error: {e}[/red]" if verbose else "[red]Error[/red]"
+                    )
 
                 # Use the first 3D library as the default if not specified
                 if not kicad_3d_dir and lib == config_3d_libs[0]:
                     kicad_3d_dir = lib_path
+
+                table.add_row(f"[bold]{lib_name}[/bold]", lib_path, env_var_display)
+
+            console.print(table)
 
     except Exception as e:
         # If there's any issue with config, continue with environment variables
@@ -301,7 +331,7 @@ def setup(
             kicad_lib_dir = env_var
             env_lib_paths["KICAD_USER_LIB"] = env_var
             console.print(
-                f"Using KiCad library from environment variable: {kicad_lib_dir}"
+                f"[green]Using KiCad library from environment variable:[/green] [blue]{kicad_lib_dir}[/blue]"
             )
         else:
             console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
@@ -316,7 +346,7 @@ def setup(
             kicad_3d_dir = env_var
             env_lib_paths["KICAD_3D_LIB"] = env_var
             console.print(
-                f"Using 3D model library from environment variable: {kicad_3d_dir}"
+                f"[green]Using 3D model library from environment variable:[/green] [blue]{kicad_3d_dir}[/blue]"
             )
         else:
             console.print(
@@ -349,25 +379,47 @@ def setup(
     if kicad_3d_dir:
         kicad_3d_dir = expand_user_path(kicad_3d_dir)
 
-    console.print(f"\nUsing KiCad symbol library directory: {kicad_lib_dir}")
+    # Create configuration summary panel
+    config_content = (
+        f"[green]Symbol library directory:[/green] [blue]{kicad_lib_dir}[/blue]\n"
+    )
     if kicad_3d_dir:
-        console.print(f"Using KiCad main 3D models directory: {kicad_3d_dir}")
+        config_content += (
+            f"[green]3D models directory:[/green]\n[blue]{kicad_3d_dir}[/blue]"
+        )
+    else:
+        config_content += "[yellow]3D models directory: Not configured[/yellow]"
+
+    console.print()
+    console.print(
+        Panel(
+            config_content,
+            title="[bold cyan]Configuration Summary[/bold cyan]",
+            border_style="cyan",
+        )
+    )
 
     # Find KiCad configuration
     try:
         kicad_config = LibraryService.find_kicad_config()
-        console.print(f"Found KiCad configuration at: {kicad_config}")
+        console.print(
+            f"[green]Found KiCad configuration at:[/green] [blue]{kicad_config}[/blue]"
+        )
 
         # Fix any invalid URIs in existing library entries
         uri_changes = fix_invalid_uris(kicad_config, True, max_backups, dry_run)
         if uri_changes:
             if dry_run:
-                console.print("Would fix invalid library URIs in KiCad configuration")
+                console.print(
+                    "[yellow]Would fix invalid library URIs in KiCad configuration[/yellow]"
+                )
             else:
-                console.print("Fixed invalid library URIs in KiCad configuration")
+                console.print(
+                    "[green]Fixed invalid library URIs in KiCad configuration[/green]"
+                )
     except Exception as e:
         console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     # Prepare environment variables dictionary
     env_vars = {}
@@ -395,19 +447,23 @@ def setup(
         if env_changes_needed:
             if dry_run:
                 console.print(
-                    "Would update environment variables in KiCad configuration"
+                    "[yellow]Would update environment variables in KiCad configuration[/yellow]"
                 )
             else:
-                console.print("Updated environment variables in KiCad configuration")
-                console.print("Created backup of kicad_common.json")
+                console.print(
+                    "[green]Updated environment variables in KiCad configuration[/green]"
+                )
+                console.print("[blue]Created backup of kicad_common.json[/blue]")
 
                 # Show all environment variables that were set
-                console.print("\nEnvironment variables set in KiCad:")
+                console.print(
+                    "\n[bold cyan]Environment variables set in KiCad:[/bold cyan]"
+                )
                 for var_name, value in env_vars.items():
-                    console.print(f"  {var_name} = {value}")
+                    console.print(f"  [cyan]{var_name}[/cyan] = [blue]{value}[/blue]")
         else:
             console.print(
-                "Environment variables already up to date in KiCad configuration"
+                "[blue]Environment variables already up to date in KiCad configuration[/blue]"
             )
     except Exception as e:
         console.print(f"[red]Error updating environment variables: {e}[/red]")
@@ -441,23 +497,23 @@ def setup(
 
             if sym_table.exists():
                 create_backup(sym_table, max_backups)
-                console.print("Created backup of symbol library table")
+                console.print("[blue]Created backup of symbol library table[/blue]")
 
             if fp_table.exists():
                 create_backup(fp_table, max_backups)
-                console.print("Created backup of footprint library table")
+                console.print("[blue]Created backup of footprint library table[/blue]")
 
         if added_libraries:
             if dry_run:
                 console.print(
-                    f"Would add {len(added_libraries)} libraries to KiCad configuration"
+                    f"[yellow]Would add {len(added_libraries)} libraries to KiCad configuration[/yellow]"
                 )
             else:
                 console.print(
-                    f"Added {len(added_libraries)} libraries to KiCad configuration"
+                    f"[green]Added {len(added_libraries)} libraries to KiCad configuration[/green]"
                 )
         else:
-            console.print("No new libraries to add")
+            console.print("[blue]No new libraries to add[/blue]")
 
         # Pin libraries if requested
         pinned_changes_needed = False
@@ -490,28 +546,35 @@ def setup(
                 if pinned_changes_needed:
                     if dry_run:
                         console.print(
-                            f"Would pin {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad"
+                            f"[yellow]Would pin {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad[/yellow]"
                         )
                     else:
                         console.print(
-                            f"Pinned {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad"
+                            f"[green]Pinned {len(symbol_libs)} symbol and {len(footprint_libs)} footprint libraries in KiCad[/green]"
                         )
                 else:
-                    console.print("All libraries already pinned in KiCad")
+                    console.print("[blue]All libraries already pinned in KiCad[/blue]")
             except Exception as e:
                 console.print(f"[red]Error pinning libraries: {e}[/red]")
 
         if not changes_needed and not env_changes_needed and not pinned_changes_needed:
-            console.print("No changes needed, configuration is up to date")
+            console.print("[blue]No changes needed, configuration is up to date[/blue]")
         elif dry_run:
-            console.print("Dry run: No changes were made")
+            console.print("[yellow]Dry run: No changes were made[/yellow]")
     except Exception as e:
         console.print(f"[red]Error adding libraries: {e}[/red]")
         if verbose:
             import traceback
 
             console.print(traceback.format_exc())
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     if not dry_run and (changes_needed or env_changes_needed or pinned_changes_needed):
-        console.print("Setup complete! Restart KiCad for changes to take effect.")
+        console.print()
+        console.print(
+            Panel(
+                "[bold green]Setup complete! Restart KiCad for changes to take effect.[/bold green]",
+                title="[bold green]✅ Success[/bold green]",
+                border_style="green",
+            )
+        )

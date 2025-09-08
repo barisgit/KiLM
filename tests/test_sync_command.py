@@ -3,13 +3,13 @@ Tests for KiCad Library Manager sync command (formerly update command).
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from click.testing import CliRunner
+from typer.testing import CliRunner
 
-from kicad_lib_manager.cli import main
 from kicad_lib_manager.commands.sync.command import check_for_library_changes
+from kicad_lib_manager.main import app as main
 
 # Sample test libraries
 TEST_LIBRARIES = [
@@ -121,26 +121,18 @@ def test_sync_command(mock_config, mock_subprocess_run, mock_path_methods):
 
 def test_sync_with_auto_setup(mock_config, mock_subprocess_run, mock_path_methods):
     """Test sync with auto-setup option."""
-    # Mock the setup module import
-    setup_module_mock = Mock()
-    setup_command_mock = Mock(name="setup_command")
-    setup_command_mock.make_context = Mock(return_value=Mock())
-    setup_command_mock.invoke = Mock()
-    setup_module_mock.setup = setup_command_mock
+    # Mock the setup command function (imported within sync function)
+    with patch("kicad_lib_manager.commands.setup.command.setup") as mock_setup:
+        mock_setup.return_value = None  # setup function returns None on success
 
-    # Mock the module import
-    with patch.dict(
-        "sys.modules", {"kicad_lib_manager.commands.setup": setup_module_mock}
-    ), patch("click.get_current_context", return_value=Mock()):
         runner = CliRunner()
         result = runner.invoke(main, ["sync", "--auto-setup"])
 
         assert result.exit_code == 0
         assert "Running 'kilm setup'" in result.output
 
-        # Verify that make_context and invoke were called
-        setup_command_mock.make_context.assert_called_once()
-        setup_command_mock.invoke.assert_called_once()
+        # Verify that setup was called
+        mock_setup.assert_called_once()
 
 
 def test_sync_with_already_up_to_date(mock_config, mock_path_methods):

@@ -247,21 +247,26 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
     if sym_table.exists():
         content = read_file_with_encoding(sym_table)
 
-        # Extract all library entries
-        lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)
-        for name, details in lib_entries:
-            lib_info = {"name": name}
+        # Match each complete (lib ...) entry on its own line
+        # This is more robust than trying to match up to the first ')'
+        for match in re.finditer(r"^\s*\(lib\s+(.*?)\)\s*$", content, re.MULTILINE):
+            entry = match.group(1)
 
-            # Extract other properties
-            uri_match = re.search(r'\(uri "([^"]+)"\)', details)
+            name_match = re.search(r'\(name\s+"([^"]+)"\)', entry)
+            if not name_match:
+                continue
+            lib_info = {"name": name_match.group(1)}
+
+            # Extract other properties (support both uri and url just in case)
+            uri_match = re.search(r'\((?:uri|url)\s+"([^"]+)"\)', entry)
             if uri_match:
                 lib_info["uri"] = uri_match.group(1)
 
-            type_match = re.search(r'\(type "([^"]+)"\)', details)
+            type_match = re.search(r'\(type\s+"([^"]+)"\)', entry)
             if type_match:
                 lib_info["type"] = type_match.group(1)
 
-            descr_match = re.search(r'\(descr "([^"]+)"\)', details)
+            descr_match = re.search(r'\(descr\s+"([^"]+)"\)', entry)
             if descr_match:
                 lib_info["description"] = descr_match.group(1)
 
@@ -270,21 +275,23 @@ def list_configured_libraries(kicad_config: Path) -> Tuple[List[dict], List[dict
     if fp_table.exists():
         content = read_file_with_encoding(fp_table)
 
-        # Extract all library entries
-        lib_entries = re.findall(r'\(lib \(name "([^"]+)"\)(.+?)\)', content, re.DOTALL)
-        for name, details in lib_entries:
-            lib_info = {"name": name}
+        for match in re.finditer(r"^\s*\(lib\s+(.*?)\)\s*$", content, re.MULTILINE):
+            entry = match.group(1)
 
-            # Extract other properties
-            uri_match = re.search(r'\(uri "([^"]+)"\)', details)
+            name_match = re.search(r'\(name\s+"([^"]+)"\)', entry)
+            if not name_match:
+                continue
+            lib_info = {"name": name_match.group(1)}
+
+            uri_match = re.search(r'\((?:uri|url)\s+"([^"]+)"\)', entry)
             if uri_match:
                 lib_info["uri"] = uri_match.group(1)
 
-            type_match = re.search(r'\(type "([^"]+)"\)', details)
+            type_match = re.search(r'\(type\s+"([^"]+)"\)', entry)
             if type_match:
                 lib_info["type"] = type_match.group(1)
 
-            descr_match = re.search(r'\(descr "([^"]+)"\)', details)
+            descr_match = re.search(r'\(descr\s+"([^"]+)"\)', entry)
             if descr_match:
                 lib_info["description"] = descr_match.group(1)
 

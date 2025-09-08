@@ -13,12 +13,18 @@ from rich.text import Text
 from rich.traceback import install
 from typer.core import TyperGroup
 
+from .commands.add_3d import add_3d_app
+from .commands.add_hook import add_hook_app
+from .commands.config import config_app
 from .commands.init import init_app
 from .commands.list_libraries import list_app
 from .commands.pin import pin_app
 from .commands.setup import setup_app
 from .commands.status import status_app
+from .commands.sync import sync_app
+from .commands.template import template_app
 from .commands.unpin import unpin_app
+from .commands.update import update_app
 from .utils.banner import show_banner
 
 TAGLINE = "Professional KiCad library management"
@@ -111,14 +117,12 @@ app.add_typer(init_app, name="init", help="Initialize library configuration")
 app.add_typer(pin_app, name="pin", help="Pin favorite libraries")
 app.add_typer(unpin_app, name="unpin", help="Unpin favorite libraries")
 app.add_typer(setup_app, name="setup", help="Configure KiCad to use libraries")
-
-# TODO: Migrate remaining commands to Typer
-# - add-3d: Add 3D model libraries
-# - config: Manage configuration settings
-# - sync: Update/sync library content
-# - update: Update KiLM itself
-# - add-hook: Add project hooks
-# - template: Manage project templates
+app.add_typer(config_app, name="config", help="Manage configuration settings")
+app.add_typer(template_app, name="template", help="Manage project templates")
+app.add_typer(add_3d_app, name="add-3d", help="Add 3D model libraries")
+app.add_typer(sync_app, name="sync", help="Update/sync library content")
+app.add_typer(update_app, name="update", help="Update KiLM itself")
+app.add_typer(add_hook_app, name="add-hook", help="Add project hooks")
 
 
 if __name__ == "__main__":

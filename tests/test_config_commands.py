@@ -5,9 +5,9 @@ Tests for KiCad Library Manager config commands.
 from typing import List
 
 import pytest
-from click.testing import CliRunner
+from typer.testing import CliRunner
 
-from kicad_lib_manager.cli import main
+from kicad_lib_manager.main import app as main
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 
 # Sample test data
@@ -55,12 +55,24 @@ def test_config_list(mock_config_class):
     result = runner.invoke(main, ["config", "list"])
 
     assert result.exit_code == 0
-    assert "Configured Libraries" in result.output
     assert "GitHub Libraries" in result.output
     assert "Cloud Libraries" in result.output
     assert "test-github-lib" in result.output
     assert "test-cloud-lib" in result.output
-    assert "(current)" in result.output  # Current library should be marked
+    assert "✓ Current" in result.output  # Current library should be marked
+
+
+def test_config_list_verbose(mock_config_class):
+    """Test the 'kilm config list --verbose' command."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["config", "list", "--verbose"])
+
+    assert result.exit_code == 0
+    assert "GitHub Libraries" in result.output
+    assert "Cloud Libraries" in result.output
+    assert "test-github-lib" in result.output
+    assert "test-cloud-lib" in result.output
+    assert "✓ CURRENT" in result.output
 
 
 def test_config_list_filtered(mock_config_class):

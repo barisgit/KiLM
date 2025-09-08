@@ -5,35 +5,28 @@ Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
 
 import subprocess
 from pathlib import Path
+from typing import Annotated, List, Tuple
 
-import click
+import typer
+from rich.console import Console
 
 from ...services.config_service import Config
 
+console = Console()
 
-@click.command()
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    default=False,
-    help="Show what would be synced without making changes",
-    show_default=True,
-)
-@click.option(
-    "--verbose",
-    is_flag=True,
-    default=False,
-    help="Show detailed output",
-    show_default=True,
-)
-@click.option(
-    "--auto-setup",
-    is_flag=True,
-    default=False,
-    help="Run 'kilm setup' automatically if new libraries are detected",
-    show_default=True,
-)
-def sync(dry_run, verbose, auto_setup):
+
+def sync(
+    dry_run: Annotated[
+        bool, typer.Option(help="Show what would be synced without making changes")
+    ] = False,
+    verbose: Annotated[bool, typer.Option(help="Show detailed output")] = False,
+    auto_setup: Annotated[
+        bool,
+        typer.Option(
+            help="Run 'kilm setup' automatically if new libraries are detected"
+        ),
+    ] = False,
+) -> None:
     """Sync all configured GitHub libraries with git pull.
 
     This command syncs all configured GitHub libraries (symbols/footprints)
@@ -44,150 +37,167 @@ def sync(dry_run, verbose, auto_setup):
     and recommend running 'kilm setup' if needed. Use --auto-setup to run
     setup automatically when new libraries are detected.
     """
-    config = Config()
+    try:
+        config = Config()
 
-    # Get GitHub libraries from config (symbols/footprints)
-    libraries = config.get_libraries(library_type="github")
+        # Get GitHub libraries from config (symbols/footprints)
+        libraries = config.get_libraries(library_type="github")
 
-    if not libraries:
-        click.echo("No GitHub libraries configured. Use 'kilm init' to add a library.")
-        return
-
-    click.echo(f"Syncing {len(libraries)} KiCad GitHub libraries...")
-
-    updated_count = 0  # Actually changed
-    up_to_date_count = 0  # Already at latest version
-    skipped_count = 0  # Could not sync (not git, etc.)
-    failed_count = 0  # Git pull failed
-
-    # Track libraries that have changes that might require setup
-    libraries_with_changes = []
-
-    for lib in libraries:
-        lib_name = lib.get("name", "unnamed")
-        lib_path = lib.get("path")
-
-        if not lib_path:
-            click.echo(f"  Skipping {lib_name}: No path defined")
-            skipped_count += 1
-            continue
-
-        lib_path = Path(lib_path)
-        if not lib_path.exists():
-            click.echo(f"  Skipping {lib_name}: Path does not exist: {lib_path}")
-            skipped_count += 1
-            continue
-
-        git_dir = lib_path / ".git"
-        if not git_dir.exists() or not git_dir.is_dir():
-            click.echo(f"  Skipping {lib_name}: Not a git repository: {lib_path}")
-            skipped_count += 1
-            continue
-
-        # Prepare to run git pull
-        click.echo(f"  Syncing {lib_name} at {lib_path}...")
-
-        if dry_run:
-            click.echo(f"    Dry run: would execute 'git pull' in {lib_path}")
-            updated_count += 1
-            continue
-
-        try:
-            # Run git pull
-            result = subprocess.run(
-                ["git", "pull"],
-                cwd=lib_path,
-                capture_output=True,
-                text=True,
-                check=False,
+        if not libraries:
+            console.print(
+                "[yellow]No GitHub libraries configured. Use 'kilm init' to add a library.[/yellow]"
             )
+            return
 
-            if result.returncode == 0:
-                output = result.stdout.strip() or "Already up to date."
-                is_updated = "Already up to date" not in output
+        console.print(
+            f"[cyan]Syncing {len(libraries)} KiCad GitHub libraries...[/cyan]"
+        )
 
-                if verbose:
-                    click.echo(f"    Success: {output}")
-                    # Also show the short status for consistency
-                    if is_updated:
-                        click.echo("    Updated")
+        updated_count = 0  # Actually changed
+        up_to_date_count = 0  # Already at latest version
+        skipped_count = 0  # Could not sync (not git, etc.)
+        failed_count = 0  # Git pull failed
+
+        # Track libraries that have changes that might require setup
+        libraries_with_changes: List[Tuple[str, Path, List[str]]] = []
+
+        for lib in libraries:
+            lib_name = lib.get("name", "unnamed")
+            lib_path = lib.get("path")
+
+            if not lib_path:
+                console.print(
+                    f"  [yellow]Skipping {lib_name}: No path defined[/yellow]"
+                )
+                skipped_count += 1
+                continue
+
+            lib_path = Path(lib_path)
+            if not lib_path.exists():
+                console.print(
+                    f"  [yellow]Skipping {lib_name}: Path does not exist: {lib_path}[/yellow]"
+                )
+                skipped_count += 1
+                continue
+
+            git_dir = lib_path / ".git"
+            if not git_dir.exists() or not git_dir.is_dir():
+                console.print(
+                    f"  [yellow]Skipping {lib_name}: Not a git repository: {lib_path}[/yellow]"
+                )
+                skipped_count += 1
+                continue
+
+            # Prepare to run git pull
+            console.print(f"  [cyan]Syncing {lib_name} at {lib_path}...[/cyan]")
+
+            if dry_run:
+                console.print(
+                    f"    [blue]Dry run: would execute 'git pull' in {lib_path}[/blue]"
+                )
+                updated_count += 1
+                continue
+
+            try:
+                # Run git pull
+                result = subprocess.run(
+                    ["git", "pull"],
+                    cwd=lib_path,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                if result.returncode == 0:
+                    output = result.stdout.strip() or "Already up to date."
+                    is_updated = "Already up to date" not in output
+
+                    if verbose:
+                        console.print(f"    [green]Success: {output}[/green]")
+                        # Also show the short status for consistency
+                        if is_updated:
+                            console.print("    [green]Updated[/green]")
+                        else:
+                            console.print("    [blue]Up to date[/blue]")
                     else:
-                        click.echo("    Up to date")
-                else:
+                        if is_updated:
+                            console.print("    [green]Updated[/green]")
+                        else:
+                            console.print("    [blue]Up to date[/blue]")
+
+                    # Update counters regardless of verbose flag
                     if is_updated:
-                        click.echo("    Updated")
+                        updated_count += 1
                     else:
-                        click.echo("    Up to date")
+                        up_to_date_count += 1
 
-                # Update counters regardless of verbose flag
-                if is_updated:
-                    updated_count += 1
-                else:
-                    up_to_date_count += 1
-
-                # Check if there are new library files that would require setup
-                if is_updated:
-                    changes_require_setup = check_for_library_changes(lib_path)
-                    if changes_require_setup:
-                        libraries_with_changes.append(
-                            (lib_name, lib_path, changes_require_setup)
-                        )
-                        if verbose:
-                            click.echo(
-                                f"    Detected new library content: {', '.join(changes_require_setup)}"
+                    # Check if there are new library files that would require setup
+                    if is_updated:
+                        changes_require_setup = check_for_library_changes(lib_path)
+                        if changes_require_setup:
+                            libraries_with_changes.append(
+                                (lib_name, lib_path, changes_require_setup)
                             )
-            else:
-                click.echo(f"    Failed: {result.stderr.strip()}")
+                            if verbose:
+                                console.print(
+                                    f"    [yellow]Detected new library content: {', '.join(changes_require_setup)}[/yellow]"
+                                )
+                else:
+                    console.print(f"    [red]Failed: {result.stderr.strip()}[/red]")
+                    failed_count += 1
+
+            except Exception as e:
+                console.print(f"    [red]Error: {str(e)}[/red]")
                 failed_count += 1
 
-        except Exception as e:
-            click.echo(f"    Error: {str(e)}")
-            failed_count += 1
+        # Summary
+        console.print("\n[bold cyan]Sync Summary:[/bold cyan]")
+        console.print(f"  [green]{updated_count}[/green] libraries synced")
+        console.print(f"  [blue]{up_to_date_count}[/blue] libraries up to date")
+        console.print(f"  [yellow]{skipped_count}[/yellow] libraries skipped")
+        console.print(f"  [red]{failed_count}[/red] libraries failed")
 
-    # Summary
-    click.echo("\nSync Summary:")
-    click.echo(f"  {updated_count} libraries synced")
-    click.echo(f"  {up_to_date_count} libraries up to date")
-    click.echo(f"  {skipped_count} libraries skipped")
-    click.echo(f"  {failed_count} libraries failed")
+        # If libraries with changes were detected, suggest running setup
+        if libraries_with_changes:
+            console.print("\n[yellow]New library content detected in:[/yellow]")
+            for lib_name, _lib_path, changes in libraries_with_changes:
+                console.print(f"  - [cyan]{lib_name}[/cyan]: {', '.join(changes)}")
 
-    # If libraries with changes were detected, suggest running setup
-    if libraries_with_changes:
-        click.echo("\nNew library content detected in:")
-        for lib_name, _lib_path, changes in libraries_with_changes:
-            click.echo(f"  - {lib_name}: {', '.join(changes)}")
-
-        if auto_setup:
-            click.echo("\nRunning 'kilm setup' to configure new libraries...")
-            # Import at runtime to avoid circular imports
-            try:
-                from ...commands.setup import setup as setup_cmd
-
-                # Create context using the command's built-in context factory
-                ctx = setup_cmd.make_context(
-                    "setup", args=[], parent=click.get_current_context()
+            if auto_setup:
+                console.print(
+                    "\n[green]Running 'kilm setup' to configure new libraries...[/green]"
                 )
-                setup_cmd.invoke(ctx)
-            except ImportError:
-                click.echo(
-                    "Error: Could not import setup command. Please run 'kilm setup' manually."
+                # Import at runtime to avoid circular imports
+                try:
+                    from ...commands.setup.command import setup as setup_cmd
+
+                    setup_cmd()
+                except ImportError:
+                    console.print(
+                        "[red]Error: Could not import setup command. Please run 'kilm setup' manually.[/red]"
+                    )
+            else:
+                console.print(
+                    "\n[yellow]You should run 'kilm setup' to configure the new libraries in KiCad.[/yellow]"
+                )
+                console.print(
+                    "[blue]Run 'kilm sync --auto-setup' next time to automatically run setup after sync.[/blue]"
                 )
         else:
-            click.echo(
-                "\nYou should run 'kilm setup' to configure the new libraries in KiCad."
+            console.print(
+                "\n[blue]No new libraries detected that would require running 'kilm setup'.[/blue]"
             )
-            click.echo(
-                "Run 'kilm sync --auto-setup' next time to automatically run setup after sync."
+            console.print(
+                "[blue]Use 'kilm status' to check your current configuration.[/blue]"
             )
-    else:
-        click.echo(
-            "\nNo new libraries detected that would require running 'kilm setup'."
-        )
-        click.echo("Use 'kilm status' to check your current configuration.")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1) from e
 
 
 # TODO: Should be in services or utils
-def check_for_library_changes(lib_path):
+def check_for_library_changes(lib_path: Path) -> List[str]:
     """
     Check if git pull changes indicate new libraries that would require setup.
     Uses git diff to analyze what files were added/changed in the pull.
@@ -252,13 +262,13 @@ def check_for_library_changes(lib_path):
     return changes
 
 
-def _is_symbol_library_change(path):
+def _is_symbol_library_change(path: str) -> bool:
     """Check if a path change indicates a symbol library change."""
     # Look for .kicad_sym files in symbols directory
     return path.startswith("symbols/") and path.endswith(".kicad_sym")
 
 
-def _is_footprint_library_change(path):
+def _is_footprint_library_change(path: str) -> bool:
     """Check if a path change indicates a footprint library change."""
     # Look for .pretty directories or files within them
     return (path.startswith("footprints/") and path.endswith(".pretty")) or (
@@ -266,13 +276,13 @@ def _is_footprint_library_change(path):
     )
 
 
-def _is_template_change(path):
+def _is_template_change(path: str) -> bool:
     """Check if a path change indicates a template change."""
     # Look for metadata.yaml files in template directories
     return path.startswith("templates/") and path.endswith("metadata.yaml")
 
 
-def _check_current_library_state(lib_path):
+def _check_current_library_state(lib_path: Path) -> List[str]:
     """
     Fallback method to check current library state when git diff is not available.
     This is used when we can't determine what changed in the pull.

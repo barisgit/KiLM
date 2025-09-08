@@ -4,6 +4,7 @@ Status command implementation for KiCad Library Manager (Typer version).
 
 import json
 from pathlib import Path
+from typing import Annotated
 
 import typer
 import yaml
@@ -18,7 +19,16 @@ from ...utils.metadata import read_cloud_metadata, read_github_metadata
 console = Console()
 
 
-def status() -> None:
+def status(
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show detailed configured libraries tables",
+        ),
+    ] = False,
+) -> None:
     """Show the current KiCad configuration status"""
     try:
         # Initialize services
@@ -38,8 +48,9 @@ def status() -> None:
         # Check pinned libraries
         _check_pinned_libraries(kicad_config, kicad_service)
 
-        # Check configured libraries
-        _show_configured_libraries(kicad_config, kicad_service)
+        # Check configured libraries (only in verbose mode)
+        if verbose:
+            _show_configured_libraries(kicad_config, kicad_service)
 
     except Exception as e:
         console.print(f"[red]Error getting KiCad configuration: {e}[/red]")
@@ -281,7 +292,7 @@ def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) 
             table.add_column("URI", style="blue")
 
             for lib in sym_libs:
-                table.add_row(lib["name"], lib["uri"])
+                table.add_row(lib.get("name", ""), lib.get("uri", ""))
 
             console.print(table)
         else:
@@ -294,7 +305,7 @@ def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) 
             table.add_column("URI", style="blue")
 
             for lib in fp_libs:
-                table.add_row(lib["name"], lib["uri"])
+                table.add_row(lib.get("name", ""), lib.get("uri", ""))
 
             console.print(table)
         else:
