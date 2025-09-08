@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kilm"
-version = "0.5.1"
+version = "0.5.2"
 description = "A command-line tool for managing KiCad libraries across projects and workstations"
 readme = "README.md"
 license = "MIT"
