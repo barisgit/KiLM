@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 from packaging.version import InvalidVersion, Version
@@ -35,8 +35,20 @@ def detect_installation_method() -> str:
     if os.environ.get("CONDA_DEFAULT_ENV") or "conda" in str(executable_path):
         return "conda"
 
-    # Check for uv installation (only via official environment variables)
-    if os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR"):
+    # Check for uv installation - check both environment variables and path patterns
+    executable_str = str(executable_path)
+    uv_env_vars = os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
+    uv_path_patterns = any(
+        part in executable_str for part in [".local/share/uv", "uv/tools"]
+    )
+
+    # Also check if executable is in ~/.local/bin and uv tools directory exists
+    local_bin_with_uv = (
+        ".local/bin" in executable_str
+        and (Path.home() / ".local" / "share" / "uv" / "tools").exists()
+    )
+
+    if uv_env_vars or uv_path_patterns or local_bin_with_uv:
         return "uv"
 
     # Check for virtual environment (pip in venv)
@@ -235,10 +247,101 @@ class UpdateService:
 
     def __init__(self, current_version: str):
         self.manager = UpdateManager(current_version)
+        self.current_version = current_version
 
-    def check_for_updates(self) -> Optional[str]:
-        """Check for available updates."""
-        return self.manager.check_latest_version()
+    def check_for_updates(self, use_cache: bool = True) -> dict[str, Any]:
+        """
+        Check for available updates.
+
+        Returns:
+            Dict containing update status information:
+            - has_update: whether an update is available
+            - current_version: current installed version
+            - latest_version: latest available version
+            - method: installation method identifier
+            - supports_auto_update: whether automatic update is supported
+        """
+        latest_version = (
+            self.manager.check_latest_version()
+            if use_cache
+            else self.manager.version_checker.check_latest_version()
+        )
+        has_update = False
+
+        if latest_version:
+            has_update = self.manager.is_newer_version_available(latest_version)
+
+        return {
+            "has_update": has_update,
+            "current_version": self.current_version,
+            "latest_version": latest_version,
+            "method": self.manager.installation_method,
+            "supports_auto_update": self.manager.can_auto_update(),
+        }
+
+    def show_update_notification(
+        self, quiet: bool = False, force_check: bool = False
+    ) -> bool:
+        """
+        Show update notification if updates are available.
+
+        Args:
+            quiet: Only show notification if update is available
+            force_check: Skip cache and force fresh check
+
+        Returns:
+            bool: True if update is available
+        """
+        from rich.console import Console
+        from rich.panel import Panel
+
+        console = Console()
+        update_info = self.check_for_updates(use_cache=not force_check)
+
+        if not update_info["has_update"]:
+            if not quiet:
+                console.print("[green]✓[/green] You are using the latest version!")
+            return False
+
+        # Create update notification
+        current = update_info["current_version"]
+        latest = update_info["latest_version"]
+        method = update_info["method"]
+        can_auto_update = update_info["supports_auto_update"]
+
+        message_lines = [
+            "[yellow]Update available![/yellow]",
+            f"Current: [blue]{current}[/blue] → Latest: [green]{latest}[/green]",
+            "",
+        ]
+
+        if can_auto_update:
+            message_lines.extend(
+                [
+                    "Run [bold cyan]kilm update[/bold cyan] to update automatically",
+                    f"Installation method: [dim]{method}[/dim]",
+                ]
+            )
+        else:
+            update_cmd = self.manager.get_update_instruction()
+            message_lines.extend(
+                [
+                    f"Installation method: [bold]{method}[/bold] (manual update required)",
+                    f"Run: [bold cyan]{update_cmd}[/bold cyan]",
+                ]
+            )
+
+        message = "\n".join(message_lines)
+
+        console.print(
+            Panel(
+                message,
+                title="[bold blue]KiLM Update Available[/bold blue]",
+                border_style="blue",
+            )
+        )
+
+        return True
 
     def is_update_available(self, latest_version: str) -> bool:
         """Check if an update is available."""
@@ -256,6 +359,61 @@ class UpdateService:
         """Check if automatic updates are supported."""
         return self.manager.can_auto_update()
 
-    def perform_update(self) -> tuple[bool, str]:
-        """Perform the update."""
+    def perform_update(
+        self,
+        target_version: Optional[str] = None,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> tuple[bool, str]:
+        """
+        Perform update installation.
+
+        Args:
+            target_version: Specific version to install
+            force: Force update even if already up to date
+            dry_run: Show what would be done without doing it
+
+        Returns:
+            tuple[bool, str]: (success, message)
+        """
+        if dry_run:
+            return self._show_dry_run_info(target_version)
+
+        # Check if update is needed (unless forced)
+        if not force:
+            update_info = self.check_for_updates()
+            if not update_info["has_update"]:
+                return True, "Already using the latest version!"
+
+        # Perform the update
         return self.manager.perform_update()
+
+    def _show_dry_run_info(
+        self, target_version: Optional[str] = None
+    ) -> tuple[bool, str]:
+        """Show what would happen during an update."""
+        from rich.console import Console
+        from rich.panel import Panel
+
+        console = Console()
+        method = self.manager.installation_method
+        can_auto_update = self.manager.can_auto_update()
+        package_spec = f"kilm=={target_version}" if target_version else "kilm"
+        update_cmd = self.manager.get_update_instruction()
+
+        console.print(
+            Panel(
+                f"""[bold]Update Plan (Dry Run)[/bold]
+
+Installation method: [cyan]{method}[/cyan]
+Target package: [green]{package_spec}[/green]
+Auto-update supported: [{"green" if can_auto_update else "red"}]{can_auto_update}[/]
+
+Command that would be executed:
+[bold cyan]{update_cmd}[/bold cyan]""",
+                title="[bold yellow]Dry Run[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+
+        return can_auto_update, f"Dry run completed - would execute: {update_cmd}"

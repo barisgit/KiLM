@@ -1,13 +1,13 @@
-import typer
+"""Update command module."""
 
-from .command import update
+from .check import check_update_command
+from .command import update_app
+from .info import info_command
+from .perform import perform_update_command
 
-update_app = typer.Typer(
-    name="update",
-    help="Update KiLM itself to the latest version",
-    rich_markup_mode="rich",
-    callback=update,
-    invoke_without_command=True,
-)
-
-__all__ = ["update", "update_app"]
+__all__ = [
+    "update_app",
+    "check_update_command",
+    "info_command",
+    "perform_update_command",
+]
