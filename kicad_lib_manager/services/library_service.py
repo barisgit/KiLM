@@ -5,6 +5,7 @@ Core functionality for managing KiCad libraries.
 
 import os
 import platform
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -316,6 +317,11 @@ class LibraryService:
         return added_libraries, changes_needed
 
     @staticmethod
+    def _kicad_version_key(version_dir: Path) -> tuple[int, ...]:
+        """Return a numeric version key for KiCad configuration directories."""
+        return tuple(int(part) for part in re.findall(r"\d+", version_dir.name))
+
+    @staticmethod
     def find_kicad_config() -> Path:
         """
         Find the KiCad configuration directory for the current platform
@@ -362,7 +368,10 @@ class LibraryService:
                 "Please run KiCad at least once before using this tool."
             )
 
-        latest_dir = sorted(version_dirs, key=lambda d: d.name)[-1]
+        latest_dir = max(
+            version_dirs,
+            key=lambda d: (LibraryService._kicad_version_key(d), d.name),
+        )
 
         # Check for required files
         sym_table = latest_dir / "sym-lib-table"

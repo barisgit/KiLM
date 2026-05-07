@@ -103,6 +103,29 @@ def test_format_uri_invalid_input():
         LibraryService.format_uri("${unclosed", "test_lib", "symbols")  # Unclosed ${
 
 
+def test_find_kicad_config_uses_latest_numeric_version(tmp_path, monkeypatch):
+    """Test KiCad config detection prefers numeric version order."""
+    home_dir = tmp_path / "home"
+    config_dir = home_dir / "Library" / "Preferences" / "kicad"
+    config_dir.mkdir(parents=True)
+
+    for version in ("8.0", "9.0", "10.0"):
+        version_dir = config_dir / version
+        version_dir.mkdir()
+        (version_dir / "sym-lib-table").touch()
+
+    monkeypatch.setattr(
+        "kicad_lib_manager.services.library_service.platform.system",
+        lambda: "Darwin",
+    )
+    monkeypatch.setattr(
+        "kicad_lib_manager.services.library_service.Path.home",
+        lambda: home_dir,
+    )
+
+    assert LibraryService.find_kicad_config() == config_dir / "10.0"
+
+
 def test_add_libraries_integration(tmp_path):
     """Test the full add_libraries function with different path formats."""
     # Create temporary directories
