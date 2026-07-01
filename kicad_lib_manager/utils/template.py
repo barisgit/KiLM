@@ -49,6 +49,45 @@ KICAD_PRL_EXT = ".kicad_prl"  # Project local settings file
 # Windows-compatible filename templating constants
 FILENAME_VAR_PATTERN = re.compile(r"%\{([^}]+)\}")
 
+# Binary file extensions that should not be rendered as templates
+BINARY_EXTENSIONS = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".ico",
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".7z",
+        ".rar",
+        ".exe",
+        ".dll",
+        ".so",
+        ".pyc",
+        ".pyo",
+        ".obj",
+        ".lib",
+        ".a",
+    }
+)
+
+# OS-generated system files that should never be processed in templates
+SYSTEM_FILES_TO_IGNORE = frozenset(
+    {
+        ".DS_Store",
+        ".Spotlight-V100",
+        ".Trashes",
+        ".fseventsd",
+        ".AppleDouble",
+        "Thumbs.db",  # Windows thumbnail cache
+        "desktop.ini",  # Windows desktop configuration
+    }
+)
+
 
 class TemplateVariable(TypedDict):
     """Template variable definition."""
@@ -1159,30 +1198,6 @@ def create_project_from_template(
         # TODO: Handle template inheritance
         click.echo("Warning: Template inheritance not fully implemented yet", err=True)
 
-    # Binary file extensions that should not be rendered
-    binary_extensions = {
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".bmp",
-        ".ico",
-        ".pdf",
-        ".zip",
-        ".gz",
-        ".tar",
-        ".7z",
-        ".rar",
-        ".exe",
-        ".dll",
-        ".so",
-        ".pyc",
-        ".pyo",
-        ".obj",
-        ".lib",
-        ".a",
-    }
-
     # Collect files to create
     files_to_create = []
 
@@ -1207,6 +1222,10 @@ def create_project_from_template(
 
         # Process files
         for file in files:
+            # Skip system files that should never be in templates
+            if file in SYSTEM_FILES_TO_IGNORE:
+                continue
+
             source_file = Path(root) / file
 
             # Strip .jinja2 extension from target file if present
@@ -1226,7 +1245,7 @@ def create_project_from_template(
 
             # Check if it's a binary file
             is_binary = any(
-                target_filename.lower().endswith(ext) for ext in binary_extensions
+                target_filename.lower().endswith(ext) for ext in BINARY_EXTENSIONS
             )
 
             # Add to the list of files to create
