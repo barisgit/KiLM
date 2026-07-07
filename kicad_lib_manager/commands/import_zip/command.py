@@ -158,7 +158,14 @@ def _upgrade_fp(path: Path, kicad_cli: Optional[Path]) -> None:
                 str(in_pretty),
             ]
 
-        subprocess.run(cmd, capture_output=True, check=False)
+        try:
+            subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            console.print(f"[yellow]  warn: kicad-cli fp upgrade timed out for {path.name}, skipping[/yellow]")
+            return
+        except subprocess.CalledProcessError as exc:
+            console.print(f"[yellow]  warn: kicad-cli fp upgrade failed for {path.name}: {exc.stderr.strip()}[/yellow]")
+            return
         upgraded = out_dir / path.name
         if upgraded.exists():
             shutil.copy2(upgraded, path)
@@ -172,7 +179,12 @@ def _upgrade_sym(sym_file: Path, kicad_cli: Optional[Path]) -> None:
         cmd = [str(kicad_cli), "kicad-cli", "sym", "upgrade", "--force", str(sym_file)]
     else:
         cmd = [str(kicad_cli), "sym", "upgrade", "--force", str(sym_file)]
-    subprocess.run(cmd, capture_output=True, check=False)
+    try:
+        subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        console.print(f"[yellow]  warn: kicad-cli sym upgrade timed out for {sym_file.name}, skipping[/yellow]")
+    except subprocess.CalledProcessError as exc:
+        console.print(f"[yellow]  warn: kicad-cli sym upgrade failed for {sym_file.name}: {exc.stderr.strip()}[/yellow]")
 
 
 # ── ZIP extraction ───────────────────────────────────────────────────────────
@@ -181,15 +193,13 @@ def _upgrade_sym(sym_file: Path, kicad_cli: Optional[Path]) -> None:
 def _safe_extractall(zf: zipfile.ZipFile, dest: Path) -> None:
     """Extract ZIP, rejecting any member whose resolved path escapes dest.
 
-    Python < 3.12 does not guard against zip-slip in extractall().
+    Defense-in-depth against zip-slip: checks every member before extracting
+    regardless of Python version or platform.
     """
     dest_resolved = dest.resolve()
     for member in zf.namelist():
         member_path = (dest / member).resolve()
-        if (
-            not str(member_path).startswith(str(dest_resolved) + "/")
-            and member_path != dest_resolved
-        ):
+        if member_path != dest_resolved and not member_path.is_relative_to(dest_resolved):
             raise ValueError(f"Unsafe ZIP entry rejected: {member!r}")
     zf.extractall(dest)
 
@@ -270,17 +280,19 @@ def _import_zip(
 
 # ── Command ───────────────────────────────────────────────────────────────────
 
+_KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
+    Path.home() / "AppImages" / "kicad.appimage",
+    Path("/usr/bin/kicad-cli"),
+    Path("/usr/local/bin/kicad-cli"),
+    Path("/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"),
+)
+
 
 def _detect_kicad_cli() -> Optional[Path]:
-    """Return kicad-cli path if found on PATH or common locations."""
+    """Return kicad-cli path if found on PATH or a location in _KICAD_CLI_CANDIDATES."""
     if shutil.which("kicad-cli"):
         return Path(shutil.which("kicad-cli"))  # type: ignore[arg-type]
-    for candidate in [
-        Path.home() / "AppImages" / "kicad.appimage",
-        Path("/usr/bin/kicad-cli"),
-        Path("/usr/local/bin/kicad-cli"),
-        Path("/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"),
-    ]:
+    for candidate in _KICAD_CLI_CANDIDATES:
         if candidate.exists():
             return candidate
     return None
@@ -388,9 +400,13 @@ def import_zip(
             continue
 
         console.print(f"\n[cyan]Importing {zip_path.name}[/cyan]")
-        r = _import_zip(
-            zip_path, sym_lib, fp_dir, models_dir, lib_name, kicad_cli, dry_run
-        )
+        try:
+            r = _import_zip(
+                zip_path, sym_lib, fp_dir, models_dir, lib_name, kicad_cli, dry_run
+            )
+        except Exception as exc:
+            console.print(f"[red]  error: {zip_path.name}: {exc}[/red]")
+            continue
         totals["sym"].extend(r["sym"])
         totals["fp"].extend(r["fp"])
         totals["models"].extend(r["models"])
