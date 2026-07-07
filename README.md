@@ -43,6 +43,33 @@ kilm status
 
 > **[Complete Installation Guide](https://kilm.aristovnik.me/guides/installation/)** - Multiple installation methods, verification steps, and troubleshooting.
 
+## Nix
+
+Run without installing:
+
+```bash
+nix run github:barisgit/KiLM -- --version
+```
+
+Build, or drop into a dev shell:
+
+```bash
+nix build github:barisgit/KiLM   # ./result/bin/kilm
+nix develop                      # dev shell with pytest + ruff
+```
+
+Add to a NixOS / home-manager config via the overlay:
+
+```nix
+{
+  inputs.kilm.url = "github:barisgit/KiLM";
+
+  # in your config:
+  nixpkgs.overlays = [ inputs.kilm.overlays.default ];
+  environment.systemPackages = [ pkgs.kilm ];  # or home.packages
+}
+```
+
 ## Documentation
 
 **[Complete Documentation](https://kilm.aristovnik.me)**
