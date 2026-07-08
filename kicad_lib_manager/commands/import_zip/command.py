@@ -139,7 +139,7 @@ def _upgrade_fp(path: Path, kicad_cli: Optional[Path]) -> None:
         cmd = _build_kicad_cli_cmd(kicad_cli, "fp", "upgrade", "--force", "--output", str(out_dir), str(in_pretty))
 
         try:
-            subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+            subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         except subprocess.TimeoutExpired:
             console.print(f"[yellow]  warn: kicad-cli fp upgrade timed out for {path.name}, skipping[/yellow]")
             return
@@ -157,7 +157,7 @@ def _upgrade_sym(sym_file: Path, kicad_cli: Optional[Path]) -> None:
         return
     cmd = _build_kicad_cli_cmd(kicad_cli, "sym", "upgrade", "--force", str(sym_file))
     try:
-        subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
     except subprocess.TimeoutExpired:
         console.print(f"[yellow]  warn: kicad-cli sym upgrade timed out for {sym_file.name}, skipping[/yellow]")
     except subprocess.CalledProcessError as exc:
