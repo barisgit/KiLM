@@ -136,27 +136,7 @@ def _upgrade_fp(path: Path, kicad_cli: Optional[Path]) -> None:
         shutil.copy2(path, in_pretty / path.name)
         out_dir = Path(tmp) / "out"
 
-        if kicad_cli.suffix.lower() == ".appimage":
-            cmd = [
-                str(kicad_cli),
-                "kicad-cli",
-                "fp",
-                "upgrade",
-                "--force",
-                "--output",
-                str(out_dir),
-                str(in_pretty),
-            ]
-        else:
-            cmd = [
-                str(kicad_cli),
-                "fp",
-                "upgrade",
-                "--force",
-                "--output",
-                str(out_dir),
-                str(in_pretty),
-            ]
+        cmd = _build_kicad_cli_cmd(kicad_cli, "fp", "upgrade", "--force", "--output", str(out_dir), str(in_pretty))
 
         try:
             subprocess.run(cmd, capture_output=True, check=True, timeout=30)
@@ -175,16 +155,20 @@ def _upgrade_sym(sym_file: Path, kicad_cli: Optional[Path]) -> None:
     """Upgrade symbol file format in-place using kicad-cli."""
     if kicad_cli is None or not kicad_cli.exists():
         return
-    if kicad_cli.suffix.lower() == ".appimage":
-        cmd = [str(kicad_cli), "kicad-cli", "sym", "upgrade", "--force", str(sym_file)]
-    else:
-        cmd = [str(kicad_cli), "sym", "upgrade", "--force", str(sym_file)]
+    cmd = _build_kicad_cli_cmd(kicad_cli, "sym", "upgrade", "--force", str(sym_file))
     try:
         subprocess.run(cmd, capture_output=True, check=True, timeout=30)
     except subprocess.TimeoutExpired:
         console.print(f"[yellow]  warn: kicad-cli sym upgrade timed out for {sym_file.name}, skipping[/yellow]")
     except subprocess.CalledProcessError as exc:
         console.print(f"[yellow]  warn: kicad-cli sym upgrade failed for {sym_file.name}: {exc.stderr.strip()}[/yellow]")
+
+
+def _build_kicad_cli_cmd(kicad_cli: Path, *args: str) -> list[str]:
+    """Return the command list for kicad-cli, inserting the subcommand for AppImages."""
+    if kicad_cli.suffix.lower() == ".appimage":
+        return [str(kicad_cli), "kicad-cli", *args]
+    return [str(kicad_cli), *args]
 
 
 # ── ZIP extraction ───────────────────────────────────────────────────────────
@@ -290,8 +274,9 @@ _KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
 
 def _detect_kicad_cli() -> Optional[Path]:
     """Return kicad-cli path if found on PATH or a location in _KICAD_CLI_CANDIDATES."""
-    if shutil.which("kicad-cli"):
-        return Path(shutil.which("kicad-cli"))  # type: ignore[arg-type]
+    on_path = shutil.which("kicad-cli")
+    if on_path is not None:
+        return Path(on_path)
     for candidate in _KICAD_CLI_CANDIDATES:
         if candidate.exists():
             return candidate
