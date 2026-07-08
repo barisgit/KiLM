@@ -26,7 +26,7 @@ runner = CliRunner()
 SAMPLE_SYM_LIB = """\
 (kicad_symbol_lib
 \t(symbol "ExistingPart"
-\t\t(property "Footprint" "LPP:ExistingPart")
+\t\t(property "Footprint" "SAMPLELIB:ExistingPart")
 \t)
 )
 """
@@ -37,7 +37,7 @@ INCOMING_SYM = """\
 \t\t(property "Footprint" "NewPart")
 \t)
 \t(symbol "ExistingPart"
-\t\t(property "Footprint" "LPP:ExistingPart")
+\t\t(property "Footprint" "SAMPLELIB:ExistingPart")
 \t)
 )
 """
@@ -52,13 +52,13 @@ def test_extract_symbol_blocks():
 
 def test_fix_footprint_ref_adds_prefix():
     block = '\t(property "Footprint" "BareFootprint")'
-    result = _fix_footprint_ref(block, "LPP")
-    assert '"Footprint" "LPP:BareFootprint"' in result
+    result = _fix_footprint_ref(block, "SAMPLELIB")
+    assert '"Footprint" "SAMPLELIB:BareFootprint"' in result
 
 
 def test_fix_footprint_ref_keeps_existing_prefix():
     block = '\t(property "Footprint" "OTHER:Footprint")'
-    result = _fix_footprint_ref(block, "LPP")
+    result = _fix_footprint_ref(block, "SAMPLELIB")
     assert '"Footprint" "OTHER:Footprint"' in result
 
 
@@ -89,18 +89,18 @@ def test_safe_extractall_rejects_zip_slip(tmp_path: Path):
 
 def test_fix_3d_path_normalises():
     text = '(model "C:/SamacSys/somepart.stp"'
-    result = _fix_3d_path(text, "LPP.3dshapes")
-    assert "${KICAD_3RD_PARTY}/LPP.3dshapes/somepart.stp" in result
+    result = _fix_3d_path(text, "SAMPLELIB.3dshapes")
+    assert "${KICAD_3RD_PARTY}/SAMPLELIB.3dshapes/somepart.stp" in result
 
 
 def test_merge_symbols_adds_new_skips_existing(tmp_path: Path):
-    sym_lib = tmp_path / "LPP.kicad_sym"
+    sym_lib = tmp_path / "SAMPLELIB.kicad_sym"
     sym_lib.write_text(SAMPLE_SYM_LIB, encoding="utf-8")
 
     src = tmp_path / "incoming.kicad_sym"
     src.write_text(INCOMING_SYM, encoding="utf-8")
 
-    added, skipped = _merge_symbols(src, sym_lib, "LPP", dry_run=False)
+    added, skipped = _merge_symbols(src, sym_lib, "SAMPLELIB", dry_run=False)
     assert added == ["NewPart"]
     assert skipped == ["ExistingPart"]
 
@@ -110,13 +110,13 @@ def test_merge_symbols_adds_new_skips_existing(tmp_path: Path):
 
 
 def test_merge_symbols_dry_run_does_not_write(tmp_path: Path):
-    sym_lib = tmp_path / "LPP.kicad_sym"
+    sym_lib = tmp_path / "SAMPLELIB.kicad_sym"
     sym_lib.write_text(SAMPLE_SYM_LIB, encoding="utf-8")
     src = tmp_path / "incoming.kicad_sym"
     src.write_text(INCOMING_SYM, encoding="utf-8")
 
     original_content = sym_lib.read_text(encoding="utf-8")
-    added, _ = _merge_symbols(src, sym_lib, "LPP", dry_run=True)
+    added, _ = _merge_symbols(src, sym_lib, "SAMPLELIB", dry_run=True)
 
     assert added == ["NewPart"]
     assert sym_lib.read_text(encoding="utf-8") == original_content
@@ -148,13 +148,44 @@ def _make_samacsys_zip(tmp_path: Path, part_name: str) -> Path:
     return zip_path
 
 
+def _make_ultralibrarian_zip(tmp_path: Path, part_name: str) -> Path:
+    """Build a minimal UltraLibrarian-style ZIP for testing.
+
+    UltraLibrarian differs from SamacSys/Mouser: the KiCad dir is named
+    "KiCADv6" (not "KiCad"), footprints live in a nested "*.pretty" dir,
+    and symbol files use 2-space indents with CRLF line endings.
+    """
+    zip_path = tmp_path / f"ul_{part_name}.zip"
+
+    sym_content = (
+        "(kicad_symbol_lib (version 20211014) (generator kicad_symbol_editor)\r\n"
+        f'  (symbol "{part_name}" (in_bom yes) (on_board yes)\r\n'
+        f'    (property "Footprint" "{part_name}")\r\n'
+        f'    (symbol "{part_name}_0_1"\r\n'
+        "    )\r\n"
+        "  )\r\n"
+        ")\r\n"
+    )
+    fp_content = f'(footprint "{part_name}"\n)\n'
+
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr(f"{part_name}/KiCADv6/2026-01-01_00-00-00.kicad_sym", sym_content)
+        zf.writestr(
+            f"{part_name}/KiCADv6/footprints.pretty/{part_name}.kicad_mod", fp_content
+        )
+
+    return zip_path
+
+
 @pytest.fixture
 def library_tree(tmp_path: Path) -> Path:
     """Set up a minimal library tree with kilm.yaml."""
     lib = tmp_path / "mylib"
     (lib / "symbols").mkdir(parents=True)
-    (lib / "footprints" / "LPP.pretty").mkdir(parents=True)
-    (lib / "symbols" / "LPP.kicad_sym").write_text(SAMPLE_SYM_LIB, encoding="utf-8")
+    (lib / "footprints" / "SAMPLELIB.pretty").mkdir(parents=True)
+    (lib / "symbols" / "SAMPLELIB.kicad_sym").write_text(
+        SAMPLE_SYM_LIB, encoding="utf-8"
+    )
     (lib / "kilm.yaml").write_text("name: mylib\n", encoding="utf-8")
     return lib
 
@@ -185,13 +216,13 @@ def test_import_zip_cli_adds_part(
     assert result.exit_code == 0, result.output
     assert "add: TestPart" in result.output
 
-    sym_lib = library_tree / "symbols" / "LPP.kicad_sym"
+    sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
     assert "TestPart" in sym_lib.read_text(encoding="utf-8")
 
-    fp_file = library_tree / "footprints" / "LPP.pretty" / "TestPart.kicad_mod"
+    fp_file = library_tree / "footprints" / "SAMPLELIB.pretty" / "TestPart.kicad_mod"
     assert fp_file.exists()
 
-    model_file = library_tree / "LPP.3dshapes" / "TestPart.stp"
+    model_file = library_tree / "SAMPLELIB.3dshapes" / "TestPart.stp"
     assert model_file.exists()
 
 
@@ -209,9 +240,31 @@ def test_import_zip_cli_dry_run_no_changes(
     assert result.exit_code == 0, result.output
     assert "add: DryPart" in result.output
 
-    sym_lib = library_tree / "symbols" / "LPP.kicad_sym"
+    sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
     assert "DryPart" not in sym_lib.read_text(encoding="utf-8")
-    assert not (library_tree / "LPP.3dshapes" / "DryPart.stp").exists()
+    assert not (library_tree / "SAMPLELIB.3dshapes" / "DryPart.stp").exists()
+
+
+def test_import_zip_cli_adds_ultralibrarian_part(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+):
+    zip_path = _make_ultralibrarian_zip(tmp_path, "UlPart")
+
+    with patch(
+        "kicad_lib_manager.commands.import_zip.command._detect_kicad_cli",
+        return_value=None,
+    ):
+        result = runner.invoke(app, ["import", str(zip_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "SYM  add: UlPart" in result.output
+    assert "FP   add: UlPart.kicad_mod" in result.output
+
+    sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
+    assert "UlPart" in sym_lib.read_text(encoding="utf-8")
+
+    fp_file = library_tree / "footprints" / "SAMPLELIB.pretty" / "UlPart.kicad_mod"
+    assert fp_file.exists()
 
 
 def test_import_zip_cli_skips_existing(

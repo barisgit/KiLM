@@ -1,5 +1,5 @@
 """
-Import command: unpack a SamacSys/Mouser KiCad ZIP into the configured library.
+Import command: unpack a SamacSys/Mouser/UltraLibrarian KiCad ZIP into the configured library.
 """
 
 import re
@@ -19,55 +19,47 @@ console = Console()
 
 # ── Symbol helpers ────────────────────────────────────────────────────────────
 
-_SYM_BLOCK_RE = re.compile(r"^\t\(symbol \"")
 
+def _extract_symbol_blocks(text: str) -> list[str]:
+    """Extract top-level `(symbol "...")` blocks by tracking paren depth.
 
-def _paren_depth(line: str) -> int:
-    """Count net paren depth change in line, ignoring parens inside "..." strings."""
+    Depth-based (not indentation-based) so it works regardless of whether
+    the generator indents with tabs (SamacSys/Mouser) or spaces
+    (UltraLibrarian), and regardless of line endings.
+    """
+    blocks: list[str] = []
     depth = 0
     in_str = False
+    block_start: Optional[int] = None
     i = 0
-    while i < len(line):
-        ch = line[i]
+    n = len(text)
+    while i < n:
+        ch = text[i]
         if in_str:
-            if ch == "\\" and i + 1 < len(line):
-                i += 2  # skip escaped character
+            if ch == "\\" and i + 1 < n:
+                i += 2
                 continue
             if ch == '"':
                 in_str = False
-        else:
-            if ch == '"':
-                in_str = True
-            elif ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth -= 1
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "(":
+            if depth == 1 and text.startswith('(symbol "', i):
+                block_start = i
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 1 and block_start is not None:
+                blocks.append(text[block_start : i + 1])
+                block_start = None
         i += 1
-    return depth
-
-
-def _extract_symbol_blocks(text: str) -> list[str]:
-    blocks: list[str] = []
-    current: list[str] = []
-    depth = 0
-    in_sym = False
-    for line in text.split("\n"):
-        if not in_sym and _SYM_BLOCK_RE.match(line):
-            in_sym = True
-            depth = _paren_depth(line)
-            current = [line]
-        elif in_sym:
-            current.append(line)
-            depth += _paren_depth(line)
-            if depth == 0:
-                blocks.append("\n".join(current))
-                in_sym = False
-                current = []
     return blocks
 
 
 def _symbol_name(block: str) -> str:
-    m = re.match(r'\t\(symbol "([^"]+)"', block)
+    m = re.match(r'\(symbol "([^"]+)"', block)
     return m.group(1) if m else ""
 
 
@@ -213,8 +205,10 @@ def _import_zip(
         with zipfile.ZipFile(zip_path) as zf:
             _safe_extractall(zf, tmp_path)
 
-        kicad_dirs = list(tmp_path.rglob("KiCad"))
-        model_dirs = list(tmp_path.rglob("3D"))
+        all_dirs = [d for d in tmp_path.rglob("*") if d.is_dir()]
+        # "KiCad" (SamacSys/Mouser) or "KiCADv6" (UltraLibrarian), any case
+        kicad_dirs = [d for d in all_dirs if d.name.lower().startswith("kicad")]
+        model_dirs = [d for d in all_dirs if d.name.lower() == "3d"]
 
         # 3D models
         for d in model_dirs:
@@ -230,9 +224,9 @@ def _import_zip(
                             shutil.copy2(f, dest)
                         result["models"].append(f.name)
 
-        # Footprints
+        # Footprints (UltraLibrarian nests these under a "*.pretty" subdir)
         for d in kicad_dirs:
-            for f in d.glob("*.kicad_mod"):
+            for f in d.rglob("*.kicad_mod"):
                 dest = fp_dir / f.name
                 if dest.exists():
                     console.print(f"  FP   skip (exists): {f.name}")
@@ -248,7 +242,7 @@ def _import_zip(
 
         # Symbols
         for d in kicad_dirs:
-            for f in d.glob("*.kicad_sym"):
+            for f in d.rglob("*.kicad_sym"):
                 if not dry_run:
                     _upgrade_sym(f, kicad_cli)
                 added, skipped = _merge_symbols(f, sym_lib, lib_name, dry_run)
@@ -285,7 +279,8 @@ def _detect_kicad_cli() -> Optional[Path]:
 
 def import_zip(
     zip_files: Annotated[
-        list[Path], typer.Argument(help="SamacSys/Mouser ZIP file(s) to import")
+        list[Path],
+        typer.Argument(help="SamacSys/Mouser/UltraLibrarian ZIP file(s) to import"),
     ],
     library: Annotated[
         Optional[str],
@@ -308,10 +303,11 @@ def import_zip(
         ),
     ] = False,
 ) -> None:
-    """Import SamacSys/Mouser KiCad ZIP(s) into the configured library.
+    """Import SamacSys/Mouser/UltraLibrarian KiCad ZIP(s) into the configured library.
 
-    Each ZIP should be a standard SamacSys multi-EDA archive as downloaded
-    from Mouser or component search. The command extracts the KiCad files
+    Each ZIP should be a standard SamacSys multi-EDA archive (as downloaded
+    from Mouser or component search) or an UltraLibrarian KiCad export.
+    The command extracts the KiCad files
     and merges them into the library. Run 'kilm setup' afterwards to register
     any newly added libraries in KiCad.
     """
