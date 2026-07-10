@@ -135,15 +135,27 @@ def _upgrade_fp(path: Path, kicad_cli: Optional[Path]) -> None:
         shutil.copy2(path, in_pretty / path.name)
         out_dir = Path(tmp) / "out"
 
-        cmd = _build_kicad_cli_cmd(kicad_cli, "fp", "upgrade", "--force", "--output", str(out_dir), str(in_pretty))
+        cmd = _build_kicad_cli_cmd(
+            kicad_cli,
+            "fp",
+            "upgrade",
+            "--force",
+            "--output",
+            str(out_dir),
+            str(in_pretty),
+        )
 
         try:
             subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         except subprocess.TimeoutExpired:
-            console.print(f"[yellow]  warn: kicad-cli fp upgrade timed out for {path.name}, skipping[/yellow]")
+            console.print(
+                f"[yellow]  warn: kicad-cli fp upgrade timed out for {path.name}, skipping[/yellow]"
+            )
             return
         except subprocess.CalledProcessError as exc:
-            console.print(f"[yellow]  warn: kicad-cli fp upgrade failed for {path.name}: {exc.stderr.strip()}[/yellow]")
+            console.print(
+                f"[yellow]  warn: kicad-cli fp upgrade failed for {path.name}: {exc.stderr.strip()}[/yellow]"
+            )
             return
         upgraded = out_dir / path.name
         if upgraded.exists():
@@ -158,9 +170,13 @@ def _upgrade_sym(sym_file: Path, kicad_cli: Optional[Path]) -> None:
     try:
         subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
     except subprocess.TimeoutExpired:
-        console.print(f"[yellow]  warn: kicad-cli sym upgrade timed out for {sym_file.name}, skipping[/yellow]")
+        console.print(
+            f"[yellow]  warn: kicad-cli sym upgrade timed out for {sym_file.name}, skipping[/yellow]"
+        )
     except subprocess.CalledProcessError as exc:
-        console.print(f"[yellow]  warn: kicad-cli sym upgrade failed for {sym_file.name}: {exc.stderr.strip()}[/yellow]")
+        console.print(
+            f"[yellow]  warn: kicad-cli sym upgrade failed for {sym_file.name}: {exc.stderr.strip()}[/yellow]"
+        )
 
 
 def _build_kicad_cli_cmd(kicad_cli: Path, *args: str) -> list[str]:
@@ -182,7 +198,9 @@ def _safe_extractall(zf: zipfile.ZipFile, dest: Path) -> None:
     dest_resolved = dest.resolve()
     for member in zf.namelist():
         member_path = (dest / member).resolve()
-        if member_path != dest_resolved and not member_path.is_relative_to(dest_resolved):
+        if member_path != dest_resolved and not member_path.is_relative_to(
+            dest_resolved
+        ):
             raise ValueError(f"Unsafe ZIP entry rejected: {member!r}")
     zf.extractall(dest)
 

@@ -4,7 +4,7 @@ from .command import import_zip
 
 import_zip_app = typer.Typer(
     name="import",
-    help="Import SamacSys/Mouser KiCad ZIP(s) into the configured library",
+    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the configured library",
     rich_markup_mode="rich",
     callback=import_zip,
     invoke_without_command=True,

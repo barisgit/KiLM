@@ -21,6 +21,13 @@ from kicad_lib_manager.main import app
 
 runner = CliRunner()
 
+
+@pytest.fixture(autouse=True)
+def _fixed_console_width(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin terminal width so Rich doesn't wrap output lines differently per host."""
+    monkeypatch.setenv("COLUMNS", "200")
+
+
 # ── Unit tests for helpers ────────────────────────────────────────────────────
 
 SAMPLE_SYM_LIB = """\
@@ -82,7 +89,10 @@ def test_safe_extractall_rejects_zip_slip(tmp_path: Path):
         zf.writestr("../../outside.txt", "malicious content")
     dest = tmp_path / "extract"
     dest.mkdir()
-    with zipfile.ZipFile(zip_path) as zf, pytest.raises(ValueError, match="Unsafe ZIP entry"):
+    with (
+        zipfile.ZipFile(zip_path) as zf,
+        pytest.raises(ValueError, match="Unsafe ZIP entry"),
+    ):
         _safe_extractall(zf, dest)
     assert not (tmp_path / "outside.txt").exists()
 

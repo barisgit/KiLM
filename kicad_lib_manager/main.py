@@ -163,7 +163,7 @@ app.add_typer(add_hook_app, name="add-hook", help="Add project hooks")
 app.add_typer(
     import_zip_app,
     name="import",
-    help="Import SamacSys/Mouser KiCad ZIP(s) into the library",
+    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library",
 )
 
 
