@@ -104,14 +104,21 @@ def _merge_symbols(
 # ── Footprint helpers ─────────────────────────────────────────────────────────
 
 
+_MODEL_PATH_RE = re.compile(
+    # Longer/compound extensions must come before their literal prefixes
+    # (e.g. "step.gz" before "step"), or the alternation matches the
+    # shorter one first and leaves the rest of the extension dangling.
+    r'\(model\s+(?:"([^"]+)"|(\S+\.(?:step\.gz|stp\.gz|step|stp)))'
+)
+
+
 def _fix_3d_path(text: str, models_dir_name: str) -> str:
     def _replace(m: re.Match[str]) -> str:
-        filename = Path(m.group(1).strip('"')).name
+        raw = m.group(1) if m.group(1) is not None else m.group(2)
+        filename = Path(raw).name
         return f'(model "${{KICAD_3RD_PARTY}}/{models_dir_name}/{filename}"'
 
-    text = re.sub(r'\(model\s+"([^"]+)"', _replace, text)
-    text = re.sub(r"\(model\s+(\S+\.(?:stp|step|stp\.gz))", _replace, text)
-    return text
+    return _MODEL_PATH_RE.sub(_replace, text)
 
 
 def _upgrade_fp(path: Path, kicad_cli: Optional[Path]) -> None:
@@ -212,7 +219,9 @@ def _import_zip(
 
         # 3D models
         for f in tmp_path.rglob("*"):
-            if f.suffix.lower() in (".stp", ".step") or f.name.endswith(".stp.gz"):
+            if f.suffix.lower() in (".stp", ".step") or f.name.lower().endswith(
+                (".stp.gz", ".step.gz")
+            ):
                 dest = models_dir / f.name
                 if dest.exists():
                     console.print(f"  3D   skip (exists): {f.name}")

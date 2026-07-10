@@ -93,6 +93,27 @@ def test_fix_3d_path_normalises():
     assert "${KICAD_3RD_PARTY}/SAMPLELIB.3dshapes/somepart.stp" in result
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '(model "C:/Vendor/somepart.step"',
+        '(model "C:/Vendor/somepart.stp.gz"',
+        '(model "C:/Vendor/somepart.step.gz"',
+        "(model somepart.stp",
+        "(model somepart.step",
+        "(model somepart.stp.gz",
+        "(model somepart.step.gz",
+    ],
+)
+def test_fix_3d_path_handles_all_extensions_without_truncation(raw: str):
+    # Regression: chained re.sub passes (or misordered alternation) previously
+    # matched a compound extension's own prefix (e.g. "step" inside
+    # "step.gz"), leaving the rest of the extension as dangling text.
+    result = _fix_3d_path(raw, "SAMPLELIB.3dshapes")
+    assert result.count('"') == 2
+    assert result.endswith('"')
+
+
 def test_merge_symbols_adds_new_skips_existing(tmp_path: Path):
     sym_lib = tmp_path / "SAMPLELIB.kicad_sym"
     sym_lib.write_text(SAMPLE_SYM_LIB, encoding="utf-8")
