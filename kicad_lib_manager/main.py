@@ -16,6 +16,7 @@ from typer.core import TyperGroup
 from .commands.add_3d import add_3d_app
 from .commands.add_hook import add_hook_app
 from .commands.config import config_app
+from .commands.import_zip import import_zip_app
 from .commands.init import init_app
 from .commands.list_libraries import list_app
 from .commands.pin import pin_app
@@ -159,6 +160,11 @@ app.add_typer(add_3d_app, name="add-3d", help="Add 3D model libraries")
 app.add_typer(sync_app, name="sync", help="Update/sync library content")
 app.add_typer(update_app, name="update", help="Update KiLM itself")
 app.add_typer(add_hook_app, name="add-hook", help="Add project hooks")
+app.add_typer(
+    import_zip_app,
+    name="import",
+    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library",
+)
 
 
 if __name__ == "__main__":
