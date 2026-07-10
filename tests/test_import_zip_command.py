@@ -177,6 +177,35 @@ def _make_ultralibrarian_zip(tmp_path: Path, part_name: str) -> Path:
     return zip_path
 
 
+def _make_snapmagic_zip(tmp_path: Path, part_name: str) -> Path:
+    """Build a minimal SnapMagic-style ZIP for testing.
+
+    SnapMagic differs from every other vendor: there is no wrapping
+    "KiCad"/"3D" dir at all - the .kicad_sym, .kicad_mod, and .step files
+    sit directly at the ZIP root.
+    """
+    zip_path = tmp_path / f"{part_name}.zip"
+
+    sym_content = f"""\
+(kicad_symbol_lib
+\t(symbol "{part_name}"
+\t\t(property "Footprint" "FP_{part_name}")
+\t)
+)
+"""
+    fp_content = f"""\
+(footprint "FP_{part_name}"
+)
+"""
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr(f"{part_name}.kicad_sym", sym_content)
+        zf.writestr(f"FP_{part_name}.kicad_mod", fp_content)
+        zf.writestr(f"{part_name}.step", "STEP data")
+        zf.writestr("how-to-import.htm", "<html></html>")
+
+    return zip_path
+
+
 @pytest.fixture
 def library_tree(tmp_path: Path) -> Path:
     """Set up a minimal library tree with kilm.yaml."""
@@ -265,6 +294,32 @@ def test_import_zip_cli_adds_ultralibrarian_part(
 
     fp_file = library_tree / "footprints" / "SAMPLELIB.pretty" / "UlPart.kicad_mod"
     assert fp_file.exists()
+
+
+def test_import_zip_cli_adds_snapmagic_part(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+):
+    zip_path = _make_snapmagic_zip(tmp_path, "SnapPart")
+
+    with patch(
+        "kicad_lib_manager.commands.import_zip.command._detect_kicad_cli",
+        return_value=None,
+    ):
+        result = runner.invoke(app, ["import", str(zip_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "SYM  add: SnapPart" in result.output
+    assert "FP   add: FP_SnapPart.kicad_mod" in result.output
+    assert "3D   add: SnapPart.step" in result.output
+
+    sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
+    assert "SnapPart" in sym_lib.read_text(encoding="utf-8")
+
+    fp_file = library_tree / "footprints" / "SAMPLELIB.pretty" / "FP_SnapPart.kicad_mod"
+    assert fp_file.exists()
+
+    model_file = library_tree / "SAMPLELIB.3dshapes" / "SnapPart.step"
+    assert model_file.exists()
 
 
 def test_import_zip_cli_skips_existing(

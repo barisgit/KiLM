@@ -1,5 +1,5 @@
 """
-Import command: unpack a SamacSys/Mouser/UltraLibrarian KiCad ZIP into the configured library.
+Import command: unpack a SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP into the configured library.
 """
 
 import re
@@ -205,53 +205,50 @@ def _import_zip(
         with zipfile.ZipFile(zip_path) as zf:
             _safe_extractall(zf, tmp_path)
 
-        all_dirs = [d for d in tmp_path.rglob("*") if d.is_dir()]
-        # "KiCad" (SamacSys/Mouser) or "KiCADv6" (UltraLibrarian), any case
-        kicad_dirs = [d for d in all_dirs if d.name.lower().startswith("kicad")]
-        model_dirs = [d for d in all_dirs if d.name.lower() == "3d"]
+        # Vendor ZIPs disagree on directory layout (SamacSys/Mouser use
+        # "KiCad"/"3D" dirs, UltraLibrarian uses "KiCADv6" with a nested
+        # "*.pretty" dir, SnapMagic has no wrapping dir at all) so search
+        # the whole extracted tree by extension instead of by dir name.
 
         # 3D models
-        for d in model_dirs:
-            for f in d.iterdir():
-                if f.suffix.lower() in (".stp", ".step") or f.name.endswith(".stp.gz"):
-                    dest = models_dir / f.name
-                    if dest.exists():
-                        console.print(f"  3D   skip (exists): {f.name}")
-                    else:
-                        console.print(f"  3D   add: {f.name}")
-                        if not dry_run:
-                            models_dir.mkdir(exist_ok=True)
-                            shutil.copy2(f, dest)
-                        result["models"].append(f.name)
-
-        # Footprints (UltraLibrarian nests these under a "*.pretty" subdir)
-        for d in kicad_dirs:
-            for f in d.rglob("*.kicad_mod"):
-                dest = fp_dir / f.name
+        for f in tmp_path.rglob("*"):
+            if f.suffix.lower() in (".stp", ".step") or f.name.endswith(".stp.gz"):
+                dest = models_dir / f.name
                 if dest.exists():
-                    console.print(f"  FP   skip (exists): {f.name}")
-                    continue
-                console.print(f"  FP   add: {f.name}")
-                if not dry_run:
-                    text = _fix_3d_path(f.read_text(encoding="utf-8"), models_dir_name)
-                    f.write_text(text, encoding="utf-8")
-                    _upgrade_fp(f, kicad_cli)
-                    fp_dir.mkdir(exist_ok=True)
-                    shutil.copy2(f, dest)
-                result["fp"].append(f.name)
+                    console.print(f"  3D   skip (exists): {f.name}")
+                else:
+                    console.print(f"  3D   add: {f.name}")
+                    if not dry_run:
+                        models_dir.mkdir(exist_ok=True)
+                        shutil.copy2(f, dest)
+                    result["models"].append(f.name)
+
+        # Footprints
+        for f in tmp_path.rglob("*.kicad_mod"):
+            dest = fp_dir / f.name
+            if dest.exists():
+                console.print(f"  FP   skip (exists): {f.name}")
+                continue
+            console.print(f"  FP   add: {f.name}")
+            if not dry_run:
+                text = _fix_3d_path(f.read_text(encoding="utf-8"), models_dir_name)
+                f.write_text(text, encoding="utf-8")
+                _upgrade_fp(f, kicad_cli)
+                fp_dir.mkdir(exist_ok=True)
+                shutil.copy2(f, dest)
+            result["fp"].append(f.name)
 
         # Symbols
-        for d in kicad_dirs:
-            for f in d.rglob("*.kicad_sym"):
-                if not dry_run:
-                    _upgrade_sym(f, kicad_cli)
-                added, skipped = _merge_symbols(f, sym_lib, lib_name, dry_run)
-                for name in added:
-                    console.print(f"  SYM  add: {name}")
-                for name in skipped:
-                    console.print(f"  SYM  skip (exists): {name}")
-                result["sym"].extend(added)
-                result["sym_skipped"].extend(skipped)
+        for f in tmp_path.rglob("*.kicad_sym"):
+            if not dry_run:
+                _upgrade_sym(f, kicad_cli)
+            added, skipped = _merge_symbols(f, sym_lib, lib_name, dry_run)
+            for name in added:
+                console.print(f"  SYM  add: {name}")
+            for name in skipped:
+                console.print(f"  SYM  skip (exists): {name}")
+            result["sym"].extend(added)
+            result["sym_skipped"].extend(skipped)
 
     return result
 
@@ -280,7 +277,9 @@ def _detect_kicad_cli() -> Optional[Path]:
 def import_zip(
     zip_files: Annotated[
         list[Path],
-        typer.Argument(help="SamacSys/Mouser/UltraLibrarian ZIP file(s) to import"),
+        typer.Argument(
+            help="SamacSys/Mouser/UltraLibrarian/SnapMagic ZIP file(s) to import"
+        ),
     ],
     library: Annotated[
         Optional[str],
@@ -303,7 +302,7 @@ def import_zip(
         ),
     ] = False,
 ) -> None:
-    """Import SamacSys/Mouser/UltraLibrarian KiCad ZIP(s) into the configured library.
+    """Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the configured library.
 
     Each ZIP should be a standard SamacSys multi-EDA archive (as downloaded
     from Mouser or component search) or an UltraLibrarian KiCad export.
