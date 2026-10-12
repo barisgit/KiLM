@@ -998,9 +998,8 @@ def list_templates(
 
     # If JSON output is requested
     if json_output:
-        import json as json_lib
-
-        get_console().print(json_lib.dumps(all_templates, indent=2))
+        # Plain echo: a Rich console would wrap long values and break the JSON.
+        typer.echo(json.dumps(all_templates, indent=2))
         return
 
     # Group templates by library for display
