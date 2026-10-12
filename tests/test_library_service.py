@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+
+from kicad_lib_manager.services import library_service
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.metadata import read_github_metadata, write_github_metadata
 
@@ -54,3 +57,15 @@ def test_force_replaces_existing_metadata(tmp_path: Path) -> None:
 
     assert metadata["name"] == tmp_path.name
     assert metadata["version"] == "1.0.0"
+
+
+def test_unwritable_metadata_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A metadata file that cannot be written is an error, not a silent success."""
+    monkeypatch.setattr(
+        library_service, "write_github_metadata", lambda _directory, _metadata: False
+    )
+
+    with pytest.raises(OSError, match=r"kilm\.yaml"):
+        LibraryService.initialize_library(tmp_path)

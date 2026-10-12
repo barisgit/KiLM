@@ -5,6 +5,7 @@ from typing import Final
 
 from kicad_lib_manager.services.kicad_config import find_kicad_config
 from kicad_lib_manager.services.library_table import add_libraries
+from kicad_lib_manager.utils.constants import GITHUB_METADATA_FILE
 from kicad_lib_manager.utils.file_ops import list_libraries
 from kicad_lib_manager.utils.metadata import (
     GitHubMetadata,
@@ -57,7 +58,7 @@ class LibraryService:
         capabilities and metadata file reflect them.
 
         Raises:
-            OSError: A folder cannot be created.
+            OSError: A folder or the metadata file cannot be written.
         """
         overrides = (name, description, env_var)
         existing = read_github_metadata(directory)
@@ -87,5 +88,7 @@ class LibraryService:
             "footprints": True,
             "templates": True,
         }
-        write_github_metadata(directory, metadata)
+        if not write_github_metadata(directory, metadata):
+            msg = f"Could not write {GITHUB_METADATA_FILE} in {directory}"
+            raise OSError(msg)
         return metadata
