@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from .helpers import (
+from tests.import_zip.helpers import (
     SAMPLE_SYM_LIB,
     run_import,
     samacsys_zip,

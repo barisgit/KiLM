@@ -9,9 +9,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from kicad_lib_manager.commands.import_zip.archive import extract_part_files
-from kicad_lib_manager.commands.import_zip.errors import ImportFailure
-
-from .helpers import run_import, samacsys_zip, summary, zip_with
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
+from tests.import_zip.helpers import run_import, samacsys_zip, summary, zip_with
 
 
 def _set_header_field(path: Path, local: int, central: int, value: int) -> None:
@@ -71,7 +70,7 @@ def test_zip_slip_entry_rejects_the_archive(tmp_path: Path) -> None:
     dest = tmp_path / "extract"
     dest.mkdir()
 
-    with pytest.raises(ImportFailure, match="unsafe ZIP entry"):
+    with pytest.raises(ImportZipError, match="unsafe ZIP entry"):
         extract_part_files(zip_path, dest)
     assert not (tmp_path / "outside.kicad_mod").exists()
 

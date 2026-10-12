@@ -10,8 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from kicad_lib_manager.utils.file_ops import write_atomically
-
-from .helpers import (
+from tests.import_zip.helpers import (
     SAMPLE_SYM_LIB,
     run_import,
     samacsys_zip,

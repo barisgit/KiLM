@@ -7,8 +7,13 @@ from unittest.mock import MagicMock, patch
 from click.testing import Result
 
 from kicad_lib_manager.main import app
-
-from .helpers import SAMPLE_SYM_LIB, run_import, runner, samacsys_zip, zip_with
+from tests.import_zip.helpers import (
+    SAMPLE_SYM_LIB,
+    run_import,
+    runner,
+    samacsys_zip,
+    zip_with,
+)
 
 KICAD8_SYM = 20231120
 KICAD8_FP = 20240108

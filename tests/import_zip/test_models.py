@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from kicad_lib_manager.commands.import_zip.importer import ModelRef, fix_3d_path
-
-from .helpers import run_import, summary, zip_with
+from tests.import_zip.helpers import run_import, summary, zip_with
 
 LIB_MODELS = {
     "somepart.stp": ModelRef("${LIB}/SAMPLELIB.3dshapes", "somepart.stp"),

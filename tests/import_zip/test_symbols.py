@@ -2,15 +2,14 @@
 
 import pytest
 
-from kicad_lib_manager.commands.import_zip.errors import ImportFailure
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
 from kicad_lib_manager.commands.import_zip.symbols import (
     extract_symbol_blocks,
     fix_footprint_ref,
     merge_symbols,
     symbol_name,
 )
-
-from .helpers import INCOMING_SYM, SAMPLE_SYM_LIB
+from tests.import_zip.helpers import INCOMING_SYM, SAMPLE_SYM_LIB
 
 
 def test_extract_symbol_blocks() -> None:
@@ -74,5 +73,5 @@ def test_merge_symbols_treats_known_names_as_present() -> None:
 
 
 def test_merge_symbols_rejects_a_non_library_target() -> None:
-    with pytest.raises(ImportFailure, match="not a KiCad symbol library"):
+    with pytest.raises(ImportZipError, match="not a KiCad symbol library"):
         merge_symbols(INCOMING_SYM, "", "SAMPLELIB")
