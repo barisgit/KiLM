@@ -1,4 +1,4 @@
-"""List command implementation for KiCad Library Manager (Typer version)."""
+"""The ``list`` command: show the libraries in a library directory."""
 
 from pathlib import Path
 from typing import Annotated
@@ -6,18 +6,40 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
+from kicad_lib_manager.commands.shared import resolve_kicad_lib_dir
+from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
 
-from ...services.library_service import LibraryService
-from ...utils.env_vars import expand_user_path, find_environment_variables
+
+def _print_library_table(
+    kind: str, names: list[str], extension: str, style: str
+) -> None:
+    """Print the ``kind`` libraries in ``names``, or a notice when there are none."""
+    console = get_console()
+    if not names:
+        console.print(f"[yellow]No {kind} libraries found[/yellow]")
+        return
+    table = Table(
+        title=f"Available {kind.capitalize()} Libraries",
+        show_header=True,
+        header_style=f"bold {style}",
+    )
+    table.add_column("Library Name", style=style, no_wrap=True)
+    table.add_column("Type", style="blue")
+    for name in sorted(names):
+        table.add_row(name, extension)
+    console.print(table)
 
 
 def list_cmd(
+    *,
     kicad_lib_dir: Annotated[
         str | None,
         typer.Option(
             "--kicad-lib-dir",
-            help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
+            help=(
+                "KiCad library directory (uses KICAD_USER_LIB env var if not specified)"
+            ),
             envvar="KICAD_USER_LIB",
         ),
     ] = None,
@@ -27,75 +49,25 @@ def list_cmd(
     This command scans the KiCad library directory for symbol (.kicad_sym) and
     footprint (.pretty) libraries and displays them in organized tables.
     """
-    # Find environment variables if not provided
-    if not kicad_lib_dir:
-        kicad_lib_dir = find_environment_variables("KICAD_USER_LIB")
-        if not kicad_lib_dir:
-            get_console().print(
-                "[red]Error: KICAD_USER_LIB not set and not provided[/red]"
-            )
-            raise typer.Exit(1)
-
-    # Expand user home directory if needed
-    kicad_lib_dir = expand_user_path(kicad_lib_dir)
-
+    library_dir = resolve_kicad_lib_dir(kicad_lib_dir)
+    console = get_console()
     try:
-        library_service = LibraryService()
-        symbols, footprints = library_service.list_libraries(Path(kicad_lib_dir))
-
-        get_console().print(
-            f"[blue]Scanning library directory:[/blue] {kicad_lib_dir}\n"
-        )
-
-        # Display symbol libraries in a table
-        if symbols:
-            symbol_table = Table(
-                title="Available Symbol Libraries",
-                show_header=True,
-                header_style="bold cyan",
-            )
-            symbol_table.add_column("Library Name", style="cyan", no_wrap=True)
-            symbol_table.add_column("Type", style="blue")
-
-            for symbol in sorted(symbols):
-                symbol_table.add_row(symbol, ".kicad_sym")
-
-            get_console().print(symbol_table)
-        else:
-            get_console().print("[yellow]No symbol libraries found[/yellow]")
-
-        get_console().print()  # Empty line for spacing
-
-        # Display footprint libraries in a table
-        if footprints:
-            footprint_table = Table(
-                title="Available Footprint Libraries",
-                show_header=True,
-                header_style="bold magenta",
-            )
-            footprint_table.add_column("Library Name", style="magenta", no_wrap=True)
-            footprint_table.add_column("Type", style="blue")
-
-            for footprint in sorted(footprints):
-                footprint_table.add_row(footprint, ".pretty")
-
-            get_console().print(footprint_table)
-        else:
-            get_console().print("[yellow]No footprint libraries found[/yellow]")
-
-        # Summary information
-        total_libs = len(symbols) + len(footprints)
-        if total_libs > 0:
-            get_console().print(
-                f"\n[green]Found {total_libs} libraries total[/green] "
-                f"([cyan]{len(symbols)} symbol[/cyan], "
-                f"[magenta]{len(footprints)} footprint[/magenta])"
-            )
-        else:
-            get_console().print(
-                "[yellow]No libraries found in the specified directory[/yellow]"
-            )
-
+        symbols, footprints = LibraryService().list_libraries(Path(library_dir))
     except Exception as e:
-        get_console().print(f"[red]Error listing libraries: {e}[/red]")
+        console.print(f"[red]Error listing libraries: {e}[/red]")
         raise typer.Exit(1) from e
+
+    console.print(f"[blue]Scanning library directory:[/blue] {library_dir}\n")
+    _print_library_table("symbol", symbols, ".kicad_sym", "cyan")
+    console.print()
+    _print_library_table("footprint", footprints, ".pretty", "magenta")
+
+    total = len(symbols) + len(footprints)
+    if total == 0:
+        console.print("[yellow]No libraries found in the specified directory[/yellow]")
+        return
+    console.print(
+        f"\n[green]Found {total} libraries total[/green] "
+        f"([cyan]{len(symbols)} symbol[/cyan], "
+        f"[magenta]{len(footprints)} footprint[/magenta])"
+    )

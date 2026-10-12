@@ -1,0 +1,32 @@
+"""Option handling shared by several commands."""
+
+import typer
+
+from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.env_vars import (
+    expand_user_path,
+    find_environment_variables,
+)
+
+
+def given(value: str | None) -> str | None:
+    """Return ``value``, or None when an option was omitted or set to ``""``.
+
+    Commands treat an empty option or environment variable as not given, so
+    callers can test for None afterwards.
+    """
+    return None if value == "" else value
+
+
+def resolve_kicad_lib_dir(option: str | None) -> str:
+    """Return the symbol and footprint library directory with ``~`` expanded.
+
+    Uses ``option`` when given, otherwise ``KICAD_USER_LIB`` from the places
+    ``find_environment_variables`` searches. Prints an error and exits with
+    status 1 when neither names a directory.
+    """
+    directory = given(option) or given(find_environment_variables("KICAD_USER_LIB"))
+    if directory is None:
+        get_console().print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
+        raise typer.Exit(1)
+    return expand_user_path(directory)
