@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+from kicad_lib_manager.utils.constants import FOOTPRINT_TABLE_FILE, SYMBOL_TABLE_FILE
+
 RUN_KICAD_FIRST: Final = "Please run KiCad at least once before using this tool."
 
 
@@ -72,8 +74,8 @@ def find_kicad_config(
 
     latest = max(versions, key=lambda entry: (_version_key(entry), entry.name))
     if (
-        not (latest / "sym-lib-table").exists()
-        and not (latest / "fp-lib-table").exists()
+        not (latest / SYMBOL_TABLE_FILE).exists()
+        and not (latest / FOOTPRINT_TABLE_FILE).exists()
     ):
         msg = f"KiCad library tables not found in {latest}. {RUN_KICAD_FIRST}"
         raise FileNotFoundError(msg)

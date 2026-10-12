@@ -9,6 +9,7 @@ from rich.table import Table
 from kicad_lib_manager.commands.shared import resolve_kicad_lib_dir
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import SYMBOL_DIR_VAR
 
 
 def _print_library_table(
@@ -40,7 +41,7 @@ def list_cmd(
             help=(
                 "KiCad library directory (uses KICAD_USER_LIB env var if not specified)"
             ),
-            envvar="KICAD_USER_LIB",
+            envvar=SYMBOL_DIR_VAR,
         ),
     ] = None,
 ) -> None:

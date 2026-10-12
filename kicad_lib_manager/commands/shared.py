@@ -3,16 +3,11 @@
 import typer
 
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import SYMBOL_DIR_VAR
 from kicad_lib_manager.utils.env_vars import (
     expand_user_path,
     find_environment_variables,
 )
-
-SYMBOL_DIR_VAR = "KICAD_USER_LIB"
-"""The variable naming the main symbol and footprint library directory."""
-
-MODELS_DIR_VAR = "KICAD_3D_LIB"
-"""The variable naming the main 3D model library directory."""
 
 
 def given(value: str | None) -> str | None:
@@ -42,8 +37,8 @@ def resolve_kicad_lib_dir(option: str | None) -> str:
     """Return the symbol and footprint library directory with ``~`` expanded.
 
     Uses ``option`` when given, otherwise ``KICAD_USER_LIB`` from the places
-    ``find_environment_variables`` searches. Prints an error and exits with
-    status 1 when neither names a directory.
+    ``find_environment_variables`` searches. The value is not checked to be a
+    directory. Prints an error and exits with status 1 when neither is given.
     """
     directory = given(option) or given(find_environment_variables(SYMBOL_DIR_VAR))
     if directory is None:

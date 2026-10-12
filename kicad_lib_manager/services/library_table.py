@@ -12,6 +12,7 @@ from typing import Final, Literal, cast
 import yaml
 
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import FOOTPRINT_TABLE_FILE, SYMBOL_TABLE_FILE
 from kicad_lib_manager.utils.env_vars import expand_user_path
 from kicad_lib_manager.utils.file_ops import (
     list_configured_libraries,
@@ -24,8 +25,8 @@ LibraryKind = Literal["symbols", "footprints"]
 """The library subdirectory of a KiLM library, and so the KiCad table it goes in."""
 
 TABLE_FILES: Final[dict[LibraryKind, str]] = {
-    "symbols": "sym-lib-table",
-    "footprints": "fp-lib-table",
+    "symbols": SYMBOL_TABLE_FILE,
+    "footprints": FOOTPRINT_TABLE_FILE,
 }
 
 LIBRARY_SUFFIXES: Final[dict[LibraryKind, str]] = {

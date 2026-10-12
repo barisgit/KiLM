@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.utils.constants import (
@@ -21,6 +21,8 @@ from kicad_lib_manager.utils.constants import (
     DEFAULT_MAX_BACKUPS,
     GITHUB_METADATA_FILE,
     KICAD_COMMON_FILE,
+    MODELS_DIR_VAR,
+    SYMBOL_DIR_VAR,
 )
 from kicad_lib_manager.utils.kicad_common import (
     PINNED_FOOTPRINTS_KEY,
@@ -34,15 +36,22 @@ class KiCadConfigError(ValueError):
     """kicad_common.json is not valid JSON or not shaped as KiCad writes it."""
 
 
-# The library variables KiLM can derive from its configuration and from the
-# metadata file of a library in the current directory.
-_CONFIG_PATHS: dict[str, Callable[[Config], str | None]] = {
-    "KICAD_USER_LIB": lambda config: config.get_symbol_library_path(),
-    "KICAD_3D_LIB": lambda config: config.get_3d_library_path(),
-}
-_LIBRARY_MARKERS = {
-    "KICAD_USER_LIB": GITHUB_METADATA_FILE,
-    "KICAD_3D_LIB": CLOUD_METADATA_FILE,
+class _LibraryVariable(NamedTuple):
+    """How KiLM derives a main library variable without the user setting it."""
+
+    configured_path: Callable[[Config], str | None]
+    """Reads the current library of this kind from the KiLM configuration."""
+    marker_file: str
+    """The metadata file that makes a directory a library of this kind."""
+
+
+_LIBRARY_VARIABLES = {
+    SYMBOL_DIR_VAR: _LibraryVariable(
+        lambda config: config.get_symbol_library_path(), GITHUB_METADATA_FILE
+    ),
+    MODELS_DIR_VAR: _LibraryVariable(
+        lambda config: config.get_3d_library_path(), CLOUD_METADATA_FILE
+    ),
 }
 _SHELL_FILES = (".bashrc", ".bash_profile", ".profile", ".zshrc")
 
@@ -74,23 +83,23 @@ def find_environment_variables(var_name: str) -> str | None:
 
 
 def _from_config(var_name: str) -> str | None:
-    read_path = _CONFIG_PATHS.get(var_name)
-    if read_path is None:
+    variable = _LIBRARY_VARIABLES.get(var_name)
+    if variable is None:
         return None
     try:
-        path = read_path(Config())
+        path = variable.configured_path(Config())
     except (OSError, LookupError, TypeError, ValueError):
         return None
     return path or None
 
 
 def _from_current_directory(var_name: str) -> str | None:
-    marker = _LIBRARY_MARKERS.get(var_name)
-    if marker is None:
+    variable = _LIBRARY_VARIABLES.get(var_name)
+    if variable is None:
         return None
     try:
         current_dir = Path.cwd().resolve()
-        is_library = (current_dir / marker).exists()
+        is_library = (current_dir / variable.marker_file).exists()
     except OSError:
         return None
     return str(current_dir) if is_library else None

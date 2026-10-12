@@ -4,18 +4,21 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from kicad_lib_manager.commands.shared import MODELS_DIR_VAR, SYMBOL_DIR_VAR
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import (
+    DEFAULT_MAX_BACKUPS,
+    FOOTPRINT_TABLE_FILE,
+    MODELS_DIR_VAR,
+    SYMBOL_DIR_VAR,
+    SYMBOL_TABLE_FILE,
+)
 from kicad_lib_manager.utils.env_vars import (
     update_kicad_env_vars,
     update_pinned_libraries,
 )
 from kicad_lib_manager.utils.file_ops import list_libraries, write_atomically
-
-SYMBOL_TABLE = "sym-lib-table"
-FOOTPRINT_TABLE = "fp-lib-table"
 
 # A path wrapped as if it were a variable: ``(uri "${/path/lib}/Lib.kicad_sym")``.
 _WRAPPED_URI = re.compile(r'\(uri "\${(\/[^}]+)}\/(.*?)"\)')
@@ -68,15 +71,15 @@ class SetupLibraries:
 def fix_invalid_uris(
     kicad_config: Path,
     *,
-    backup_first: bool = True,
-    max_backups: int = 5,
+    max_backups: int = DEFAULT_MAX_BACKUPS,
     dry_run: bool = False,
 ) -> bool:
     """Unwrap library paths written as ``${/path}`` in KiCad's library tables.
 
+    Each table is backed up before it is changed.
+
     Args:
         kicad_config: The KiCad configuration directory.
-        backup_first: Back up each table before changing it.
         max_backups: The number of backups to keep per table.
         dry_run: Only report whether a table needs fixing.
 
@@ -87,7 +90,8 @@ def fix_invalid_uris(
         OSError: A table cannot be read, backed up, or written.
     """
     changes_made = False
-    for table_path in (kicad_config / SYMBOL_TABLE, kicad_config / FOOTPRINT_TABLE):
+    for table in (SYMBOL_TABLE_FILE, FOOTPRINT_TABLE_FILE):
+        table_path = kicad_config / table
         if not table_path.exists():
             continue
         content = table_path.read_text(encoding="utf-8")
@@ -96,8 +100,7 @@ def fix_invalid_uris(
         changes_made = True
         if dry_run:
             continue
-        if backup_first:
-            create_backup(table_path, max_backups)
+        create_backup(table_path, max_backups)
         fixed_content = _WRAPPED_URI.sub(r'(uri "\1/\2")', content)
         write_atomically(table_path, fixed_content.encode("utf-8"))
     return changes_made
@@ -154,7 +157,10 @@ def add_libraries(options: ChangeOptions, libraries: SetupLibraries) -> bool:
     # Plan first: the backup must hold the tables from before the change.
     added, changed = _add_libraries(options, libraries, dry_run=True)
     if changed and not options.dry_run:
-        for table, name in ((SYMBOL_TABLE, "symbol"), (FOOTPRINT_TABLE, "footprint")):
+        for table, name in (
+            (SYMBOL_TABLE_FILE, "symbol"),
+            (FOOTPRINT_TABLE_FILE, "footprint"),
+        ):
             table_path = options.kicad_config / table
             if table_path.exists():
                 create_backup(table_path, options.max_backups)

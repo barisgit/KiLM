@@ -8,7 +8,7 @@ from rich.panel import Panel
 
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
+from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS, KICAD_COMMON_FILE
 from kicad_lib_manager.utils.kicad_common import (
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
@@ -163,7 +163,7 @@ def unpin(  # noqa: PLR0913 -- each CLI option is a Typer parameter
     ] = False,
     max_backups: Annotated[
         int, typer.Option("--max-backups", help="Maximum number of backups to keep")
-    ] = 5,
+    ] = DEFAULT_MAX_BACKUPS,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show verbose output for debugging"),

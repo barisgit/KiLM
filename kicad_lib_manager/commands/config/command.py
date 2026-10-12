@@ -13,11 +13,12 @@ from rich.table import Table
 
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
+from kicad_lib_manager.utils.constants import (
+    CLOUD_METADATA_FILE,
+    GITHUB_METADATA_FILE,
+    MODEL_EXTENSIONS,
+)
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
-
-MODEL_EXTENSIONS: Final = (".step", ".stp", ".wrl", ".wings")
-"""File extensions counted as 3D models when a library does not state its count."""
 
 
 @dataclass(frozen=True)

@@ -11,6 +11,7 @@ from kicad_lib_manager.commands.shared import resolve_kicad_lib_dir
 from kicad_lib_manager.services.kicad_service import KiCadService
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS, SYMBOL_DIR_VAR
 from kicad_lib_manager.utils.env_vars import update_pinned_libraries
 
 
@@ -111,7 +112,7 @@ def pin(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         str | None,
         typer.Option(
             "--kicad-lib-dir",
-            envvar="KICAD_USER_LIB",
+            envvar=SYMBOL_DIR_VAR,
             help=(
                 "KiCad library directory (uses KICAD_USER_LIB env var if not specified)"
             ),
@@ -153,7 +154,7 @@ def pin(  # noqa: PLR0913 -- each CLI option is a Typer parameter
             "--max-backups",
             help="Maximum number of backups to keep",
         ),
-    ] = 5,
+    ] = DEFAULT_MAX_BACKUPS,
     verbose: Annotated[
         bool,
         typer.Option(

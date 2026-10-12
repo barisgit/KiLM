@@ -24,6 +24,7 @@ from kicad_lib_manager.utils.constants import (
     CLOUD_METADATA_FILE,
     GITHUB_METADATA_FILE,
     MAX_ENV_VAR_NAME_LENGTH,
+    MODEL_EXTENSIONS,
 )
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "CloudMetadata",
     "GitHubMetadata",
     "LibraryCapabilities",
+    "count_model_files",
     "generate_env_var_name",
     "get_default_cloud_metadata",
     "get_default_github_metadata",
@@ -40,8 +42,6 @@ __all__ = [
     "write_cloud_metadata",
     "write_github_metadata",
 ]
-
-_MODEL_SUFFIXES = (".step", ".stp", ".wrl", ".wings")
 
 
 class LibraryCapabilities(TypedDict, total=False):
@@ -252,6 +252,16 @@ def get_default_github_metadata(directory: Path) -> GitHubMetadata:
     }
 
 
+def count_model_files(directory: Path) -> int:
+    """Return the number of entries below ``directory`` named like 3D models.
+
+    Matches MODEL_EXTENSIONS case-sensitively at any depth.
+    """
+    return sum(
+        len(list(directory.glob(f"**/*{extension}"))) for extension in MODEL_EXTENSIONS
+    )
+
+
 def get_default_cloud_metadata(directory: Path) -> CloudMetadata:
     """Metadata for a new 3D model library in directory, named after the directory.
 
@@ -259,9 +269,7 @@ def get_default_cloud_metadata(directory: Path) -> CloudMetadata:
     KICAD_3D_<NAME>.
     """
     name = directory.name
-    model_count = sum(
-        len(list(directory.glob(f"**/*{suffix}"))) for suffix in _MODEL_SUFFIXES
-    )
+    model_count = count_model_files(directory)
     return {
         "name": name,
         "description": f"KiCad 3D model library {name}",

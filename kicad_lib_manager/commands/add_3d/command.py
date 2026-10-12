@@ -16,13 +16,12 @@ from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.metadata import (
     CLOUD_METADATA_FILE,
     CloudMetadata,
+    count_model_files,
     generate_env_var_name,
     get_default_cloud_metadata,
     read_cloud_metadata,
     write_cloud_metadata,
 )
-
-MODEL_EXTENSIONS = (".step", ".stp", ".wrl", ".wings")
 
 
 @dataclass(frozen=True)
@@ -127,13 +126,6 @@ def _create_new(
     write_cloud_metadata(directory, metadata)
     console.print("[green]Metadata file created[/green]")
     return metadata
-
-
-def _count_models(directory: Path) -> int:
-    """Return the number of 3D model files below ``directory``."""
-    return sum(
-        len(list(directory.glob(f"**/*{extension}"))) for extension in MODEL_EXTENSIONS
-    )
 
 
 def _confirm_models(model_count: int) -> None:
@@ -250,7 +242,7 @@ def add_3d(  # noqa: PLR0913 -- each CLI option is a Typer parameter
     else:
         metadata = _create_new(directory, overrides, overwriting=has_existing)
 
-    model_count = _count_models(directory)
+    model_count = count_model_files(directory)
     _confirm_models(model_count)
     metadata["model_count"] = model_count
     write_cloud_metadata(directory, metadata)

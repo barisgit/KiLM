@@ -20,6 +20,11 @@ from kicad_lib_manager.commands.setup.sources import (
 )
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import (
+    DEFAULT_MAX_BACKUPS,
+    MODELS_DIR_VAR,
+    SYMBOL_DIR_VAR,
+)
 from kicad_lib_manager.utils.env_vars import expand_user_path
 
 
@@ -29,7 +34,7 @@ def setup(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         str | None,
         typer.Option(
             "--kicad-lib-dir",
-            envvar="KICAD_USER_LIB",
+            envvar=SYMBOL_DIR_VAR,
             help="KiCad library directory (uses KICAD_USER_LIB env var if not "
             "specified)",
         ),
@@ -38,7 +43,7 @@ def setup(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         str | None,
         typer.Option(
             "--kicad-3d-dir",
-            envvar="KICAD_3D_LIB",
+            envvar=MODELS_DIR_VAR,
             help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not "
             "specified)",
         ),
@@ -68,7 +73,7 @@ def setup(  # noqa: PLR0913 -- each CLI option is a Typer parameter
     ] = False,
     max_backups: Annotated[
         int, typer.Option("--max-backups", help="Maximum number of backups to keep")
-    ] = 5,
+    ] = DEFAULT_MAX_BACKUPS,
     dry_run: Annotated[
         bool,
         typer.Option(

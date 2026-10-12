@@ -25,10 +25,6 @@ INVALID_URI_TABLE = (
 @pytest.fixture
 def kicad_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Return an isolated KiCad configuration directory that setup finds."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setattr(setup_sources, "find_environment_variables", lambda _name: None)
     config = tmp_path / "kicad"
     config.mkdir()
@@ -72,7 +68,7 @@ def test_fix_invalid_uris_rewrites_wrapped_paths(kicad_config: Path) -> None:
     table = kicad_config / "sym-lib-table"
     table.write_text(INVALID_URI_TABLE, encoding="utf-8")
 
-    assert setup_changes.fix_invalid_uris(kicad_config, backup_first=False)
+    assert setup_changes.fix_invalid_uris(kicad_config)
 
     assert '(uri "/libs/symbols/Bad.kicad_sym")' in table.read_text(encoding="utf-8")
 
@@ -86,7 +82,7 @@ def test_fix_invalid_uris_keeps_the_table_when_writing_fails(
     fail_writes(monkeypatch)
 
     with pytest.raises(OSError, match="No space left"):
-        setup_changes.fix_invalid_uris(kicad_config, backup_first=False)
+        setup_changes.fix_invalid_uris(kicad_config)
 
     assert table.read_text(encoding="utf-8") == INVALID_URI_TABLE
 

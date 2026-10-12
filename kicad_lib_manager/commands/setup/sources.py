@@ -12,9 +12,10 @@ from typing import Literal
 import typer
 from rich.table import Table
 
-from kicad_lib_manager.commands.shared import MODELS_DIR_VAR, SYMBOL_DIR_VAR, given
+from kicad_lib_manager.commands.shared import given
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import MODELS_DIR_VAR, SYMBOL_DIR_VAR
 from kicad_lib_manager.utils.env_vars import find_environment_variables
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
 

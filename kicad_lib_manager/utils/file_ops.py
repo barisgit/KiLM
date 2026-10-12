@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from kicad_lib_manager.utils.constants import FOOTPRINT_TABLE_FILE, SYMBOL_TABLE_FILE
+
 _DEFAULT_ENCODINGS = ("utf-8", "utf-16", "iso-8859-1")
 
 # One (lib ...) entry per line, as KiCad writes library tables.
@@ -120,7 +122,7 @@ def validate_lib_table(
         ValueError: The table is missing and create_if_missing is False, or
             its content is not a table of its kind.
     """
-    table_type = "fp" if table_path.name == "fp-lib-table" else "sym"
+    table_type = "fp" if table_path.name == FOOTPRINT_TABLE_FILE else "sym"
     if not table_path.exists():
         if not create_if_missing:
             msg = f"Library table not found: {table_path}"
@@ -174,8 +176,8 @@ def list_configured_libraries(
         (symbol library entries, footprint library entries)
     """
     return (
-        _read_lib_table(kicad_config / "sym-lib-table"),
-        _read_lib_table(kicad_config / "fp-lib-table"),
+        _read_lib_table(kicad_config / SYMBOL_TABLE_FILE),
+        _read_lib_table(kicad_config / FOOTPRINT_TABLE_FILE),
     )
 
 
