@@ -1,5 +1,4 @@
-"""
-Template utility functions for KiCad Library Manager.
+"""Template utility functions for KiCad Library Manager.
 Provides functions for working with project templates.
 """
 
@@ -126,8 +125,7 @@ class TemplateMetadata(TypedDict, total=False):
 
 
 def get_gitignore_spec(directory: Path) -> pathspec.PathSpec | None:
-    """
-    Get a PathSpec object representing the gitignore patterns in the given directory.
+    """Get a PathSpec object representing the gitignore patterns in the given directory.
 
     Args:
         directory: Path to the directory containing .gitignore
@@ -172,8 +170,7 @@ def get_gitignore_spec(directory: Path) -> pathspec.PathSpec | None:
 
 
 def list_templates_in_directory(directory: Path) -> list[TemplateMetadata]:
-    """
-    List all templates in a given directory.
+    """List all templates in a given directory.
 
     Args:
         directory: Path to the directory to scan for templates
@@ -219,8 +216,7 @@ def list_templates_in_directory(directory: Path) -> list[TemplateMetadata]:
 def find_potential_variables(
     directory: Path, patterns: list[str] | None = None
 ) -> dict[str, list[str]]:
-    """
-    Scan files in a directory for potential template variables.
+    """Scan files in a directory for potential template variables.
 
     Args:
         directory: Path to the directory to scan
@@ -290,8 +286,7 @@ def create_template_metadata(
     extends: str | None = None,
     dependencies: list[str] | None = None,
 ) -> TemplateMetadata:
-    """
-    Create template metadata dictionary.
+    """Create template metadata dictionary.
 
     Args:
         name: Template name
@@ -358,8 +353,7 @@ def create_template_metadata(
 
 
 def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None:
-    """
-    Write template metadata to a file.
+    """Write template metadata to a file.
 
     Args:
         directory: Template directory
@@ -377,8 +371,7 @@ def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None
 def process_markdown_file(
     source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
-    """
-    Process a Markdown file to add a template header with available variables.
+    """Process a Markdown file to add a template header with available variables.
 
     Args:
         source_file: Source file path
@@ -427,8 +420,7 @@ def create_template_structure(
     gitignore_spec: pathspec.PathSpec | None = None,
     additional_excludes: list[str] | None = None,
 ) -> None:
-    """
-    Create template structure from source directory.
+    """Create template structure from source directory.
 
     Args:
         source_directory: Source directory containing the project
@@ -664,8 +656,7 @@ def create_template_structure(
 
 
 def create_hook_script(hooks_dir: Path) -> None:
-    """
-    Create a basic post-creation hook script.
+    """Create a basic post-creation hook script.
 
     Args:
         hooks_dir: Hooks directory
@@ -716,8 +707,7 @@ def post_create(context):
 def process_kicad_project_file(
     source_file: Path, target_file: Path, variables: dict[str, TemplateVariable]
 ) -> None:
-    """
-    Process a KiCad project file (.kicad_pro).
+    """Process a KiCad project file (.kicad_pro).
 
     Args:
         source_file: Source file path
@@ -776,8 +766,7 @@ def process_kicad_project_file(
 
 
 def process_kicad_schematic_file(source_file: Path, target_file: Path) -> None:
-    """
-    Process a KiCad schematic file (.kicad_sch).
+    """Process a KiCad schematic file (.kicad_sch).
 
     Args:
         source_file: Source file path
@@ -813,8 +802,7 @@ def process_kicad_schematic_file(source_file: Path, target_file: Path) -> None:
 
 
 def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
-    """
-    Process a KiCad PCB file (.kicad_pcb).
+    """Process a KiCad PCB file (.kicad_pcb).
 
     Args:
         source_file: Source file path
@@ -860,8 +848,7 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
 def render_template_string(
     template_str: str, variables: Mapping[str, str | int | bool]
 ) -> str:
-    """
-    Render a template string using Jinja2 or custom Windows-compatible templating.
+    """Render a template string using Jinja2 or custom Windows-compatible templating.
 
     First tries the custom Windows-compatible %{variable} syntax, then falls back to Jinja2.
 
@@ -888,8 +875,7 @@ def render_template_string(
 def render_filename_custom(
     filename: str, variables: Mapping[str, str | int | bool]
 ) -> str:
-    """
-    Render a filename using a custom Windows-compatible templating system.
+    """Render a filename using a custom Windows-compatible templating system.
 
     Uses %{variable_name} syntax instead of {{variable_name}} to avoid Windows filename restrictions.
     Supports transformations like:
@@ -964,12 +950,11 @@ def render_filename_custom(
                 value = transform_value(value, transformations)
 
             return value
-        else:
-            click.echo(
-                f"Warning: Variable '{var_name}' not found in template variables",
-                err=True,
-            )
-            return match.group(0)  # Return original if variable not found
+        click.echo(
+            f"Warning: Variable '{var_name}' not found in template variables",
+            err=True,
+        )
+        return match.group(0)  # Return original if variable not found
 
     # Only try to render if the filename contains our custom template pattern
     if FILENAME_VAR_PATTERN.search(filename):
@@ -982,8 +967,7 @@ def render_filename_custom(
 
 
 def render_filename(filename: str, variables: Mapping[str, str | int | bool]) -> str:
-    """
-    Render a filename using either Jinja2 or custom Windows-compatible templating.
+    """Render a filename using either Jinja2 or custom Windows-compatible templating.
 
     First tries the custom Windows-compatible %{variable} syntax, then falls back to Jinja2.
 
@@ -1012,8 +996,7 @@ def render_filename(filename: str, variables: Mapping[str, str | int | bool]) ->
 
 
 def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
-    """
-    Find all templates in all configured libraries.
+    """Find all templates in all configured libraries.
 
     Args:
         config: The configuration object
@@ -1059,8 +1042,7 @@ def render_template_file(
     variables: Mapping[str, str | int | bool],
     is_binary: bool = False,
 ) -> bool:
-    """
-    Render a template file to a target file.
+    """Render a template file to a target file.
 
     Args:
         source_file: Source file path
@@ -1105,8 +1087,9 @@ def render_template_file(
 
                 # Write rendered content to target file (without .jinja2 extension)
                 target_path_str = str(target_file)
-                if target_path_str.endswith(".jinja2"):
-                    target_path_str = target_path_str[:-7]  # Remove ".jinja2"
+                target_path_str = target_path_str.removesuffix(
+                    ".jinja2"
+                )  # Remove ".jinja2"
                 target_path = Path(target_path_str)
                 with Path(target_path).open("w", encoding="utf-8") as f:
                     f.write(rendered_content)
@@ -1143,8 +1126,7 @@ def create_project_from_template(
     dry_run: bool = False,
     skip_hooks: bool = False,
 ) -> bool:
-    """
-    Create a new project from a template.
+    """Create a new project from a template.
 
     Args:
         template_dir: Path to the template directory
@@ -1200,7 +1182,7 @@ def create_project_from_template(
             return False
 
     # Check if we need to merge with variables from a parent template
-    if "extends" in metadata and metadata["extends"]:
+    if metadata.get("extends"):
         # TODO: Handle template inheritance
         click.echo("Warning: Template inheritance not fully implemented yet", err=True)
 
@@ -1236,8 +1218,7 @@ def create_project_from_template(
 
             # Strip .jinja2 extension from target file if present
             target_filename = file
-            if target_filename.endswith(".jinja2"):
-                target_filename = target_filename[:-7]
+            target_filename = target_filename.removesuffix(".jinja2")
 
             # Render the filename if it contains template variables
             rendered_filename = render_filename(target_filename, variables)
@@ -1300,8 +1281,7 @@ def run_post_create_hook(
     variables: Mapping[str, str | int | bool],
     template_metadata: dict[str, Any],
 ) -> None:
-    """
-    Run a post-creation hook script.
+    """Run a post-creation hook script.
 
     Args:
         hook_script: Path to the hook script

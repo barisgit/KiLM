@@ -1,6 +1,4 @@
-"""
-Banner utilities for KiCad Library Manager
-"""
+"""Banner utilities for KiCad Library Manager"""
 
 from typing import Literal
 
@@ -10,8 +8,7 @@ from rich.console import Console
 def show_banner(
     console: Console, justify: Literal["center", "left", "right"] = "center"
 ) -> None:
-    """
-    Display the KiLM banner with colorful ASCII art.
+    """Display the KiLM banner with colorful ASCII art.
 
     Front characters (KILM text) and back characters (box drawing) use different colors
     to create a layered visual effect.

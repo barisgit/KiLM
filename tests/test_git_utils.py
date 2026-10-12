@@ -1,6 +1,4 @@
-"""
-Tests for Git utility functions.
-"""
+"""Tests for Git utility functions."""
 
 import os
 from pathlib import Path

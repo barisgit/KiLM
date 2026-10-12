@@ -1,6 +1,4 @@
-"""
-Tests for template utilities and commands.
-"""
+"""Tests for template utilities and commands."""
 
 import shutil
 import tempfile

@@ -1,6 +1,4 @@
-"""
-Status command implementation for KiCad Library Manager (Typer version).
-"""
+"""Status command implementation for KiCad Library Manager (Typer version)."""
 
 import json
 from pathlib import Path

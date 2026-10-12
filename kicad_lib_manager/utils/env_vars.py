@@ -1,6 +1,4 @@
-"""
-Environment variable handling utilities
-"""
+"""Environment variable handling utilities"""
 
 import json
 import os
@@ -31,8 +29,7 @@ except ImportError:
 
 
 def find_environment_variables(var_name: str) -> str | None:
-    """
-    Find environment variables from various sources in the following order:
+    """Find environment variables from various sources in the following order:
     1. Config file
     2. Metadata files in current directory
     3. Environment variables
@@ -131,8 +128,7 @@ def find_environment_variables(var_name: str) -> str | None:
 
 
 def expand_user_path(path: str) -> str:
-    """
-    Expand a path that might start with ~ to an absolute path
+    """Expand a path that might start with ~ to an absolute path
 
     Args:
         path: The path to expand
@@ -148,8 +144,7 @@ def expand_user_path(path: str) -> str:
 def update_kicad_env_vars(
     kicad_config: Path, env_vars: dict, dry_run: bool = False, max_backups: int = 5
 ) -> bool:
-    """
-    Update environment variables in KiCad's common configuration file
+    """Update environment variables in KiCad's common configuration file
 
     Args:
         kicad_config: Path to the KiCad configuration directory
@@ -234,8 +229,7 @@ def update_pinned_libraries(
     dry_run: bool = False,
     max_backups: int = 5,
 ) -> bool:
-    """
-    Update pinned libraries in KiCad's common configuration file
+    """Update pinned libraries in KiCad's common configuration file
 
     Args:
         kicad_config: Path to the KiCad configuration directory

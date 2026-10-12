@@ -1,6 +1,4 @@
-"""
-Tests for update command group and subcommands.
-"""
+"""Tests for update command group and subcommands."""
 
 from unittest.mock import MagicMock, patch
 

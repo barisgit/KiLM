@@ -1,5 +1,4 @@
-"""
-Library service implementation for KiCad Library Manager.
+"""Library service implementation for KiCad Library Manager.
 Core functionality for managing KiCad libraries.
 """
 
@@ -151,8 +150,7 @@ class LibraryService:
         additional_3d_dirs: dict[str, str] | None = None,
         dry_run: bool = False,
     ) -> tuple[set[str], bool]:
-        """
-        Add KiCad libraries to the configuration.
+        """Add KiCad libraries to the configuration.
 
         Args:
             kicad_lib_dir: Path to the KiCad library directory
@@ -322,8 +320,7 @@ class LibraryService:
 
     @staticmethod
     def find_kicad_config() -> Path:
-        """
-        Find the KiCad configuration directory for the current platform
+        """Find the KiCad configuration directory for the current platform
 
         Returns:
             Path to the KiCad configuration directory
@@ -388,8 +385,7 @@ class LibraryService:
     def get_library_description(
         lib_type: str, lib_name: str, kicad_lib_dir: str
     ) -> str:
-        """
-        Get a description for a library from the YAML file or generate a default one
+        """Get a description for a library from the YAML file or generate a default one
 
         Args:
             lib_type: Either 'symbols' or 'footprints'
@@ -421,13 +417,11 @@ class LibraryService:
         # Default description if YAML file doesn't exist or doesn't contain the library
         if lib_type == "symbols":
             return f"{lib_name} symbol library"
-        else:
-            return f"{lib_name} footprint library"
+        return f"{lib_name} footprint library"
 
     @staticmethod
     def format_uri(base_path: str, lib_name: str, lib_type: str) -> str:
-        """
-        Format a URI for a KiCad library.
+        """Format a URI for a KiCad library.
 
         Args:
             base_path: The base path to the library directory
@@ -469,22 +463,19 @@ class LibraryService:
                 # If it's an absolute path, remove the ${...} wrapper
                 base_path = path
             # Otherwise, keep the ${...} wrapper for environment variables
-        else:
-            # If it's not in ${...} format, check if it's an absolute path
-            if not is_absolute_path(base_path):
-                # If it's not an absolute path, treat it as an environment variable
-                base_path = f"${{{base_path}}}"
+        # If it's not in ${...} format, check if it's an absolute path
+        elif not is_absolute_path(base_path):
+            # If it's not an absolute path, treat it as an environment variable
+            base_path = f"${{{base_path}}}"
 
         # Construct the URI based on library type
         if lib_type == "symbols":
             return f"{base_path}/symbols/{lib_name}.kicad_sym"
-        else:
-            return f"{base_path}/footprints/{lib_name}.pretty"
+        return f"{base_path}/footprints/{lib_name}.pretty"
 
     @staticmethod
     def add_entries_to_table(table_path: Path, entries: list[dict[str, str]]) -> None:
-        """
-        Add entries to a KiCad library table file
+        """Add entries to a KiCad library table file
 
         Args:
             table_path: Path to the library table

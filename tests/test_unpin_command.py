@@ -1,6 +1,4 @@
-"""
-Tests for the unpin command functionality.
-"""
+"""Tests for the unpin command functionality."""
 
 from pathlib import Path
 from unittest.mock import patch

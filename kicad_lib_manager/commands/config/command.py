@@ -1,5 +1,4 @@
-"""
-Configuration commands implementation for KiCad Library Manager.
+"""Configuration commands implementation for KiCad Library Manager.
 Provides commands for managing KiCad Library Manager configuration.
 """
 
@@ -108,7 +107,7 @@ def list_config(
                             content += (
                                 f"[yellow]Version:[/yellow] {metadata['version']}\n"
                             )
-                        if "env_var" in metadata and metadata["env_var"]:
+                        if metadata.get("env_var"):
                             content += f"[magenta]Environment Variable:[/magenta] {metadata['env_var']}\n"
 
                         # Capabilities with clear labels
@@ -203,7 +202,7 @@ def list_config(
                             content += (
                                 f"[yellow]Version:[/yellow] {metadata['version']}\n"
                             )
-                        if "env_var" in metadata and metadata["env_var"]:
+                        if metadata.get("env_var"):
                             content += f"[magenta]Environment Variable:[/magenta] {metadata['env_var']}\n"
 
                         # Model count
@@ -337,7 +336,6 @@ def set_default(
     from the available libraries of the specified type.
 
     Examples:
-
     \b
     # Set a GitHub library as default
     kilm config set-default my-library
@@ -400,10 +398,9 @@ def set_default(
                         library_name = selected_lib.get("name")
                         library_path = selected_lib.get("path")
                         break
-                    else:
-                        get_console().print(
-                            f"Please enter a number between 1 and {len(libraries)}"
-                        )
+                    get_console().print(
+                        f"Please enter a number between 1 and {len(libraries)}"
+                    )
                 except ValueError:
                     get_console().print("Please enter a valid number")
         else:
@@ -457,7 +454,6 @@ def remove(
     This does not delete any files, it only removes the library from the configuration.
 
     Examples:
-
     \b
     # Remove a library (prompts for confirmation)
     kilm config remove my-library

@@ -1,6 +1,4 @@
-"""
-Configuration management for KiCad Library Manager.
-"""
+"""Configuration management for KiCad Library Manager."""
 
 import time
 from pathlib import Path
@@ -37,9 +35,7 @@ DEFAULT_CONFIG: dict[str, ConfigValue] = {
 
 
 class Config:
-    """
-    Configuration manager for KiCad Library Manager
-    """
+    """Configuration manager for KiCad Library Manager"""
 
     def __init__(self):
         """Initialize configuration with default values"""
@@ -82,8 +78,7 @@ class Config:
             yaml.dump(self._config, f, default_flow_style=False)
 
     def add_library(self, name: str, path: str, library_type: str = "github") -> None:
-        """
-        Add a library to the configuration
+        """Add a library to the configuration
 
         Args:
             name: Library name
@@ -107,8 +102,7 @@ class Config:
         self.save()
 
     def remove_library(self, name: str, library_type: str | None = None) -> bool:
-        """
-        Remove a library from the configuration
+        """Remove a library from the configuration
 
         Args:
             name: Library name
@@ -137,8 +131,7 @@ class Config:
         return removed
 
     def get_libraries(self, library_type: str | None = None) -> list[LibraryDict]:
-        """
-        Get libraries from configuration
+        """Get libraries from configuration
 
         Args:
             library_type: Type of library ("github" or "cloud"). If None, get all types.
@@ -150,12 +143,10 @@ class Config:
 
         if library_type:
             return [lib for lib in libraries if lib["type"] == library_type]
-        else:
-            return libraries
+        return libraries
 
     def get_library_path(self, name: str, library_type: str = "github") -> str | None:
-        """
-        Get the path for a specific library
+        """Get the path for a specific library
 
         Args:
             name: Library name
@@ -173,8 +164,7 @@ class Config:
         return None
 
     def get_current_library_paths(self) -> tuple[str | None, str | None]:
-        """
-        Get paths for the current active libraries
+        """Get paths for the current active libraries
 
         Returns:
             Tuple of (github_library_path, cloud_library_path), either may be None
@@ -219,8 +209,7 @@ class Config:
         return github_lib_path, cloud_lib_path
 
     def set_current_library(self, path: str) -> None:
-        """
-        Set the current active library path
+        """Set the current active library path
 
         Args:
             path: Path to the library
@@ -229,8 +218,7 @@ class Config:
         self.save()
 
     def get_current_library(self) -> str | None:
-        """
-        Get the current active library path
+        """Get the current active library path
 
         Returns:
             Path to the current library or None if not set
@@ -239,8 +227,7 @@ class Config:
         return value if isinstance(value, str) else None
 
     def get_symbol_library_path(self) -> str | None:
-        """
-        Get the path for the current symbol library
+        """Get the path for the current symbol library
 
         Returns:
             Path to the symbol library or None if not found
@@ -249,8 +236,7 @@ class Config:
         return github_path
 
     def get_3d_library_path(self) -> str | None:
-        """
-        Get the path for the current 3D models library
+        """Get the path for the current 3D models library
 
         Returns:
             Path to the 3D models library or None if not found
@@ -283,8 +269,7 @@ class Config:
         self._config["libraries"] = normalized_libraries
 
     def _get_normalized_libraries(self) -> list[LibraryDict]:
-        """
-        Get libraries ensuring they are properly normalized.
+        """Get libraries ensuring they are properly normalized.
 
         Returns:
             List of properly typed library dictionaries
@@ -320,8 +305,7 @@ class Config:
         return normalized_libraries
 
     def should_check_updates(self) -> bool:
-        """
-        Determine if update check should run based on configuration.
+        """Determine if update check should run based on configuration.
 
         Returns:
             True if update check should be performed
@@ -346,7 +330,7 @@ class Config:
 
             if frequency == "daily":
                 return now - last_check > 86400  # 24 hours
-            elif frequency == "weekly":
+            if frequency == "weekly":
                 return now - last_check > 604800  # 7 days
         except (ValueError, OSError):
             return True
@@ -355,15 +339,13 @@ class Config:
 
     def mark_update_check_performed(self) -> None:
         """Mark that an update check was performed."""
-
         cache_dir = Path.home() / ".cache" / "kilm"
         cache_dir.mkdir(parents=True, exist_ok=True)
         last_check_file = cache_dir / "last_update_check"
         last_check_file.write_text(str(time.time()))
 
     def get_update_preferences(self) -> dict[str, bool | str]:
-        """
-        Get update-related preferences.
+        """Get update-related preferences.
 
         Returns:
             Dictionary containing update preferences
@@ -375,8 +357,7 @@ class Config:
         }
 
     def set_update_preference(self, key: str, value: bool | str) -> None:
-        """
-        Set an update preference with strict type validation and coercion.
+        """Set an update preference with strict type validation and coercion.
 
         Args:
             key: Preference key ('update_check', 'update_check_frequency', 'auto_update')
@@ -408,8 +389,7 @@ class Config:
         self.save()
 
     def _coerce_to_bool(self, value: bool | str) -> bool:
-        """
-        Coerce a value to boolean with strict validation.
+        """Coerce a value to boolean with strict validation.
 
         Args:
             value: Value to coerce (bool or string)
@@ -427,13 +407,12 @@ class Config:
             value_lower = value.lower().strip()
             if value_lower in {"true", "1", "yes"}:
                 return True
-            elif value_lower in {"false", "0", "no"}:
+            if value_lower in {"false", "0", "no"}:
                 return False
-            else:
-                raise ValueError(
-                    f"Invalid boolean value: '{value}'. "
-                    f"Must be one of: true, false, 1, 0, yes, no (case-insensitive)"
-                )
+            raise ValueError(
+                f"Invalid boolean value: '{value}'. "
+                f"Must be one of: true, false, 1, 0, yes, no (case-insensitive)"
+            )
 
         # Should never happen
         raise ValueError(

@@ -1,5 +1,4 @@
-"""
-Sync command implementation for KiCad Library Manager.
+"""Sync command implementation for KiCad Library Manager.
 Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
 """
 
@@ -118,11 +117,10 @@ def sync(
                             get_console().print("    [green]Updated[/green]")
                         else:
                             get_console().print("    [blue]Up to date[/blue]")
+                    elif is_updated:
+                        get_console().print("    [green]Updated[/green]")
                     else:
-                        if is_updated:
-                            get_console().print("    [green]Updated[/green]")
-                        else:
-                            get_console().print("    [blue]Up to date[/blue]")
+                        get_console().print("    [blue]Up to date[/blue]")
 
                     # Update counters regardless of verbose flag
                     if is_updated:
@@ -148,7 +146,7 @@ def sync(
                     failed_count += 1
 
             except Exception as e:
-                get_console().print(f"    [red]Error: {str(e)}[/red]")
+                get_console().print(f"    [red]Error: {e!s}[/red]")
                 failed_count += 1
 
         # Summary
@@ -201,8 +199,7 @@ def sync(
 
 # TODO: Should be in services or utils
 def check_for_library_changes(lib_path: Path) -> list[str]:
-    """
-    Check if git pull changes indicate new libraries that would require setup.
+    """Check if git pull changes indicate new libraries that would require setup.
     Uses git diff to analyze what files were added/changed in the pull.
 
     Args:
@@ -286,8 +283,7 @@ def _is_template_change(path: str) -> bool:
 
 
 def _check_current_library_state(lib_path: Path) -> list[str]:
-    """
-    Fallback method to check current library state when git diff is not available.
+    """Fallback method to check current library state when git diff is not available.
     This is used when we can't determine what changed in the pull.
     """
     changes = []

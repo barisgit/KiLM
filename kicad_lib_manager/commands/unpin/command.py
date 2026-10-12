@@ -1,6 +1,4 @@
-"""
-Unpin command implementation for KiCad Library Manager (Typer version).
-"""
+"""Unpin command implementation for KiCad Library Manager (Typer version)."""
 
 import json
 

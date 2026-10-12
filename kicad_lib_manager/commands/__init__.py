@@ -1,3 +1,1 @@
-"""
-Command implementations for KiCad Library Manager CLI.
-"""
+"""Command implementations for KiCad Library Manager CLI."""

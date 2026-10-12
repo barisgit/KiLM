@@ -17,7 +17,6 @@ def info_command(
     ] = False,
 ) -> None:
     """Show detailed installation and update information."""
-
     version = importlib.metadata.version("kilm")
     update_service = UpdateService(version)
 

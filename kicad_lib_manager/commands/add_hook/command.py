@@ -1,5 +1,4 @@
-"""
-Add Hook command implementation for KiCad Library Manager.
+"""Add Hook command implementation for KiCad Library Manager.
 Adds a git post-merge hook to the current repository to automatically update KiCad libraries.
 """
 
@@ -40,7 +39,7 @@ def add_hook(
     """
     try:
         # Determine target directory
-        target_dir = directory if directory else Path.cwd()
+        target_dir = directory or Path.cwd()
 
         get_console().print(f"[cyan]Adding Git hook to repository: {target_dir}[/cyan]")
 
@@ -131,7 +130,7 @@ def add_hook(
             )
 
         except Exception as e:
-            get_console().print(f"[red]Error creating hook: {str(e)}[/red]")
+            get_console().print(f"[red]Error creating hook: {e!s}[/red]")
             raise typer.Exit(1) from e
 
     except Exception as e:

@@ -1,5 +1,4 @@
-"""
-Update command group for KiCad Library Manager.
+"""Update command group for KiCad Library Manager.
 Contains subcommands for checking, showing info, and performing updates.
 """
 

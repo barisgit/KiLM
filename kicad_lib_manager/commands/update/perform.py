@@ -44,7 +44,6 @@ def perform_update_command(
     To update library content, use 'kilm sync' instead.
     This banner will be removed in a future version.
     """
-
     # Show deprecation notice
     deprecation_notice = (
         "[bold yellow]⚠️  BREAKING CHANGE NOTICE (KiLM 0.4.0)[/bold yellow]\n\n"

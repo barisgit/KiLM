@@ -1,6 +1,4 @@
-"""
-Library service protocol interface for KiCad Library Manager.
-"""
+"""Library service protocol interface for KiCad Library Manager."""
 
 from abc import abstractmethod
 from pathlib import Path
@@ -12,8 +10,7 @@ class LibraryServiceProtocol(Protocol):
 
     @abstractmethod
     def list_libraries(self, directory: Path) -> tuple[list[str], list[str]]:
-        """
-        List symbol and footprint libraries in a directory.
+        """List symbol and footprint libraries in a directory.
 
         Returns:
             Tuple of (symbol_libraries, footprint_libraries)
@@ -49,8 +46,7 @@ class LibraryServiceProtocol(Protocol):
         dry_run: bool = False,
         max_backups: int = 5,
     ) -> bool:
-        """
-        Pin libraries in KiCad for quick access.
+        """Pin libraries in KiCad for quick access.
 
         Returns:
             True if changes were made, False otherwise
@@ -66,8 +62,7 @@ class LibraryServiceProtocol(Protocol):
         dry_run: bool = False,
         max_backups: int = 5,
     ) -> bool:
-        """
-        Unpin libraries in KiCad.
+        """Unpin libraries in KiCad.
 
         Returns:
             True if changes were made, False otherwise

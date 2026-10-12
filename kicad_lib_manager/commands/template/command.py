@@ -1,5 +1,4 @@
-"""
-Template commands implementation for KiCad Library Manager.
+"""Template commands implementation for KiCad Library Manager.
 Provides commands for creating KiCad projects from templates and creating templates from projects.
 """
 
@@ -45,7 +44,6 @@ def main_callback() -> None:
     This command group allows you to create new KiCad projects from templates,
     and create new templates from existing projects.
     """
-    pass
 
 
 def create(
@@ -86,7 +84,6 @@ def create(
     and the name will be extracted from the last part of the path.
 
     Examples:
-
     \b
     # Create a project named 'MyProject' in the current directory
     kilm template create MyProject
@@ -415,15 +412,14 @@ def create(
             ):
                 get_console().print("Aborted.")
                 return
-            else:
-                get_console().print(f"Removing existing directory: {final_project_dir}")
-                try:
-                    shutil.rmtree(final_project_dir)
-                except Exception as e:
-                    get_console(stderr=True).print(
-                        f"Error removing existing directory: {e}"
-                    )
-                    return
+            get_console().print(f"Removing existing directory: {final_project_dir}")
+            try:
+                shutil.rmtree(final_project_dir)
+            except Exception as e:
+                get_console(stderr=True).print(
+                    f"Error removing existing directory: {e}"
+                )
+                return
 
         # Create parent directories if they don't exist
         try:
@@ -557,7 +553,6 @@ def make(
     template variables and prompting for confirmation. Use --non-interactive to disable prompts.
 
     Examples:
-
     \b
     # Create a template named 'basic-project' from the current directory
     kilm template make basic-project
@@ -644,10 +639,9 @@ def make(
                         selected_lib = library_names[lib_selection - 1]
                         library_path = library_paths[selected_lib]
                         break
-                    else:
-                        get_console().print(
-                            f"Please enter a number between 1 and {len(library_names)}"
-                        )
+                    get_console().print(
+                        f"Please enter a number between 1 and {len(library_names)}"
+                    )
                 except ValueError:
                     get_console().print("Please enter a valid number")
 
@@ -796,11 +790,8 @@ def make(
                 if not git_path.endswith("/"):
                     git_path += "/"
 
-                if (
-                    gitignore_spec
-                    and gitignore_spec.match_file(git_path)
-                    or additional_spec
-                    and additional_spec.match_file(git_path)
+                if (gitignore_spec and gitignore_spec.match_file(git_path)) or (
+                    additional_spec and additional_spec.match_file(git_path)
                 ):
                     dirs_to_remove.append(d)
                     excluded_files.append(f"{rel_path}/")
@@ -919,7 +910,7 @@ def make(
         )
 
     except Exception as e:
-        get_console(stderr=True).print(f"Error creating template: {str(e)}")
+        get_console(stderr=True).print(f"Error creating template: {e!s}")
         traceback.print_exc()
         sys.exit(1)
 
@@ -944,7 +935,6 @@ def list_templates(
     with their descriptions, source libraries, and other metadata.
 
     Examples:
-
     \b
     # List all templates
     kilm template list
@@ -1059,7 +1049,7 @@ def list_templates(
                     var_display = "[dim]None[/dim]"
 
                 row_data.append(var_display)
-                row_data.append(extends if extends else "[dim]None[/dim]")
+                row_data.append(extends or "[dim]None[/dim]")
 
             table.add_row(*row_data)
 

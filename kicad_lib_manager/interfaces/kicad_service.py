@@ -1,6 +1,4 @@
-"""
-KiCad service protocol interface for KiCad Library Manager.
-"""
+"""KiCad service protocol interface for KiCad Library Manager."""
 
 from abc import abstractmethod
 from pathlib import Path
@@ -32,8 +30,7 @@ class KiCadServiceProtocol(Protocol):
     def get_configured_libraries(
         self, config_dir: Path
     ) -> tuple[list[dict], list[dict]]:
-        """
-        Get configured symbol and footprint libraries.
+        """Get configured symbol and footprint libraries.
 
         Returns:
             Tuple of (symbol_libraries, footprint_libraries)
@@ -52,8 +49,7 @@ class KiCadServiceProtocol(Protocol):
 
     @abstractmethod
     def get_pinned_libraries(self, config_dir: Path) -> tuple[list[str], list[str]]:
-        """
-        Get pinned libraries from KiCad configuration.
+        """Get pinned libraries from KiCad configuration.
 
         Returns:
             Tuple of (symbol_libraries, footprint_libraries)

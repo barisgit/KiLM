@@ -1,6 +1,4 @@
-"""
-Tests for KiCad Library Manager sync command (formerly update command).
-"""
+"""Tests for KiCad Library Manager sync command (formerly update command)."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -75,12 +73,12 @@ def mock_path_methods(monkeypatch):
             mock_file = MagicMock()
             mock_file.name = "test.kicad_sym"
             return [mock_file]
-        elif "**/*.pretty" in pattern:
+        if "**/*.pretty" in pattern:
             mock_dir = MagicMock()
             mock_dir.name = "test.pretty"
             mock_dir.is_dir.return_value = True
             return [mock_dir]
-        elif "*" in pattern and "metadata.yaml" not in str(self):
+        if "*" in pattern and "metadata.yaml" not in str(self):
             mock_dir = MagicMock()
             mock_dir.name = "template-dir"
             mock_dir.__truediv__ = lambda self, other: Path(f"{self}/{other}")

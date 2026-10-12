@@ -1,6 +1,4 @@
-"""
-Utilities for backup management
-"""
+"""Utilities for backup management"""
 
 import shutil
 from datetime import datetime
@@ -8,8 +6,7 @@ from pathlib import Path
 
 
 def create_backup(file_path: Path, max_backups: int = 5) -> Path:
-    """
-    Create a timestamped backup of a file and maintain a limited history
+    """Create a timestamped backup of a file and maintain a limited history
 
     Args:
         file_path: Path to the file to back up
@@ -38,8 +35,7 @@ def create_backup(file_path: Path, max_backups: int = 5) -> Path:
 
 
 def manage_backup_history(file_path: Path, max_backups: int = 5) -> None:
-    """
-    Maintain a limited history of backups, removing the oldest ones
+    """Maintain a limited history of backups, removing the oldest ones
 
     Args:
         file_path: Path to the original file

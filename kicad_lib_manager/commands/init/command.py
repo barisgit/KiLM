@@ -1,5 +1,4 @@
-"""
-Init command implementation for KiCad Library Manager (Typer version).
+"""Init command implementation for KiCad Library Manager (Typer version).
 Initializes the current directory as a KiCad library directory (symbols, footprints, templates).
 """
 
@@ -60,8 +59,7 @@ def init(
         ),
     ] = False,
 ) -> None:
-    """
-    Initialize the current directory as a KiCad library collection.
+    """Initialize the current directory as a KiCad library collection.
 
     This command sets up the current directory as a KiCad library containing
     symbols, footprints, and templates. It creates the required folders if they

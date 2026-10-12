@@ -1,6 +1,4 @@
-"""
-Add cloud-based 3D models directory command for KiCad Library Manager (Typer version).
-"""
+"""Add cloud-based 3D models directory command for KiCad Library Manager (Typer version)."""
 
 from pathlib import Path
 from typing import Annotated

@@ -1,6 +1,4 @@
-"""
-Entry point for running the package as a module
-"""
+"""Entry point for running the package as a module"""
 
 from .main import app
 

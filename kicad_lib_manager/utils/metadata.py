@@ -1,6 +1,4 @@
-"""
-Metadata management utilities for KiCad Library Manager.
-"""
+"""Metadata management utilities for KiCad Library Manager."""
 
 import json
 import re
@@ -15,8 +13,7 @@ from .constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 def read_github_metadata(
     directory: Path,
 ) -> dict[str, Any] | None:
-    """
-    Read metadata from a GitHub library directory.
+    """Read metadata from a GitHub library directory.
 
     Args:
         directory: Path to the GitHub library directory
@@ -42,8 +39,7 @@ def read_github_metadata(
 
 
 def write_github_metadata(directory: Path, metadata: dict[str, Any]) -> bool:
-    """
-    Write metadata to a GitHub library directory.
+    """Write metadata to a GitHub library directory.
 
     Args:
         directory: Path to the GitHub library directory
@@ -64,8 +60,7 @@ def write_github_metadata(directory: Path, metadata: dict[str, Any]) -> bool:
 
 
 def read_cloud_metadata(directory: Path) -> dict[str, str | int | None] | None:
-    """
-    Read metadata from a cloud 3D model directory.
+    """Read metadata from a cloud 3D model directory.
 
     Args:
         directory: Path to the cloud 3D model directory
@@ -93,8 +88,7 @@ def read_cloud_metadata(directory: Path) -> dict[str, str | int | None] | None:
 def write_cloud_metadata(
     directory: Path, metadata: dict[str, str | int | None]
 ) -> bool:
-    """
-    Write metadata to a cloud 3D model directory.
+    """Write metadata to a cloud 3D model directory.
 
     Args:
         directory: Path to the cloud 3D model directory
@@ -115,8 +109,7 @@ def write_cloud_metadata(
 
 
 def generate_env_var_name(name: str, prefix: str = "") -> str:
-    """
-    Generate a valid environment variable name from a library name.
+    """Generate a valid environment variable name from a library name.
 
     Args:
         name: Library name
@@ -146,8 +139,7 @@ def generate_env_var_name(name: str, prefix: str = "") -> str:
 def get_default_github_metadata(
     directory: Path,
 ) -> dict[str, Any]:
-    """
-    Generate default metadata for a GitHub library.
+    """Generate default metadata for a GitHub library.
 
     Args:
         directory: Path to the GitHub library directory
@@ -183,8 +175,7 @@ def get_default_github_metadata(
 
 
 def get_default_cloud_metadata(directory: Path) -> dict[str, str | int | None]:
-    """
-    Generate default metadata for a cloud 3D model directory.
+    """Generate default metadata for a cloud 3D model directory.
 
     Args:
         directory: Path to the cloud 3D model directory

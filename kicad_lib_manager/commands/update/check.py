@@ -20,7 +20,6 @@ def check_update_command(
     ] = False,
 ) -> None:
     """Check for available updates without installing."""
-
     version = importlib.metadata.version("kilm")
     update_service = UpdateService(version)
 
@@ -48,10 +47,9 @@ def check_update_command(
 
         # Exit with code 1 to indicate update available
         raise typer.Exit(1)
-    else:
-        if not quiet:
-            get_console().print(
-                f"[green]✓[/green] You are using the latest version ([bold cyan]v{update_info['current_version']}[/bold cyan])"
-            )
-        # Exit with code 0 for no update needed
-        raise typer.Exit(0)
+    if not quiet:
+        get_console().print(
+            f"[green]✓[/green] You are using the latest version ([bold cyan]v{update_info['current_version']}[/bold cyan])"
+        )
+    # Exit with code 0 for no update needed
+    raise typer.Exit(0)

@@ -1,6 +1,4 @@
-"""
-Utility functions for KiCad Library Manager
-"""
+"""Utility functions for KiCad Library Manager"""
 
 from .banner import show_banner
 

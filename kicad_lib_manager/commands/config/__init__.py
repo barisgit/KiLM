@@ -17,4 +17,4 @@ config_app.command("set-default", help="Set a library as the default for operati
 )
 config_app.command("remove", help="Remove a library from the configuration")(remove)
 
-__all__ = ["config_app", "list_config", "set_default", "remove"]
+__all__ = ["config_app", "list_config", "remove", "set_default"]

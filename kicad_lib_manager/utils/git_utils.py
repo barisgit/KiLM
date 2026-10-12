@@ -1,5 +1,4 @@
-"""
-Git utility functions for KiCad Library Manager.
+"""Git utility functions for KiCad Library Manager.
 Handles Git hooks directory detection and safe hook management.
 """
 
@@ -10,8 +9,7 @@ from pathlib import Path
 
 
 def get_git_hooks_directory(repo_path: Path) -> Path:
-    """
-    Get the active Git hooks directory for a repository.
+    """Get the active Git hooks directory for a repository.
 
     This function detects the correct hooks directory by:
     1. Using git rev-parse --git-path hooks (handles core.hooksPath, worktrees, and common dir)
@@ -62,8 +60,7 @@ def get_git_hooks_directory(repo_path: Path) -> Path:
 
 
 def backup_existing_hook(hook_path: Path) -> Path:
-    """
-    Create a timestamped backup of an existing hook file.
+    """Create a timestamped backup of an existing hook file.
 
     Args:
         hook_path: Path to the existing hook file
@@ -87,8 +84,7 @@ def backup_existing_hook(hook_path: Path) -> Path:
 
 
 def merge_hook_content(existing_content: str, kilm_content: str) -> str:
-    """
-    Safely merge existing hook content with KiLM content.
+    """Safely merge existing hook content with KiLM content.
 
     Args:
         existing_content: Content of existing hook
@@ -124,8 +120,7 @@ def merge_hook_content(existing_content: str, kilm_content: str) -> str:
 
 
 def create_kilm_hook_content() -> str:
-    """
-    Create the standard KiLM hook content with clear markers.
+    """Create the standard KiLM hook content with clear markers.
 
     Returns:
         Formatted hook content string

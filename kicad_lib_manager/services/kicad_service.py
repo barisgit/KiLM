@@ -1,6 +1,4 @@
-"""
-KiCad service implementation for KiCad Library Manager.
-"""
+"""KiCad service implementation for KiCad Library Manager."""
 
 import json
 from pathlib import Path

@@ -1,6 +1,4 @@
-"""
-Setup command implementation for KiCad Library Manager (Typer version).
-"""
+"""Setup command implementation for KiCad Library Manager (Typer version)."""
 
 import re
 from pathlib import Path
@@ -30,8 +28,7 @@ def fix_invalid_uris(
     max_backups: int = 5,
     dry_run: bool = False,
 ) -> bool:
-    """
-    Fix invalid URIs in KiCad library tables, such as paths incorrectly wrapped in ${} syntax.
+    """Fix invalid URIs in KiCad library tables, such as paths incorrectly wrapped in ${} syntax.
 
     Args:
         kicad_config: Path to the KiCad configuration directory

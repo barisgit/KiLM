@@ -1,6 +1,4 @@
-"""
-List command implementation for KiCad Library Manager (Typer version).
-"""
+"""List command implementation for KiCad Library Manager (Typer version)."""
 
 from pathlib import Path
 from typing import Annotated
@@ -24,8 +22,7 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """
-    List available libraries in the specified directory.
+    """List available libraries in the specified directory.
 
     This command scans the KiCad library directory for symbol (.kicad_sym) and
     footprint (.pretty) libraries and displays them in organized tables.

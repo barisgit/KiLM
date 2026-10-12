@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Main Typer CLI entry point for KiCad Library Manager
-"""
+"""Main Typer CLI entry point for KiCad Library Manager"""
 
 import importlib.metadata
 from typing import Annotated
@@ -115,8 +113,7 @@ def main(
         ),
     ] = None,
 ) -> None:
-    """
-    [bold blue]KiCad Library Manager[/bold blue] - Professional KiCad library management
+    """[bold blue]KiCad Library Manager[/bold blue] - Professional KiCad library management
 
     This tool helps you configure and manage KiCad libraries across your projects
     and workstations with a modern, type-safe CLI interface.

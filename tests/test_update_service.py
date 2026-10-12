@@ -1,6 +1,4 @@
-"""
-Tests for the update service functionality including installation detection and update operations.
-"""
+"""Tests for the update service functionality including installation detection and update operations."""
 
 import sys
 from pathlib import Path, PureWindowsPath

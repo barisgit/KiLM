@@ -1,6 +1,4 @@
-"""
-Configuration service protocol interface for KiCad Library Manager.
-"""
+"""Configuration service protocol interface for KiCad Library Manager."""
 
 from abc import abstractmethod
 from pathlib import Path

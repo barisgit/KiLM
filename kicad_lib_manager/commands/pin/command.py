@@ -1,6 +1,4 @@
-"""
-Pin command implementation for KiCad Library Manager (Typer version).
-"""
+"""Pin command implementation for KiCad Library Manager (Typer version)."""
 
 from pathlib import Path
 from typing import Annotated
@@ -75,8 +73,7 @@ def pin(
         ),
     ] = False,
 ) -> None:
-    """
-    Pin libraries in KiCad for quick access.
+    """Pin libraries in KiCad for quick access.
 
     This command pins libraries in KiCad's interface for quick access.
     You can pin specific symbol and footprint libraries or all available libraries.

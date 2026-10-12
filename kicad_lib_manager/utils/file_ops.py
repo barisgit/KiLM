@@ -1,6 +1,4 @@
-"""
-File operation utilities
-"""
+"""File operation utilities"""
 
 import os
 import re
@@ -10,8 +8,7 @@ from pathlib import Path
 
 
 def read_file_with_encoding(file_path: Path, encodings: list[str] | None = None) -> str:
-    """
-    Read a file trying multiple encodings until successful
+    """Read a file trying multiple encodings until successful
 
     Args:
         file_path: Path to the file to read
@@ -43,8 +40,7 @@ def read_file_with_encoding(file_path: Path, encodings: list[str] | None = None)
 def write_file_with_encoding(
     file_path: Path, content: str, encoding: str = "utf-8"
 ) -> None:
-    """
-    Write content to a file with the specified encoding
+    """Write content to a file with the specified encoding
 
     Args:
         file_path: Path to the file to write
@@ -83,8 +79,7 @@ def write_atomically(path: Path, data: bytes) -> None:
 
 
 def validate_lib_table(table_path: Path, create_if_missing: bool = True) -> None:
-    """
-    Validate a KiCad library table file
+    """Validate a KiCad library table file
 
     Args:
         table_path: Path to the library table
@@ -122,8 +117,7 @@ def add_symbol_lib(
     sym_table: Path,
     dry_run: bool = False,
 ) -> bool:
-    """
-    Add a symbol library to the KiCad configuration
+    """Add a symbol library to the KiCad configuration
 
     Args:
         lib_name: The name of the library
@@ -160,10 +154,7 @@ def add_symbol_lib(
         write_file_with_encoding(sym_table, "\n".join(lines) + "\n")
 
         return True
-    else:
-        raise ValueError(
-            "Invalid symbol library table format: missing closing parenthesis"
-        )
+    raise ValueError("Invalid symbol library table format: missing closing parenthesis")
 
 
 def add_footprint_lib(
@@ -173,8 +164,7 @@ def add_footprint_lib(
     fp_table: Path,
     dry_run: bool = False,
 ) -> bool:
-    """
-    Add a footprint library to the KiCad configuration
+    """Add a footprint library to the KiCad configuration
 
     Args:
         lib_name: The name of the library
@@ -211,15 +201,13 @@ def add_footprint_lib(
         write_file_with_encoding(fp_table, "\n".join(lines) + "\n")
 
         return True
-    else:
-        raise ValueError(
-            "Invalid footprint library table format: missing closing parenthesis"
-        )
+    raise ValueError(
+        "Invalid footprint library table format: missing closing parenthesis"
+    )
 
 
 def list_libraries(kicad_lib_dir: str) -> tuple[list[str], list[str]]:
-    """
-    List all available libraries in the repository
+    """List all available libraries in the repository
 
     Args:
         kicad_lib_dir: The KiCad library directory
@@ -252,8 +240,7 @@ def list_libraries(kicad_lib_dir: str) -> tuple[list[str], list[str]]:
 
 
 def list_configured_libraries(kicad_config: Path) -> tuple[list[dict], list[dict]]:
-    """
-    List all libraries currently configured in KiCad
+    """List all libraries currently configured in KiCad
 
     Args:
         kicad_config: Path to the KiCad configuration directory

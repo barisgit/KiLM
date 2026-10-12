@@ -1,5 +1,4 @@
-"""
-Auto-update functionality for KiLM.
+"""Auto-update functionality for KiLM.
 Handles installation method detection, PyPI integration, and update execution.
 """
 
@@ -102,8 +101,7 @@ class InstallationDetector:
         return any(self.executable_str.startswith(path) for path in homebrew_paths)
 
     def detect(self) -> str:
-        """
-        Detect installation method with priority order.
+        """Detect installation method with priority order.
         Returns: 'pipx' | 'conda' | 'uv' | 'pip-venv' | 'homebrew' | 'pip'
         """
         # Priority order matters - more specific first
@@ -127,8 +125,7 @@ class InstallationDetector:
 
 # TODO: Add strong typing
 def detect_installation_method() -> str:
-    """
-    Detect how KiLM was installed to determine appropriate update strategy.
+    """Detect how KiLM was installed to determine appropriate update strategy.
     Returns: 'pipx' | 'pip' | 'pip-venv' | 'uv' | 'conda' | 'homebrew'
     """
     detector = InstallationDetector()
@@ -145,8 +142,7 @@ class PyPIVersionChecker:
         self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
 
     def check_latest_version(self) -> str | None:
-        """
-        Check latest version from PyPI with caching and rate limiting.
+        """Check latest version from PyPI with caching and rate limiting.
         Returns None if check fails or is rate limited.
         """
         try:
@@ -281,8 +277,7 @@ class UpdateManager:
         return self.installation_method in ["pipx", "pip", "pip-venv", "uv"]
 
     def perform_update(self) -> tuple[bool, str]:
-        """
-        Execute update using detected installation method.
+        """Execute update using detected installation method.
         Returns: (success: bool, message: str)
         """
         if not self.can_auto_update():
@@ -302,11 +297,10 @@ class UpdateManager:
                 success = update_func()
                 if success:
                     return True, "KiLM updated successfully!"
-                else:
-                    instruction = self.get_update_instruction()
-                    return False, f"Auto-update failed. Try manually: {instruction}"
+                instruction = self.get_update_instruction()
+                return False, f"Auto-update failed. Try manually: {instruction}"
             except Exception as e:
-                return False, f"Update error: {str(e)}"
+                return False, f"Update error: {e!s}"
         else:
             instruction = self.get_update_instruction()
             return False, f"Unsupported installation method. Run: {instruction}"
@@ -320,8 +314,7 @@ class UpdateService:
         self.current_version = current_version
 
     def check_for_updates(self, use_cache: bool = True) -> dict[str, Any]:
-        """
-        Check for available updates.
+        """Check for available updates.
 
         Returns:
             Dict containing update status information:
@@ -352,8 +345,7 @@ class UpdateService:
     def show_update_notification(
         self, quiet: bool = False, force_check: bool = False
     ) -> bool:
-        """
-        Show update notification if updates are available.
+        """Show update notification if updates are available.
 
         Args:
             quiet: Only show notification if update is available
@@ -435,8 +427,7 @@ class UpdateService:
         force: bool = False,
         dry_run: bool = False,
     ) -> tuple[bool, str]:
-        """
-        Perform update installation.
+        """Perform update installation.
 
         Args:
             target_version: Specific version to install

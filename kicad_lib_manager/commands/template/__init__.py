@@ -19,4 +19,4 @@ template_app.command("create", help="Create a new KiCad project from a template"
 template_app.command("make", help="Create a template from an existing project")(make)
 template_app.command("list", help="List all available templates")(list_templates)
 
-__all__ = ["template_app", "create", "make", "list_templates"]
+__all__ = ["create", "list_templates", "make", "template_app"]

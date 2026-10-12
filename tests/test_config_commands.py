@@ -1,6 +1,4 @@
-"""
-Tests for KiCad Library Manager config commands.
-"""
+"""Tests for KiCad Library Manager config commands."""
 
 import pytest
 from typer.testing import CliRunner

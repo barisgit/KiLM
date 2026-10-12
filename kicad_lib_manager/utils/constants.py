@@ -1,6 +1,4 @@
-"""
-Constants used throughout KiCad Library Manager.
-"""
+"""Constants used throughout KiCad Library Manager."""
 
 # Metadata filenames
 GITHUB_METADATA_FILE = "kilm.yaml"
