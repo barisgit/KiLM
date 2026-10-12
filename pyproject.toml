@@ -78,6 +78,8 @@ packages = ["kicad_lib_manager"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Release workflow scripts are tested as top-level modules.
+pythonpath = [".github/scripts"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -86,6 +88,10 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
+
+[tool.ty.environment]
+# Matches pytest's pythonpath so the tests of .github/scripts resolve.
+extra-paths = [".github/scripts"]
 
 [tool.ruff]
 line-length = 88

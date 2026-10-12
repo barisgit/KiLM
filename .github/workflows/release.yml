@@ -67,8 +67,9 @@ jobs:
             *) echo "::error::PyPI lookup for $name $version returned HTTP $status"; exit 1 ;;
           esac
 
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName > /dev/null 2> gh-error.txt; then
-            has_release=true
+          # A draft is an unfinished publication, so only a published release counts.
+          if is_draft=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2> gh-error.txt); then
+            if [[ $is_draft == false ]]; then has_release=true; else has_release=false; fi
           elif grep -q 'release not found' gh-error.txt; then
             has_release=false
           else
@@ -157,13 +158,19 @@ jobs:
 
   github:
     # Runs only after this run published to PyPI, so the tag marks the commit
-    # whose artifacts PyPI holds.
+    # whose artifacts PyPI holds. The script re-reads GitHub instead of the
+    # plan's snapshot, so a re-run finishes or accepts an earlier attempt.
     needs: [plan, pypi]
     if: needs.plan.outputs.has-release == 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
@@ -183,21 +190,9 @@ jobs:
           done
           echo "::error::PyPI files for $NAME $VERSION differ from the built artifact"
           diff <(echo "$built") <(echo "$published")
-      - name: Create the tag and GitHub release
+      - name: Create or finish the tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           NAME: ${{ needs.plan.outputs.name }}
           VERSION: ${{ needs.plan.outputs.version }}
-        run: |
-          tag="v$VERSION"
-          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2> /dev/null) \
-            && [[ $tag_sha != "$RELEASE_SHA" ]]; then
-            echo "::error::Tag $tag already points at $tag_sha, not $RELEASE_SHA"
-            exit 1
-          fi
-          gh release create "$tag" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$RELEASE_SHA" \
-            --title "Release $tag" \
-            --generate-notes \
-            --notes "Install with \`pipx install $NAME==$VERSION\` or \`uv tool install $NAME==$VERSION\`; upgrade an existing install with \`kilm update\`."
+        run: python3 .github/scripts/github_release.py dist

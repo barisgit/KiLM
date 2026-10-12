@@ -49,6 +49,8 @@ files; tests run in `just check`.
   name, version, and dependencies from `pyproject.toml`, so a new runtime
   dependency must exist in nixpkgs under the same name.
 - `.github/workflows/`: `ci.yml` (checks, coverage, docs, Nix) and `release.yml`.
+- `.github/scripts/`: Python steps of `release.yml`, tested like the package
+  (pytest and ty resolve them as top-level modules).
 
 ## Standards
 
