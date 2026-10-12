@@ -1,520 +1,172 @@
-"""Auto-update functionality for KiLM.
-Handles installation method detection, PyPI integration, and update execution.
-"""
+"""Checking for and installing new KiLM releases."""
 
 # PEP 810: on Python 3.15+ these imports load on first use.
-__lazy_modules__ = {"packaging.version", "requests"}
+__lazy_modules__ = {"packaging.version"}
 
-import importlib.metadata
-import json
-import os
-import subprocess
-import sys
-import time
-from pathlib import Path, PurePath
-from typing import Any, Literal
+from typing import NamedTuple, Protocol, TypedDict
 
-import requests
 from packaging.version import InvalidVersion, Version
+from rich.panel import Panel
+
+from kicad_lib_manager.services.install_method import (
+    InstallMethod,
+    detect_installation_method,
+    run_upgrade,
+    update_instruction,
+    upgrade_command,
+)
+from kicad_lib_manager.services.pypi_version import PyPIVersionChecker
+from kicad_lib_manager.utils.console import get_console
 
 
-InstallMethod = Literal[
-    "pipx", "conda", "uv", "nix", "pip-venv", "homebrew", "pip", "unknown"
-]
-"""How KiLM was installed; decides how it can be updated."""
-
-
-def read_installer() -> str | None:
-    """Return the installer recorded for kilm (INSTALLER file), if any."""
-    try:
-        installer = importlib.metadata.distribution("kilm").read_text("INSTALLER")
-    except importlib.metadata.PackageNotFoundError:
-        return None
-    return installer.strip() if installer else None
-
-
-class InstallationDetector:
-    """Platform-aware installation method detector."""
-
-    def __init__(
-        self,
-        executable_path: PurePath | None = None,
-        platform_name: str | None = None,
-        *,
-        installer: str | None = "",
-    ):
-        self.executable_path = executable_path or Path(sys.executable)
-        self.platform_name = platform_name or os.name
-        # "" means "read it from the installed distribution".
-        self.installer = read_installer() if installer == "" else installer
-        # Forward slashes on every platform so the path patterns below
-        # (".local/share/pipx", "uv/tools", ...) also match Windows paths.
-        self.executable_str = self.executable_path.as_posix()
-
-    def is_windows(self) -> bool:
-        """Check if running on Windows."""
-        return self.platform_name == "nt"
-
-    def is_unix_like(self) -> bool:
-        """Check if running on Unix-like system."""
-        return not self.is_windows()
-
-    def detect_pipx(self) -> bool:
-        """Detect pipx installation."""
-        # Check for pipx path patterns
-        pipx_patterns = [".local/share/pipx", "pipx/venvs"]
-        if any(part in self.executable_str for part in pipx_patterns):
-            return True
-
-        # Check for pipx environment variable
-        pipx_home = os.environ.get("PIPX_HOME")
-        return bool(pipx_home and "pipx" in self.executable_str)
-
-    def detect_conda(self) -> bool:
-        """Detect a conda install: the interpreter lives in a conda environment.
-
-        An activated environment (``CONDA_DEFAULT_ENV``) is no evidence on its
-        own, since many shells activate conda's base environment by default.
-        """
-        if "conda" in self.executable_str:
-            return True
-        prefix = os.environ.get("CONDA_PREFIX")
-        return bool(prefix) and self.executable_path.is_relative_to(
-            type(self.executable_path)(prefix)
-        )
-
-    def detect_uv(self) -> bool:
-        """Detect a uv tool install: the interpreter lives in a uv tools directory.
-
-        uv keeps tool environments in ``uv/tools`` under its data directory
-        (``uv/data/tools`` on Windows) unless ``UV_TOOL_DIR`` moves them. The
-        variable alone is no evidence: it is also set where uv manages other
-        tools, so only an interpreter inside that directory counts.
-        """
-        if any(
-            part in self.executable_str for part in ("/uv/tools/", "/uv/data/tools/")
-        ):
-            return True
-        tool_dir = os.environ.get("UV_TOOL_DIR")
-        return bool(tool_dir) and self.executable_path.is_relative_to(
-            type(self.executable_path)(tool_dir)
-        )
-
-    def detect_virtual_env(self) -> bool:
-        """Detect virtual environment (pip in venv)."""
-        # Check VIRTUAL_ENV environment variable
-        if os.environ.get("VIRTUAL_ENV"):
-            return True
-
-        # Check sys.prefix vs base_prefix
-        base_prefix = getattr(sys, "base_prefix", sys.prefix)
-        return sys.prefix != base_prefix
-
-    def detect_homebrew(self) -> bool:
-        """Detect homebrew installation (macOS/Linux)."""
-        if self.is_windows():
-            return False
-
-        homebrew_paths = ["/opt/homebrew/", "/usr/local/Cellar/"]
-        return any(self.executable_str.startswith(path) for path in homebrew_paths)
-
-    def detect_nix(self) -> bool:
-        """Detect a Nix install: the interpreter lives in the Nix store."""
-        return self.executable_str.startswith("/nix/store/")
-
-    def detect(self) -> InstallMethod:
-        """Detect the installation method, most specific evidence first.
-
-        Returns "unknown" rather than guessing when nothing identifies the
-        installer, so callers never suggest a command that cannot work.
-        """
-        # Priority order matters - more specific first
-        if self.detect_pipx():
-            return "pipx"
-
-        if self.detect_conda():
-            return "conda"
-
-        if self.detect_uv():
-            return "uv"
-
-        if self.detect_nix():
-            return "nix"
-
-        if self.detect_virtual_env():
-            return "pip-venv"
-
-        if self.detect_homebrew():
-            return "homebrew"
-
-        if self.installer == "pip":
-            return "pip"
-
-        return "unknown"
-
-
-def detect_installation_method() -> InstallMethod:
-    """Detect how KiLM was installed to determine appropriate update strategy."""
-    detector = InstallationDetector()
-    return detector.detect()
-
-
-class PyPIVersionChecker:
-    """PyPI client for the latest release of a package, cached for a day.
-
-    A cached answer younger than `CACHE_TTL_SECONDS` is returned without a
-    request. Otherwise PyPI is asked with the cached ETag, so an unchanged
-    release costs a 304 answer.
-    """
-
-    CACHE_TTL_SECONDS = 24 * 60 * 60
-
-    def __init__(
-        self,
-        package_name: str,
-        version: str = "unknown",
-        *,
-        cache_file: Path | None = None,
-    ):
-        self.package_name = package_name
-        self.base_url = f"https://pypi.org/pypi/{package_name}/json"
-        self.cache_file = cache_file or (
-            Path.home() / ".cache" / "kilm" / "version_check.json"
-        )
-        self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
+class LatestVersionSource(Protocol):
+    """Where the latest release is looked up; `PyPIVersionChecker` in production."""
 
     def check_latest_version(self, *, use_cache: bool = True) -> str | None:
-        """Return the latest released version, or None when it is unknown.
-
-        With `use_cache` a fresh cached answer is returned without a request.
-        Network and response errors return None and never raise, so an
-        offline machine only loses the update notice.
-        """
-        cached_data = self._load_cache()
-        cached_version = cached_data.get("version") if cached_data else None
-        if use_cache and cached_data and self._is_fresh(cached_data):
-            return cached_version
-
-        headers = {"User-Agent": self.user_agent}
-        if cached_data and cached_data.get("etag"):
-            headers["If-None-Match"] = cached_data["etag"]
-        try:
-            response = requests.get(self.base_url, headers=headers, timeout=10)
-            if response.status_code == 304:  # Not Modified
-                latest_version = cached_version
-                etag = cached_data.get("etag") if cached_data else None
-            elif response.status_code == 200:
-                latest_version = response.json()["info"]["version"]
-                etag = response.headers.get("ETag")
-            else:
-                return None
-        except (requests.RequestException, KeyError, ValueError):
-            # Fail silently - don't block CLI functionality
-            return None
-
-        if latest_version:
-            self._save_cache(
-                {"version": latest_version, "etag": etag, "timestamp": time.time()}
-            )
-        return latest_version
-
-    def _is_fresh(self, data: dict) -> bool:
-        return time.time() - data.get("timestamp", 0) < self.CACHE_TTL_SECONDS
-
-    def _load_cache(self) -> dict | None:
-        """Load cached version data of any age; None when absent or unreadable."""
-        try:
-            with self.cache_file.open() as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            return None
-        return data if isinstance(data, dict) else None
-
-    def _save_cache(self, data: dict):
-        """Save version data to cache; a cache that cannot be written is skipped."""
-        try:
-            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-            with self.cache_file.open("w") as f:
-                json.dump(data, f)
-        except OSError:
-            pass
+        """Return the latest released version, or None when it is unknown."""
+        ...
 
 
-def upgrade_command(
-    method: InstallMethod, target_version: str | None = None
-) -> list[str] | None:
-    """Return the command that updates kilm for an install method, as shown to users.
+class UpdateStatus(TypedDict):
+    """Result of an update check."""
 
-    Without a target version the command upgrades to the latest release; with
-    one it installs exactly that version, which may be a downgrade. Returns
-    None for methods where kilm cannot update itself.
-    """
-    spec = f"kilm=={target_version}" if target_version else "kilm"
-    if method == "pipx":
-        if target_version:
-            return ["pipx", "install", "--force", spec]
-        return ["pipx", "upgrade", "kilm"]
-    if method == "uv":
-        # `uv tool upgrade` keeps an exact pin from an earlier install and
-        # then succeeds without changing anything; `uv tool install` replaces
-        # the pin.
-        return ["uv", "tool", "install", spec if target_version else "kilm@latest"]
-    if method in ("pip", "pip-venv"):
-        return ["pip", "install", "--upgrade", spec]
-    return None
+    has_update: bool
+    """Whether a release newer than the installed version exists."""
+    current_version: str
+    latest_version: str | None
+    """None when PyPI could not be asked and nothing was cached."""
+    method: InstallMethod
+    supports_auto_update: bool
 
 
-UPGRADE_TIMEOUT_SECONDS = 300
-"""How long an installer may run before the update counts as failed."""
+class UpdateResult(NamedTuple):
+    """Outcome of an installation attempt."""
 
-UPGRADE_ERROR_LINES = 10
-"""Trailing lines of installer output kept to explain a failed update."""
+    success: bool
+    message: str
+    """On failure, why it failed and how to update by hand."""
 
 
-def run_upgrade(command: list[str]) -> str | None:
-    """Run an upgrade command from `upgrade_command`.
-
-    Returns None on success, otherwise why it failed: the end of the
-    installer's error output, or why the installer could not run.
-    """
-    # pip runs through this interpreter so it updates the running environment.
-    argv = [sys.executable, "-m", *command] if command[0] == "pip" else command
+def is_newer_version(latest_version: str, current_version: str) -> bool:
+    """Return whether `latest_version` is newer; False if either is no version."""
     try:
-        result = subprocess.run(
-            argv,
-            capture_output=True,
-            text=True,
-            timeout=UPGRADE_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return f"{command[0]} did not finish within {UPGRADE_TIMEOUT_SECONDS} seconds"
-    except OSError as exc:
-        return f"Could not run {command[0]}: {exc.strerror or exc}"
-    if result.returncode == 0:
-        return None
-    output = (result.stderr or result.stdout).strip().splitlines()
-    detail = "\n".join(output[-UPGRADE_ERROR_LINES:])
-    return detail or f"{command[0]} exited with status {result.returncode}"
-
-
-class UpdateManager:
-    """Manages update checking and execution for KiLM."""
-
-    def __init__(self, current_version: str):
-        self.version_checker = PyPIVersionChecker("kilm", current_version)
-        self.current_version = current_version
-        self.installation_method: InstallMethod = detect_installation_method()
-
-    def check_latest_version(self, *, use_cache: bool = True) -> str | None:
-        """Return the latest kilm release, from a fresh cache unless bypassed."""
-        return self.version_checker.check_latest_version(use_cache=use_cache)
-
-    def is_newer_version_available(self, latest_version: str) -> bool:
-        """Compare versions to determine if update is available."""
-        try:
-            current_ver = Version(self.current_version)
-            latest_ver = Version(latest_version)
-            return latest_ver > current_ver
-        except (InvalidVersion, AttributeError):
-            return False
-
-    def get_update_instruction(self, target_version: str | None = None) -> str:
-        """Get update instruction for the detected installation method."""
-        command = upgrade_command(self.installation_method, target_version)
-        if command:
-            return " ".join(command)
-        instructions: dict[InstallMethod, str] = {
-            "conda": "Conda package not yet available (planned for future)",
-            "homebrew": "Homebrew package not yet available (planned for future)",
-            "nix": "nix flake update, then rebuild the configuration or profile"
-            " that installs kilm",
-            "unknown": "Update KiLM with the tool that installed it",
-        }
-        return instructions.get(self.installation_method, "")
-
-    def can_auto_update(self) -> bool:
-        """Check if automatic update is possible for this installation method."""
-        return upgrade_command(self.installation_method) is not None
-
-    def perform_update(self, target_version: str | None = None) -> tuple[bool, str]:
-        """Install the latest release, or `target_version` when given.
-
-        Returns: (success, message)
-        """
-        command = upgrade_command(self.installation_method, target_version)
-        if command is None:
-            instruction = self.get_update_instruction()
-            return False, f"Manual update required: {instruction}"
-        error = run_upgrade(command)
-        if error is None:
-            return True, "KiLM updated successfully!"
-        instruction = self.get_update_instruction(target_version)
-        return False, f"{error}\nTry manually: {instruction}"
+        return Version(latest_version) > Version(current_version)
+    except InvalidVersion:
+        return False
 
 
 class UpdateService:
-    """Service wrapper for KiLM update functionality."""
+    """Checks PyPI for new KiLM releases and installs them.
 
-    def __init__(self, current_version: str):
-        self.manager = UpdateManager(current_version)
-        self.current_version = current_version
+    The installation method is detected once, at construction, and decides
+    which installer command an update runs.
+    """
 
-    def check_for_updates(self, use_cache: bool = True) -> dict[str, Any]:
-        """Check for available updates.
+    def __init__(
+        self,
+        current_version: str,
+        *,
+        method: InstallMethod | None = None,
+        version_checker: LatestVersionSource | None = None,
+    ) -> None:
+        """Prepare update operations for the running installation.
 
-        Returns:
-            Dict containing update status information:
-            - has_update: whether an update is available
-            - current_version: current installed version
-            - latest_version: latest available version
-            - method: installation method identifier
-            - supports_auto_update: whether automatic update is supported
+        Args:
+            current_version: The installed KiLM version.
+            method: The installation method; detected when omitted.
+            version_checker: The PyPI client; a cached kilm checker if omitted.
         """
-        latest_version = self.manager.check_latest_version(use_cache=use_cache)
-        has_update = False
+        self.current_version = current_version
+        self.method: InstallMethod = method or detect_installation_method()
+        self.version_checker: LatestVersionSource = (
+            version_checker or PyPIVersionChecker("kilm", current_version)
+        )
 
-        if latest_version:
-            has_update = self.manager.is_newer_version_available(latest_version)
+    @property
+    def can_auto_update(self) -> bool:
+        """Whether KiLM can run the installer for this installation method."""
+        return upgrade_command(self.method) is not None
 
+    def update_instruction(self, target_version: str | None = None) -> str:
+        """Return the command, or advice, for updating this installation by hand."""
+        return update_instruction(self.method, target_version)
+
+    def check_for_updates(self, *, use_cache: bool = True) -> UpdateStatus:
+        """Compare the installed version with the latest release on PyPI.
+
+        With `use_cache` a version check from the last day is reused. Never
+        raises for network problems; `latest_version` is then None.
+        """
+        latest_version = self.version_checker.check_latest_version(use_cache=use_cache)
         return {
-            "has_update": has_update,
+            "has_update": latest_version is not None
+            and is_newer_version(latest_version, self.current_version),
             "current_version": self.current_version,
             "latest_version": latest_version,
-            "method": self.manager.installation_method,
-            "supports_auto_update": self.manager.can_auto_update(),
+            "method": self.method,
+            "supports_auto_update": self.can_auto_update,
         }
 
     def show_update_notification(
-        self, quiet: bool = False, force_check: bool = False
+        self, *, quiet: bool = False, force_check: bool = False
     ) -> bool:
-        """Show update notification if updates are available.
+        """Print a panel when a newer release exists; return whether one does.
 
         Args:
-            quiet: Only show notification if update is available
-            force_check: Skip cache and force fresh check
-
-        Returns:
-            bool: True if update is available
+            quiet: Print nothing when KiLM is up to date.
+            force_check: Ask PyPI even when a recent answer is cached.
         """
-        from rich.console import Console
-        from rich.panel import Panel
-
-        console = Console()
-        update_info = self.check_for_updates(use_cache=not force_check)
-
-        if not update_info["has_update"]:
+        console = get_console()
+        status = self.check_for_updates(use_cache=not force_check)
+        if not status["has_update"]:
             if not quiet:
-                console.print("[green]✓[/green] You are using the latest version!")
+                console.print("[green]You are using the latest version.[/green]")
             return False
 
-        # Create update notification
-        current = update_info["current_version"]
-        latest = update_info["latest_version"]
-        method = update_info["method"]
-        can_auto_update = update_info["supports_auto_update"]
-
-        message_lines = [
+        current = status["current_version"]
+        latest = status["latest_version"]
+        lines = [
             "[yellow]Update available![/yellow]",
             f"Current: [blue]{current}[/blue] → Latest: [green]{latest}[/green]",
             "",
         ]
-
-        if can_auto_update:
-            message_lines.extend(
-                [
-                    "Run [bold cyan]kilm update[/bold cyan] to update automatically",
-                    f"Installation method: [dim]{method}[/dim]",
-                ]
-            )
+        if status["supports_auto_update"]:
+            lines += [
+                "Run [bold cyan]kilm update[/bold cyan] to update automatically",
+                f"Installation method: [dim]{self.method}[/dim]",
+            ]
         else:
-            update_cmd = self.manager.get_update_instruction()
-            message_lines.extend(
-                [
-                    f"Installation method: [bold]{method}[/bold] (manual update required)",
-                    f"Update manually: [bold cyan]{update_cmd}[/bold cyan]",
-                ]
-            )
-
-        message = "\n".join(message_lines)
-
+            instruction = self.update_instruction()
+            method = f"[bold]{self.method}[/bold]"
+            lines += [
+                f"Installation method: {method} (manual update required)",
+                f"Update manually: [bold cyan]{instruction}[/bold cyan]",
+            ]
         console.print(
             Panel(
-                message,
+                "\n".join(lines),
                 title="[bold blue]KiLM Update Available[/bold blue]",
                 border_style="blue",
             )
         )
-
         return True
 
-    def is_update_available(self, latest_version: str) -> bool:
-        """Check if an update is available."""
-        return self.manager.is_newer_version_available(latest_version)
+    def perform_update(self, target_version: str | None = None) -> UpdateResult:
+        """Run the installer for the latest release, or exactly `target_version`.
 
-    def get_installation_method(self) -> InstallMethod:
-        """Get detected installation method."""
-        return self.manager.installation_method
-
-    def get_update_instructions(self) -> str:
-        """Get update instructions for current installation method."""
-        return self.manager.get_update_instruction()
-
-    def can_auto_update(self) -> bool:
-        """Check if automatic updates are supported."""
-        return self.manager.can_auto_update()
-
-    def perform_update(
-        self,
-        target_version: str | None = None,
-        force: bool = False,
-        dry_run: bool = False,
-    ) -> tuple[bool, str]:
-        """Perform update installation.
-
-        Args:
-            target_version: Specific version to install
-            force: Force update even if already up to date
-            dry_run: Show what would be done without doing it
-
-        Returns:
-            tuple[bool, str]: (success, message)
+        Installs unconditionally: deciding whether an update is needed is the
+        caller's job. A target version may be older than the installed one.
         """
-        if dry_run:
-            return self._show_dry_run_info(target_version)
-
-        # A target version is installed as asked, even when it is older.
-        if not force and target_version is None:
-            update_info = self.check_for_updates()
-            if not update_info["has_update"]:
-                return True, "Already using the latest version!"
-
-        return self.manager.perform_update(target_version)
-
-    def _show_dry_run_info(self, target_version: str | None = None) -> tuple[bool, str]:
-        """Show what would happen during an update."""
-        from rich.console import Console
-        from rich.panel import Panel
-
-        console = Console()
-        method = self.manager.installation_method
-        can_auto_update = self.manager.can_auto_update()
-        package_spec = f"kilm=={target_version}" if target_version else "kilm"
-        update_cmd = self.manager.get_update_instruction(target_version)
-
-        console.print(
-            Panel(
-                f"""[bold]Update Plan (Dry Run)[/bold]
-
-Installation method: [cyan]{method}[/cyan]
-Target package: [green]{package_spec}[/green]
-Auto-update supported: [{"green" if can_auto_update else "red"}]{can_auto_update}[/]
-
-Command that would be executed:
-[bold cyan]{update_cmd}[/bold cyan]""",
-                title="[bold yellow]Dry Run[/bold yellow]",
-                border_style="yellow",
+        command = upgrade_command(self.method, target_version)
+        if command is None:
+            return UpdateResult(
+                success=False,
+                message=f"Manual update required: {self.update_instruction()}",
             )
+        error = run_upgrade(command)
+        if error is None:
+            return UpdateResult(success=True, message="KiLM updated successfully!")
+        instruction = self.update_instruction(target_version)
+        return UpdateResult(
+            success=False, message=f"{error}\nTry manually: {instruction}"
         )
-
-        return can_auto_update, f"Dry run completed - would execute: {update_cmd}"

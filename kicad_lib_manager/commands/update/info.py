@@ -1,4 +1,4 @@
-"""Update info command implementation."""
+"""`kilm update info`: show how KiLM is installed and how it updates."""
 
 import importlib.metadata
 from typing import Annotated
@@ -6,55 +6,47 @@ from typing import Annotated
 import typer
 from rich.panel import Panel
 
+from kicad_lib_manager.services.update_service import UpdateService
 from kicad_lib_manager.utils.console import get_console
-
-from ...services.update_service import UpdateService
 
 
 def info_command(
+    *,
     force_check: Annotated[
         bool, typer.Option(help="Force fresh version check, bypass cache")
     ] = False,
 ) -> None:
     """Show detailed installation and update information."""
-    version = importlib.metadata.version("kilm")
-    update_service = UpdateService(version)
+    update_service = UpdateService(importlib.metadata.version("kilm"))
+    status = update_service.check_for_updates(use_cache=not force_check)
 
-    # Get installation and update information
-    update_info = update_service.check_for_updates(use_cache=not force_check)
-    method = update_service.get_installation_method()
-    can_auto_update = update_service.can_auto_update()
-    update_cmd = update_service.get_update_instructions()
-
-    # Current version status
-    version_status = f"[green]{update_info['current_version']}[/green]"
-    if update_info["has_update"]:
-        version_status += (
-            f" → [yellow]{update_info['latest_version']} available[/yellow]"
-        )
+    version_status = f"[green]{status['current_version']}[/green]"
+    if status["has_update"]:
+        version_status += f" → [yellow]{status['latest_version']} available[/yellow]"
     else:
         version_status += " [dim](latest)[/dim]"
 
-    # Installation details
-    install_details = [
-        f"Method: [cyan]{method}[/cyan]",
-        f"Auto-update: [{'green' if can_auto_update else 'red'}]{can_auto_update}[/]",
-        f"Update command: [cyan]{update_cmd}[/cyan]",
-    ]
-
-    # Display information
+    auto_update = status["supports_auto_update"]
+    auto_update_color = "green" if auto_update else "red"
+    instruction = update_service.update_instruction()
     get_console().print(
         Panel(
-            f"""[bold]Version Information[/bold]
-Current version: {version_status}
-
-[bold]Installation Details[/bold]
-{chr(10).join(install_details)}
-
-[bold]Available Commands[/bold]
-[cyan]kilm update check[/cyan]    - Check for updates
-[cyan]kilm update perform[/cyan]  - Install updates
-[cyan]kilm update info[/cyan]     - Show this information""",
+            "\n".join(
+                [
+                    "[bold]Version Information[/bold]",
+                    f"Current version: {version_status}",
+                    "",
+                    "[bold]Installation Details[/bold]",
+                    f"Method: [cyan]{status['method']}[/cyan]",
+                    f"Auto-update: [{auto_update_color}]{auto_update}[/]",
+                    f"Update command: [cyan]{instruction}[/cyan]",
+                    "",
+                    "[bold]Available Commands[/bold]",
+                    "[cyan]kilm update check[/cyan]    - Check for updates",
+                    "[cyan]kilm update perform[/cyan]  - Install updates",
+                    "[cyan]kilm update info[/cyan]     - Show this information",
+                ]
+            ),
             title="[bold blue]KiLM Installation Info[/bold blue]",
             border_style="blue",
         )
