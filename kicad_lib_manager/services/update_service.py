@@ -264,17 +264,38 @@ def upgrade_command(
     return None
 
 
-def run_upgrade(command: list[str]) -> bool:
-    """Run an upgrade command from `upgrade_command` and report success."""
+UPGRADE_TIMEOUT_SECONDS = 300
+"""How long an installer may run before the update counts as failed."""
+
+UPGRADE_ERROR_LINES = 10
+"""Trailing lines of installer output kept to explain a failed update."""
+
+
+def run_upgrade(command: list[str]) -> str | None:
+    """Run an upgrade command from `upgrade_command`.
+
+    Returns None on success, otherwise why it failed: the end of the
+    installer's error output, or why the installer could not run.
+    """
     # pip runs through this interpreter so it updates the running environment.
     argv = [sys.executable, "-m", *command] if command[0] == "pip" else command
     try:
         result = subprocess.run(
-            argv, capture_output=True, text=True, timeout=300, check=False
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=UPGRADE_TIMEOUT_SECONDS,
+            check=False,
         )
-    except (subprocess.TimeoutExpired, OSError):
-        return False
-    return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        return f"{command[0]} did not finish within {UPGRADE_TIMEOUT_SECONDS} seconds"
+    except OSError as exc:
+        return f"Could not run {command[0]}: {exc.strerror or exc}"
+    if result.returncode == 0:
+        return None
+    output = (result.stderr or result.stdout).strip().splitlines()
+    detail = "\n".join(output[-UPGRADE_ERROR_LINES:])
+    return detail or f"{command[0]} exited with status {result.returncode}"
 
 
 class UpdateManager:
@@ -325,10 +346,11 @@ class UpdateManager:
         if command is None:
             instruction = self.get_update_instruction()
             return False, f"Manual update required: {instruction}"
-        if run_upgrade(command):
+        error = run_upgrade(command)
+        if error is None:
             return True, "KiLM updated successfully!"
         instruction = self.get_update_instruction(target_version)
-        return False, f"Auto-update failed. Try manually: {instruction}"
+        return False, f"{error}\nTry manually: {instruction}"
 
 
 class UpdateService:

@@ -133,7 +133,4 @@ def perform_update_command(
         )
     else:
         get_console().print(f"\n[red]✗[/red] Update failed: {message}")
-        get_console().print(
-            "Please try updating manually or check the error messages above"
-        )
         raise typer.Exit(1)

@@ -473,6 +473,28 @@ class TestUpdateService:
         assert success is True
         assert calls == [expected_argv]
 
+    def test_failed_update_reports_the_installer_error(self, monkeypatch):
+        """The installer's error output explains why an update failed."""
+        with patch(
+            "kicad_lib_manager.services.update_service.detect_installation_method",
+            return_value="pipx",
+        ):
+            service = UpdateService("1.0.0")
+
+        def fake_run(argv, **_kwargs):
+            error = "No matching distribution found for kilm==9.9.9\n"
+            return subprocess.CompletedProcess(argv, 1, "", error)
+
+        monkeypatch.setattr(
+            "kicad_lib_manager.services.update_service.subprocess.run", fake_run
+        )
+
+        success, message = service.perform_update(target_version="9.9.9")
+
+        assert success is False
+        assert "No matching distribution found for kilm==9.9.9" in message
+        assert "pipx install --force kilm==9.9.9" in message
+
     def test_dry_run_info_display(self, update_service):
         """Test dry run information display."""
         with (
