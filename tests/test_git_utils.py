@@ -79,77 +79,26 @@ echo 'after kilm'"""
         assert "old kilm content" not in result
         assert "kilm sync" in result
 
+    @pytest.mark.parametrize("relative", [True, False])
     @patch("subprocess.run")
-    def test_get_git_hooks_directory_standard(
-        self, mock_run: Mock, tmp_path: Path
+    def test_get_git_hooks_directory_asks_git(
+        self, mock_run: Mock, tmp_path: Path, *, relative: bool
     ) -> None:
-        """Test standard hooks directory detection."""
-        # Mock the first call to succeed with hooks path
-        mock_run.return_value = Mock(returncode=0, stdout=".git/hooks")
+        """Git's hooks path is used, relative to the repository or as given.
 
-        repo_path = tmp_path / "test-repo"
+        core.hooksPath and worktrees reach this as such a path.
+        """
+        repo_path = tmp_path / "repo"
         repo_path.mkdir()
-        (repo_path / ".git" / "hooks").mkdir(parents=True, exist_ok=True)
+        if relative:
+            hooks = repo_path / "custom" / "hooks"
+            mock_run.return_value = Mock(returncode=0, stdout="custom/hooks")
+        else:
+            hooks = tmp_path / "main-repo" / ".git" / "hooks"
+            mock_run.return_value = Mock(returncode=0, stdout=str(hooks))
 
-        hooks_dir = get_git_hooks_directory(repo_path)
-
-        assert hooks_dir == repo_path / ".git" / "hooks"
-        mock_run.assert_called_once()
-
-    @patch("subprocess.run")
-    def test_get_git_hooks_directory_custom_path(
-        self, mock_run: Mock, tmp_path: Path
-    ) -> None:
-        """Test custom hooks directory detection."""
-        custom_hooks = tmp_path / "custom" / "hooks"
-        custom_hooks.mkdir(parents=True, exist_ok=True)
-
-        mock_run.return_value = Mock(returncode=0, stdout=str(custom_hooks))
-
-        repo_path = tmp_path / "test-repo"
-        repo_path.mkdir()
-        (repo_path / ".git").mkdir()
-
-        hooks_dir = get_git_hooks_directory(repo_path)
-
-        assert hooks_dir == custom_hooks
-        mock_run.assert_called_once()
-
-    @patch("subprocess.run")
-    def test_get_git_hooks_directory_relative_path(
-        self, mock_run: Mock, tmp_path: Path
-    ) -> None:
-        """Test relative custom hooks path handling."""
-        mock_run.return_value = Mock(returncode=0, stdout="custom/hooks")
-
-        repo_path = tmp_path / "test-repo"
-        repo_path.mkdir()
-        (repo_path / ".git").mkdir()
-        (repo_path / "custom" / "hooks").mkdir(parents=True, exist_ok=True)
-
-        hooks_dir = get_git_hooks_directory(repo_path)
-
-        assert hooks_dir == repo_path / "custom" / "hooks"
-        mock_run.assert_called_once()
-
-    @patch("subprocess.run")
-    def test_get_git_hooks_directory_worktree(
-        self, mock_run: Mock, tmp_path: Path
-    ) -> None:
-        """Test Git worktree hooks directory detection."""
-        # Mock the Git command to return the worktree hooks path
-        main_git_dir = tmp_path / "main-repo" / ".git"
-        worktree_hooks = main_git_dir / "hooks"
-        worktree_hooks.mkdir(parents=True, exist_ok=True)
-
-        mock_run.return_value = Mock(returncode=0, stdout=str(worktree_hooks))
-
-        repo_path = tmp_path / "worktree"
-        repo_path.mkdir()
-
-        hooks_dir = get_git_hooks_directory(repo_path)
-
-        assert hooks_dir == worktree_hooks
+        assert get_git_hooks_directory(repo_path) == hooks
+        assert hooks.is_dir()
         mock_run.assert_called_once()
 
     def test_get_git_hooks_directory_without_git(
