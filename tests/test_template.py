@@ -20,6 +20,10 @@ from kicad_lib_manager.utils.template.discovery import (
     ConfiguredLibrary,
     find_all_templates,
 )
+from kicad_lib_manager.utils.template.hooks import (
+    create_hook_script,
+    run_post_create_hook,
+)
 from kicad_lib_manager.utils.template.models import (
     DiscoveredTemplate,
     TemplateMetadata,
@@ -191,6 +195,20 @@ def test_create_project_dry_run_writes_nothing(
 
     assert create_project_from_template(template, project_dir, PROJECT, dry_run=True)
     assert not project_dir.exists()
+
+
+def test_starting_hook_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The hook that template make writes loads and runs as written."""
+    create_hook_script(tmp_path)
+
+    run_post_create_hook(
+        tmp_path / POST_CREATE_HOOK,
+        tmp_path / "project",
+        PROJECT,
+        create_template_metadata("tpl"),
+    )
+
+    assert "Project MyProject created successfully!" in capsys.readouterr().out
 
 
 class _LibraryConfig:

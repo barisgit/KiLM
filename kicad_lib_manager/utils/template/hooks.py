@@ -12,11 +12,13 @@ from kicad_lib_manager.utils.template.models import RenderVariables, TemplateMet
 HOOK_MODULE_NAME = "hook"
 HOOK_FUNCTION = "post_create"
 
-# The starting point written into every new template's hooks directory.
-HOOK_SCRIPT = '''"""
+# The starting point written into every new template's hooks directory. Raw, so
+# the escapes in its commented examples reach the file as written.
+HOOK_SCRIPT = r'''"""
 Post-creation hook for template.
 This script runs after the template has been used to create a new project.
 """
+
 
 def post_create(context):
     """
@@ -33,21 +35,22 @@ def post_create(context):
     """
     # Uncomment and modify as needed
     # import subprocess
-    # import os
+    # from pathlib import Path
 
     # Example: Initialize git repository
-    # subprocess.run(["git", "init"], cwd=context["project_dir"])
+    # subprocess.run(["git", "init"], cwd=context["project_dir"], check=True)
 
     # Example: Create README.md if it doesn't exist
-    # readme_path = os.path.join(context["project_dir"], "README.md")
-    # if not os.path.exists(readme_path):
-    #     with Path(readme_path).open("w") as f:
-    #         f.write(f"# {context['variables']['project_name']}\n\n")
-    #         f.write("Created with KiCad Library Manager\n")
+    # readme_path = Path(context["project_dir"]) / "README.md"
+    # if not readme_path.exists():
+    #     readme_path.write_text(
+    #         f"# {context['variables']['project_name']}\n\n"
+    #         "Created with KiCad Library Manager\n"
+    #     )
 
     # Print message to user
-    click.echo(f"Project {context['variables']['project_name']} created successfully!")
-    click.echo(f"Location: {context['project_dir']}")
+    print(f"Project {context['variables']['project_name']} created successfully!")
+    print(f"Location: {context['project_dir']}")
 '''
 
 
