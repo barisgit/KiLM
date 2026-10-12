@@ -362,5 +362,15 @@ def test_main_kicad_files_are_named_after_the_new_project(tmp_path: Path) -> Non
     assert '(project "Widget")' in (project / "Widget.kicad_sch").read_text()
     assert '(sheetfile "Widget.kicad_sch")' in (project / "Widget.kicad_pcb").read_text()
 
+def test_rendered_files_keep_markup_characters(tmp_path: Path) -> None:
+    """Variables are inserted verbatim, not HTML-escaped."""
+    source = tmp_path / "title.txt.jinja2"
+    source.write_text("{{ project_name }}")
+    target = tmp_path / "title.txt"
+
+    render_template_file(source, target, {"project_name": "R&D <1>"})
+
+    assert target.read_text() == "R&D <1>"
+
 if __name__ == "__main__":
     pytest.main()

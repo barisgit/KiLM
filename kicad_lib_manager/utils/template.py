@@ -1084,10 +1084,10 @@ def render_template_file(
 
         # If it's a Jinja template, process it
         if source_file.name.endswith(".jinja2"):
-            # Create Jinja2 template environment with safe auto-escaping
+            # No HTML escaping: templates render KiCad and text files.
             env = jinja2.Environment(
                 loader=jinja2.FileSystemLoader(source_file.parent),
-                autoescape=jinja2.select_autoescape(["html", "xml"]),
+                autoescape=False,
                 undefined=jinja2.StrictUndefined,
             )
 
