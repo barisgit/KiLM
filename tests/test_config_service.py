@@ -12,6 +12,7 @@ from kicad_lib_manager.services.config_service import (
     Config,
     LibraryDict,
 )
+from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS
 
 GITHUB = LibraryDict(name="symbols", path="/libs/symbols", type="github")
 CLOUD = LibraryDict(name="models", path="/libs/models", type="cloud")
@@ -85,6 +86,19 @@ def test_unreadable_file_is_reported_and_yields_defaults(
     config = make_config(config_file)
 
     assert config.get_libraries() == []
+    assert "Error loading config file" in capsys.readouterr().err
+
+
+def test_undecodable_file_is_reported_and_yields_defaults(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A file that is not UTF-8 is reported on stderr and the defaults apply."""
+    config_file.parent.mkdir(parents=True)
+    config_file.write_bytes(b"max_backups: \xff\n")
+
+    config = make_config(config_file)
+
+    assert config.get("max_backups") == DEFAULT_MAX_BACKUPS
     assert "Error loading config file" in capsys.readouterr().err
 
 

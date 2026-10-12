@@ -85,7 +85,7 @@ class Config:
                 loaded = yaml.safe_load(f)
         except FileNotFoundError:
             return
-        except (OSError, yaml.YAMLError) as e:
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
             click.echo(f"Error loading config file: {e}", err=True)
             return
         if isinstance(loaded, dict):
