@@ -120,8 +120,8 @@ def _show_library_table(
         table.add_row(
             str(library.get("name", "unnamed")),
             path,
-            "✓ Current" if current_library == path else "",
-            "✓" if metadata is not None and metadata else "✗",
+            "Current" if current_library == path else "",
+            "Yes" if metadata is not None and metadata else "Missing",
         )
     get_console().print(table)
 

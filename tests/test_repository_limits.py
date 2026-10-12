@@ -4,6 +4,7 @@
   that grows past it instead of raising the limit.
 - Every lint or type suppression names its rule and states a reason after
   ``--``, for example ``# noqa: S603 -- arguments are a fixed git command``.
+- No module contains emoji or check-mark glyphs; CLI output uses words.
 """
 
 import io
@@ -20,6 +21,9 @@ REASONED_SUPPRESSION = re.compile(
     r"#\s*(noqa: [A-Z]+[0-9]+(, [A-Z]+[0-9]+)*|ty: ignore\[[a-z-]+(, [a-z-]+)*\])"
     r" -- \S"
 )
+# Miscellaneous symbols, dingbats (check and cross marks), pictographs, and
+# the emoji variation selector. Arrows, bullets, and box drawing stay allowed.
+PICTOGRAPH = re.compile("[\u2600-\u27bf\u2b00-\u2bff\ufe0f\U0001f000-\U0001faff]")
 
 
 def python_modules() -> list[Path]:
@@ -56,3 +60,16 @@ def test_suppressions_name_rule_and_reason() -> None:
             if not REASONED_SUPPRESSION.search(token.string):
                 unreasoned.append(f"{relative(path)}:{token.start[0]}")
     assert not unreasoned, f"Suppressions without rule and reason: {unreasoned}"
+
+
+def test_modules_contain_no_pictographs() -> None:
+    """No module contains an emoji, check mark, or other pictograph."""
+    found = [
+        f"{relative(path)}:{number}"
+        for path in python_modules()
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        )
+        if PICTOGRAPH.search(line)
+    ]
+    assert not found, f"Pictographs in: {found}"
