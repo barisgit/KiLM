@@ -1,14 +1,19 @@
 """Tests for ``kilm unpin`` against a temporary KiCad configuration."""
 
-import io
 import json
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+from kicad_lib_manager.commands.kicad_common import (
+    JsonObject,
+    load_json_object,
+    session_of,
+)
 from kicad_lib_manager.main import app
 from kicad_lib_manager.services.library_service import LibraryService
+from tests.fault_injection import fail_writes
 
 CONFLICT = "'--all' cannot be used with '--symbols' or '--footprints'"
 
@@ -29,11 +34,10 @@ def kicad_common(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return path
 
 
-def _session(path: Path) -> dict[str, object]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    assert isinstance(data, dict)
-    session = data["session"]
-    assert isinstance(session, dict)
+def _session(path: Path) -> JsonObject:
+    """Return the ``session`` section of the kicad_common.json at ``path``."""
+    session = session_of(load_json_object(path))
+    assert session is not None
     return session
 
 
@@ -103,16 +107,7 @@ def test_unpin_keeps_the_file_when_writing_fails(
 ) -> None:
     """A failed write leaves kicad_common.json as it was."""
     before = kicad_common.read_text(encoding="utf-8")
-    real_open = io.open
-
-    def failing_open(file: object, mode: str = "r", *args: object, **kwargs: object):
-        handle = real_open(file, mode, *args, **kwargs)
-        if "w" in mode:
-            handle.close()
-            raise OSError(28, "No space left on device")
-        return handle
-
-    monkeypatch.setattr(io, "open", failing_open)
+    fail_writes(monkeypatch)
 
     result = CliRunner().invoke(app, ["unpin", "--symbols", "sym_a"])
 
