@@ -2,7 +2,10 @@
 File operation utilities
 """
 
+import os
 import re
+import shutil
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -53,6 +56,33 @@ def write_file_with_encoding(
     """
     with Path(file_path).open("w", encoding=encoding) as f:
         f.write(content)
+
+
+def write_atomically(path: Path, data: bytes) -> None:
+    """Replace path with data so readers see the old or the new file, never a partial one.
+
+    The data goes to a hidden sibling first, which keeps the final rename on
+    one filesystem and therefore atomic, and is flushed to disk before the
+    rename. A symlinked path is followed. The new file takes over an existing file's permission bits; a new
+    file gets the default ones (0o666 less the umask). On failure the sibling
+    is removed and path is unchanged.
+    """
+    path = path.resolve()  # write through a symlink instead of replacing it
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+    # O_BINARY (Windows only) stops newline translation of the bytes.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    fd = os.open(tmp, flags, 0o666)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        if path.exists():
+            shutil.copymode(path, tmp)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def validate_lib_table(table_path: Path, create_if_missing: bool = True) -> None:

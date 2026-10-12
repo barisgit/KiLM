@@ -101,6 +101,7 @@ kilm                    # Main CLI entry point
 ├── sync               # Update/sync library content (was 'update')
 ├── update             # Update KiLM itself (breaking change in 0.4.0)
 ├── add-hook           # Add project hooks
+├── import             # Import vendor part ZIPs into a library
 └── template           # Project template management
 ```
 

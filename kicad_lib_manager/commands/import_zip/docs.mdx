@@ -1,0 +1,110 @@
+---
+title: import
+description: Import symbols, footprints, and 3D models from vendor part ZIPs into a KiLM library.
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+The `kilm import` command adds the parts in vendor ZIP downloads to a KiLM-managed library: symbols are merged into a symbol library, footprints are copied into a footprint library, and 3D models are copied next to them with their paths rewritten. It reads ZIPs from SamacSys (including Mouser and Component Search Engine downloads), UltraLibrarian, and SnapMagic.
+
+## Usage
+
+```bash
+kilm import [OPTIONS] ZIP_FILES...
+```
+
+## Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--library`, `-l TEXT` | Name of the KiLM library to import into | The current library | `--library my-library` |
+| `--symbol-lib`, `-s TEXT` | Symbol library (file stem in `symbols/`) to add symbols to | The only one; required when there are several | `--symbol-lib MyLib_IC` |
+| `--footprint-lib`, `-f TEXT` | Footprint library (`.pretty` stem in `footprints/`) to add footprints to | The only one; required when there are several | `--footprint-lib MyLib_QFN` |
+| `--kicad-cli PATH` | `kicad-cli` executable or KiCad AppImage used to upgrade file formats | Found on `PATH` or in the standard KiCad install location | `--kicad-cli /usr/bin/kicad-cli` |
+| `--dry-run` | Report what would be imported without changing files | `False` | `--dry-run` |
+| `--help`, `-h` | Show help message and exit | - | `--help` |
+
+## Behavior
+
+The target library needs at least one `.kicad_sym` file in `symbols/` and one `.pretty` directory in `footprints/`. Create them in KiCad's Symbol and Footprint Editors (File > New Library) if the library is new.
+
+For each ZIP, the command:
+
+1. **Extracts the archive safely**: An archive with an entry that would land outside the extraction directory is rejected. KiCad files are found by extension, so the vendor's folder layout does not matter; other files, macOS metadata (`__MACOSX/`, `._*`), and hidden files are ignored.
+2. **Copies 3D models** (`.step`, `.stp`, `.step.gz`, `.stp.gz`): A model already present in any `*.3dshapes` directory of the library is reused instead of copied again.
+3. **Copies footprints** (`.kicad_mod`, written with that lowercase extension, the only one KiCad lists): References to models the library holds are pointed at them; other references, such as those into KiCad's own 3D libraries, are kept. Footprints that already exist are skipped.
+4. **Merges symbols** (`.kicad_sym`): Symbols that already exist are skipped, and each new symbol's `Footprint` field is pointed at the footprint library that received its footprint. The symbol library keeps its line endings.
+
+Every file of a ZIP is read, upgraded, and checked before anything is written, so a dry run reports the same additions and failures as a real run, and a ZIP that fails these checks changes nothing. Each file is written to a temporary sibling and then renamed over the target, so an interrupted import never leaves a truncated library. Before its first change in a run, the symbol library is copied to `<name>.kicad_sym.backup.<timestamp>` next to it; the five newest backups are kept.
+
+Re-running an import is safe: existing symbols, footprints, and models are reported as skipped and left untouched. File names that differ only in case count as the same file (within one ZIP, the first by archive path is kept), so a library stays usable on case-insensitive filesystems (macOS, Windows); symbols reference the footprint under the name the library already holds. A dry run reports exactly what a real run would add, including parts repeated across several ZIPs.
+
+### 3D model paths
+
+Models go to the first of:
+
+- a 3D library registered with [`kilm add-3d`](/reference/cli/add-3d/) inside the library directory, referenced through its environment variable;
+- the library's existing `*.3dshapes` directory (one named after the library is preferred), referenced through the library's environment variable from `kilm.yaml`;
+- a new `<library>.3dshapes` directory.
+
+Without an environment variable, model paths are absolute to the current machine, and the command warns about it.
+
+### Format upgrades
+
+When `kicad-cli` is available, legacy `(module ...)` footprints and vendor symbols are upgraded to the format of the installed KiCad. An upgrade is kept only if it does not make the library's format newer than it already is, because older KiCad releases cannot open newer files. If the installed KiCad writes a newer format than the library uses, the vendor format is kept; KiCad reads it either way.
+
+A vendor symbol or footprint that is already newer than the library is rejected, along with the rest of its ZIP: merged under the library's older header, it would make the library unreadable for the KiCad releases that use it now. If every KiCad that uses the library reads the newer format, upgrade the library with `kicad-cli sym upgrade` or `kicad-cli fp upgrade` and import again.
+
+## Examples
+
+**Import one part into the current library:**
+
+```bash
+kilm import ~/Downloads/LIB_TPS56637RPAR.zip
+```
+
+**Preview a batch import:**
+
+```bash
+kilm import --dry-run ~/Downloads/LIB_*.zip ~/Downloads/ul_*.zip
+```
+
+**Import into specific symbol and footprint libraries:**
+
+```bash
+kilm import -s MyLib_Power -f MyLib_QFN ~/Downloads/LIB_BQ25303JRTER.zip
+```
+
+## Error Handling
+
+- **Missing or invalid ZIP**: Reported, and the remaining ZIPs are still imported.
+- **Unsafe, corrupt, or password-protected archive, or an unsupported compression method**: Reported, nothing from that ZIP is written, and the remaining ZIPs are still imported.
+- **Vendor file that is not valid UTF-8 or is newer than the library's format**: Reported the same way, in a dry run too.
+- **Write failure** (for example a full disk): The file being written is left as it was. Files written before it from the same ZIP stay; later ZIPs in the run and re-runs skip them.
+- **Several symbol or footprint libraries**: The command lists them and asks for `--symbol-lib` or `--footprint-lib`.
+- **`--kicad-cli` path does not exist**: The command stops before changing anything.
+- **`kicad-cli` fails or times out**: The file is imported in its vendor format.
+
+The command exits with status 1 if any ZIP could not be imported.
+
+## Integration with Other Commands
+
+<CardGrid>
+  <LinkCard
+    title="init"
+    href="/reference/cli/init/"
+    description="Create the KiLM library that parts are imported into"
+  />
+  <LinkCard
+    title="add-3d"
+    href="/reference/cli/add-3d/"
+    description="Register a 3D model directory for imported models"
+  />
+  <LinkCard
+    title="setup"
+    href="/reference/cli/setup/"
+    description="Register new libraries and environment variables in KiCad"
+  />
+</CardGrid>
+
+Run `kilm setup` after importing into a symbol or footprint library that KiCad does not know yet.

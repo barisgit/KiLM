@@ -53,6 +53,7 @@ export default defineConfig({
             { label: "Overview", link: "/reference/cli/" },
             { label: "init", link: "/reference/cli/init/" },
             { label: "add-3d", link: "/reference/cli/add-3d/" },
+            { label: "import", link: "/reference/cli/import/" },
             { label: "config", link: "/reference/cli/config/" },
             { label: "setup", link: "/reference/cli/setup/" },
             { label: "pin", link: "/reference/cli/pin/" },
