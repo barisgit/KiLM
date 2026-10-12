@@ -85,6 +85,9 @@ def init(
         )
     )
 
+    # The service creates the library folders, so note what exists beforehand.
+    present_before = {entry.name for entry in current_dir.iterdir()}
+
     # Use library service to initialize
     library_service = LibraryService()
     try:
@@ -107,8 +110,7 @@ def init(
 
         for folder_type, exists in capabilities.items():
             if exists:
-                folder_path = current_dir / folder_type
-                if folder_path.exists():
+                if folder_type in present_before:
                     existing_folders.append(folder_type)
                 else:
                     created_folders.append(folder_type)
