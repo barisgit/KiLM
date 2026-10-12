@@ -40,7 +40,8 @@ DEFAULT_VARIABLE_PATTERNS = (
 # Files larger than this are not scanned for variables.
 MAX_SCANNED_FILE_BYTES = 1024 * 1024
 
-# Patterns added to a project's .gitignore when choosing files for a template.
+# Ignored in addition to a project's .gitignore rules when choosing the files
+# of a template; a project without a .gitignore uses neither.
 ALWAYS_IGNORED_PATTERNS = (
     "__pycache__/",
     "*.py[cod]",

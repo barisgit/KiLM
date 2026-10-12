@@ -13,10 +13,10 @@ def _no_network(*_args: object, **_kwargs: object) -> requests.Response:
 
 
 @pytest.fixture(autouse=True)
-def _isolated_user(
+def home(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> Path:
-    """Give each test an empty home and no network.
+    """Give each test an empty home, returned for tests that use it, and no network.
 
     Every CLI invocation runs the update check, which reads the KiLM config,
     writes the version cache, and asks PyPI. Without this the suite would

@@ -114,6 +114,11 @@ def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None
         yaml.dump(dict(metadata), stream, default_flow_style=False)
 
 
+def default_description(name: str) -> str:
+    """Return the description of a variable whose author gave none."""
+    return f"Value for {name}"
+
+
 def _string_keyed(value: object) -> dict[str, object] | None:
     """Return a YAML mapping with its keys as text, or None for other values."""
     if not isinstance(value, Mapping):
@@ -135,7 +140,9 @@ def _variables(raw: dict[str, object]) -> dict[str, TemplateVariable]:
         description = _text(fields.get("description"))
         default = _text(fields.get("default"))
         variables[name] = TemplateVariable(
-            description=f"Value for {name}" if description is None else description,
+            description=default_description(name)
+            if description is None
+            else description,
             default="" if default is None else default,
         )
     return variables

@@ -12,6 +12,7 @@ from typing import Annotated
 import questionary
 import typer
 
+from kicad_lib_manager.commands.shared import parse_assignments
 from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import TEMPLATE_CONTENT_DIR
@@ -59,36 +60,12 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
         bool, typer.Option("--skip-hooks", help="Skip post-creation hooks")
     ] = False,
 ) -> None:
-    r"""Create a new KiCad project from a template.
+    """Create a KiCad project from a template in one of the configured libraries.
 
-    Creates a new KiCad project from a template in one of the configured libraries.
-    If NAME is provided, it will be used as the project name. If DIRECTORY is provided,
-    the project will be created in that directory. Otherwise, it will be created
-    in the current directory.
-
-    If NAME contains a path separator, it will be treated as a directory path
-    and the name will be extracted from the last part of the path.
-
-    Examples:
-    \b
-    # Create a project named 'MyProject' in the current directory
-    kilm template create MyProject
-
-    \b
-    # Create a project in a specific directory
-    kilm template create MyProject path/to/project
-
-    \b
-    # Create a project using a full path
-    kilm template create path/to/project/MyProject
-
-    \b
-    # Create a project using a specific template
-    kilm template create MyProject --template basic-project
-
-    \b
-    # Set template variables
-    kilm template create MyProject --set-var author="John Doe" --set-var version=1.0
+    The project goes into a subdirectory of DIRECTORY (default: the working
+    directory), named by the ``directory_name`` variable or derived from the
+    project name. A NAME with a path separator gives both the parent directory
+    and the name. Variables not set by NAME or ``--set-var`` are prompted for.
     """
     templates = find_all_templates(Config(), library)
     if not templates:
@@ -202,7 +179,7 @@ def _collect_variables(
     rendered with the values gathered before it. Returns None when a prompt
     is cancelled.
     """
-    from_options = _parse_assignments(assignments)
+    from_options = parse_assignments(assignments)
     variables: dict[str, str] = {}
     name_given = name is not None and bool(name) and PROJECT_NAME not in from_options
     if name is not None and name_given:
@@ -240,16 +217,6 @@ def _collect_variables(
             return None
         variables[var_name] = answer
     return variables
-
-
-def _parse_assignments(assignments: list[str]) -> dict[str, str]:
-    """Parse ``key=value`` options; entries without ``=`` are ignored."""
-    parsed: dict[str, str] = {}
-    for assignment in assignments:
-        key, separator, value = assignment.partition("=")
-        if separator:
-            parsed[key.strip()] = value.strip()
-    return parsed
 
 
 def _target_directory(
@@ -305,7 +272,7 @@ def _project_directory(
 
 
 def _prepare_project_directory(project_dir: Path) -> bool:
-    """Replace an existing project directory, after confirmation, and its parents.
+    """Remove an existing project directory, after confirmation; create its parents.
 
     Returns False, after explaining why, when the user declines or the
     directories cannot be changed.

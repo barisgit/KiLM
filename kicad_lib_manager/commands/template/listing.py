@@ -31,27 +31,9 @@ def list_templates(
         bool, typer.Option("--json", help="Output in JSON format")
     ] = False,
 ) -> None:
-    r"""List all available templates.
+    """List the templates of the configured libraries, grouped by library.
 
-    Displays all available templates across all configured libraries,
-    with their descriptions, source libraries, and other metadata.
-
-    Examples:
-    \b
-    # List all templates
-    kilm template list
-
-    \b
-    # List templates with detailed information
-    kilm template list --verbose
-
-    \b
-    # List templates from a specific library
-    kilm template list --library my-library
-
-    \b
-    # Output template list in JSON format
-    kilm template list --json
+    ``--json`` prints the discovered templates as JSON on stdout instead.
     """
     templates = find_all_templates(Config(), library)
     if not templates:

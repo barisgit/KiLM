@@ -139,8 +139,6 @@ def _run_hook(
     template: DiscoveredTemplate,
 ) -> None:
     """Run the template's post-creation hook, reporting any failure."""
-    if not hook_script.exists():
-        return
     try:
         run_post_create_hook(hook_script, project_dir, variables, template)
     except Exception as error:  # noqa: BLE001 -- the hook is template code and may raise anything

@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from kicad_lib_manager.commands.shared import parse_assignments
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import (
@@ -23,7 +24,10 @@ from kicad_lib_manager.utils.template.constants import (
     POST_CREATE_HOOK,
     PROJECT_FILENAME_VARIABLE,
 )
-from kicad_lib_manager.utils.template.models import TemplateVariable
+from kicad_lib_manager.utils.template.models import (
+    TemplateVariable,
+    default_description,
+)
 from kicad_lib_manager.utils.template.selection import (
     TemplatePlan,
     find_potential_variables,
@@ -93,42 +97,13 @@ def make(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
         bool, typer.Option("--force", help="Overwrite existing template if it exists")
     ] = False,
 ) -> None:
-    r"""Create a template from an existing project.
+    """Create a template from an existing KiCad project.
 
-    Creates a new KiCad project template from an existing project. If NAME
-    is provided, it will be used as the template name. If SOURCE_DIRECTORY is
-    provided, it will be used as the source project directory. Otherwise,
-    the current directory will be used.
-
-    By default, the command runs in interactive mode, automatically identifying
-    potential template variables and prompting for confirmation. Use
-    --non-interactive to disable prompts.
-
-    Examples:
-    \b
-    # Create a template named 'basic-project' from the current directory
-    kilm template make basic-project
-
-    \b
-    # Create a template from a specific directory
-    kilm template make basic-project path/to/project
-
-    \b
-    # Create a template with a description and use case
-    kilm template make basic-project --description "Basic KiCad project" \
-        --use-case "Starting point for simple PCB designs"
-
-    \b
-    # Create a template with variables
-    kilm template make basic-project --variable "author=John Doe"
-
-    \b
-    # Create a template without prompts
-    kilm template make basic-project --non-interactive
-
-    \b
-    # Create a template that extends another template
-    kilm template make advanced-project --extends basic-project
+    Interactively, asks for each part not given (source, name, description,
+    use case, target library) and offers values found in the project as
+    variables. With ``--non-interactive``, the name defaults to the source
+    directory's and the output to ``templates/<name>`` in the symbol library.
+    Exits with status 1 when no GitHub library is configured.
     """
     config = Config()
     libraries = config.get_libraries(library_type=GITHUB_LIBRARY)
@@ -286,15 +261,11 @@ def _print_request(
 
 
 def _parse_variables(assignments: list[str]) -> dict[str, TemplateVariable]:
-    """Parse ``--variable name=value`` options and show them."""
-    variables: dict[str, TemplateVariable] = {}
-    for assignment in assignments:
-        key, separator, value = assignment.partition("=")
-        if separator:
-            key = key.strip()
-            variables[key] = TemplateVariable(
-                description=f"Value for {key}", default=value.strip()
-            )
+    """Turn ``--variable name=value`` options into variables and show them."""
+    variables = {
+        key: TemplateVariable(description=default_description(key), default=value)
+        for key, value in parse_assignments(assignments).items()
+    }
     if variables:
         get_console().print("\nTemplate variables:")
         for key, info in variables.items():
@@ -311,7 +282,9 @@ def _ask_variables(source: Path) -> dict[str, TemplateVariable]:
     for var_name, values in potential.items():
         get_console().print(f"  {var_name}: {', '.join(values)}")
         if typer.confirm(f"  Use '{var_name}' as a template variable?", default=True):
-            description = typer.prompt("  Description", default=f"Value for {var_name}")
+            description = typer.prompt(
+                "  Description", default=default_description(var_name)
+            )
             variables[var_name] = TemplateVariable(
                 description=str(description), default=values[0]
             )
@@ -320,7 +293,7 @@ def _ask_variables(source: Path) -> dict[str, TemplateVariable]:
     ):
         var_name = str(typer.prompt("Variable name"))
         default = str(typer.prompt("Default value", default=""))
-        description = typer.prompt("Description", default=f"Value for {var_name}")
+        description = typer.prompt("Description", default=default_description(var_name))
         variables[var_name] = TemplateVariable(
             description=str(description), default=default
         )

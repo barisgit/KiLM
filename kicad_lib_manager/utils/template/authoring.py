@@ -64,8 +64,8 @@ def create_template_metadata(
             merged[key] = variable
     metadata = TemplateMetadata(
         name=name,
-        description=_or_default(description, f"KiCad project template for {name}"),
-        use_case=_or_default(use_case, ""),
+        description=description or f"KiCad project template for {name}",
+        use_case=use_case or "",
         version=TEMPLATE_VERSION,
         variables=merged,
     )
@@ -171,8 +171,3 @@ def _predefined_variables(name: str) -> dict[str, TemplateVariable]:
             default="%{project_name}",
         ),
     }
-
-
-def _or_default(value: str | None, default: str) -> str:
-    """Return ``value`` unless it is None or empty."""
-    return default if value is None or not value else value

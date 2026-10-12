@@ -24,6 +24,20 @@ def given(value: str | None) -> str | None:
     return None if value == "" else value
 
 
+def parse_assignments(assignments: list[str]) -> dict[str, str]:
+    """Parse ``name=value`` options into a mapping.
+
+    Splits at the first ``=`` and strips both sides. Entries without ``=``
+    are ignored, and a later assignment to a name replaces an earlier one.
+    """
+    parsed: dict[str, str] = {}
+    for assignment in assignments:
+        key, separator, value = assignment.partition("=")
+        if separator:
+            parsed[key.strip()] = value.strip()
+    return parsed
+
+
 def resolve_kicad_lib_dir(option: str | None) -> str:
     """Return the symbol and footprint library directory with ``~`` expanded.
 

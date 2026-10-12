@@ -96,8 +96,10 @@ def render_template_file(
     fails, the source is copied unchanged.
 
     Returns:
-        False when the file was not rendered as intended or could not be
-        written at all, True otherwise.
+        False when Jinja2 rejects the template (the source is still copied)
+        or when nothing could be written; True when the file was rendered or
+        copied, including a template copied because it could not be read or
+        its rendering could not be written.
     """
     target_file.parent.mkdir(parents=True, exist_ok=True)
     if is_binary:

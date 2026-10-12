@@ -17,11 +17,12 @@ from kicad_lib_manager.utils.template.constants import (
     JINJA_SUFFIX,
     KICAD_PROJECT_EXT,
     KICAD_SCHEMATIC_EXT,
+    PROJECT_FILENAME_VARIABLE,
     PROJECT_NAME_VARIABLES,
 )
 from kicad_lib_manager.utils.template.models import TemplateVariable
 
-PROJECT_FILENAME_TEMPLATE = "{{ project_filename }}"
+PROJECT_FILENAME_TEMPLATE = f"{{{{ {PROJECT_FILENAME_VARIABLE} }}}}"
 SCHEMATIC_PROJECT_PATTERN = re.compile(r'\(project\s+"([^"]+)"')
 PCB_SHEETFILE_PATTERN = re.compile(r'\(sheetfile\s+"([^"]+)"')
 

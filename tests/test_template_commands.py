@@ -17,15 +17,6 @@ from kicad_lib_manager.utils.constants import (
 )
 
 
-@pytest.fixture
-def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """An empty home directory, so Config reads and writes only test data."""
-    home_dir = tmp_path / "home"
-    home_dir.mkdir()
-    monkeypatch.setattr(Path, "home", lambda: home_dir)
-    return home_dir
-
-
 def add_library(home: Path, name: str) -> Path:
     """Configure a GitHub library called ``name`` and return its directory."""
     library = home / name

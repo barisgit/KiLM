@@ -1,7 +1,8 @@
 """Choosing the files of a source project that a new template copies.
 
 ``plan_template_files`` is the one place that decides what ``template make``
-copies, so the dry-run preview, the copy, and the variable scan agree.
+copies, so the dry-run preview and the copy agree. The variable scan uses the
+same rules without the template directory and ``--exclude`` patterns.
 """
 
 # PEP 810: on Python 3.15+ these imports load on first use.
@@ -198,8 +199,10 @@ class _ExclusionRules:
         path = f"{relative.as_posix()}/"
         if relative.name in EXCLUDED_DIRECTORIES:
             return Exclusion(path, f"Excluding common directory: {relative.name}")
-        if self.template_root is not None and _is_within(
-            self.source / relative, self.template_root
+        if self.template_root is not None and (
+            (self.source / relative)
+            .resolve()
+            .is_relative_to(self.template_root.resolve())
         ):
             message = f"Preventing recursive template copy: {relative.as_posix()}"
             return Exclusion(path, message)
@@ -220,15 +223,6 @@ class _ExclusionRules:
             message = f"Excluding KiCad project preferences file: {path}"
             return Exclusion(path, message)
         return None
-
-
-def _is_within(path: Path, directory: Path) -> bool:
-    """Whether ``path`` is ``directory`` or inside it, after resolving links."""
-    try:
-        path.resolve().relative_to(directory.resolve())
-    except ValueError:
-        return False
-    return True
 
 
 def _find_main_files(files: list[PurePath]) -> dict[MainFileKind, PurePath]:
