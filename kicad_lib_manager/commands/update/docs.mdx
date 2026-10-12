@@ -40,7 +40,7 @@ Shows the current version, whether a newer one exists, the detected installation
 
 Installs the update. If KiLM is already up to date, it exits without changes unless `--force` is given.
 
-- `--target-version`, `-t` `TEXT`: Version to install. Default: the latest release.
+- `--target-version`, `-t` `TEXT`: Version to install. Currently only `--dry-run` output uses it; an actual update always installs the latest release.
 - `--force`, `-f`: Reinstall even if KiLM is already up to date.
 - `--dry-run`: Show what would be updated without changing anything.
 - `--no-cache`: Bypass the cached version check and query PyPI.

@@ -98,42 +98,58 @@ def _resolve(words: list[str]) -> tuple[click.Command, str]:
     return command, " ".join(path)
 
 
-def _segment_target(
+def _segment_flags(
     segment: str, page_command: str | None
-) -> tuple[click.Command, str] | None:
-    """Return the command a text segment's flags belong to, or None to skip it."""
+) -> tuple[frozenset[str], str] | None:
+    """Return the flags valid in a text segment and their owner, or None to skip.
+
+    A segment that runs another program, such as ``pip install kilm --user``, is
+    skipped. A ``kilm`` invocation before the first flag owns the flags, and only
+    the options of the (sub)command it names are valid, so ``kilm update --force``
+    fails although ``kilm update perform --force`` exists. Other flags on a
+    command page may belong to the page's command or any of its subcommands;
+    on site pages they are not checked.
+    """
     words = segment.split()
-    # Only a kilm invocation before the first flag owns the flags; in
-    # `pip install --upgrade kilm` the word is the package being installed.
+    if words[0] in EXTERNAL_PROGRAMS:
+        return None
     first_flag = next(i for i, word in enumerate(words) if LONG_FLAG.search(word))
     before_flags = words[:first_flag]
     if "kilm" in before_flags:
         last_kilm = len(before_flags) - 1 - before_flags[::-1].index("kilm")
-        return _resolve(words[last_kilm + 1 :])
-    if (words and words[0] in EXTERNAL_PROGRAMS) or page_command is None:
+        command, path = _resolve(words[last_kilm + 1 :])
+        return _own_flags(command), path
+    if page_command is None:
         return None
-    return ROOT.commands[page_command], f"kilm {page_command}"
+    return _subtree_flags(ROOT.commands[page_command]), f"kilm {page_command}"
+
+
+def _logical_lines(text: str) -> list[tuple[int, str]]:
+    """Join backslash-continued shell lines, numbering each by its last line."""
+    logical: list[tuple[int, str]] = []
+    pending = ""
+    for number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.rstrip()
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        logical.append((number, pending + line))
+        pending = ""
+    return logical
 
 
 def _stale_flags(page: Path, page_command: str | None) -> list[str]:
-    """List flags on ``page`` that the command they are attributed to lacks.
-
-    Flags in a segment that invokes ``kilm`` belong to that (sub)command. On a
-    command page, other flags belong to the page's command unless the segment
-    invokes an external program; on site pages they are not checked.
-    """
-    stale = []
-    lines = page.read_text(encoding="utf-8").splitlines()
-    for number, line in enumerate(lines, start=1):
+    """List long flags on ``page`` that the command they belong to lacks."""
+    stale: list[str] = []
+    for number, line in _logical_lines(page.read_text(encoding="utf-8")):
         for segment in SEGMENT_SEPARATOR.split(line):
             flags = LONG_FLAG.findall(segment)
-            target = _segment_target(segment, page_command) if flags else None
+            target = _segment_flags(segment, page_command) if flags else None
             if target is None:
                 continue
-            command, path = target
-            known = _own_flags(command) if command is ROOT else _subtree_flags(command)
+            known, owner = target
             stale.extend(
-                f"{page.name}:{number}: {flag} is not an option of {path}"
+                f"{page.name}:{number}: {flag} is not an option of {owner}"
                 for flag in flags
                 if flag not in known | HELP_FLAGS
             )
