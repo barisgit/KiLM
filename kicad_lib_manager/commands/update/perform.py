@@ -4,6 +4,7 @@ import importlib.metadata
 from typing import Annotated
 
 import typer
+from packaging.version import InvalidVersion, Version
 from rich.panel import Panel
 
 from kicad_lib_manager.utils.console import get_console
@@ -54,6 +55,14 @@ def perform_update_command(
     get_console().print(Panel(deprecation_notice, expand=False, border_style="yellow"))
 
     version = importlib.metadata.version("kilm")
+    if target_version is not None:
+        try:
+            Version(target_version)
+        except InvalidVersion:
+            raise typer.BadParameter(
+                f"'{target_version}' is not a version number",
+                param_hint="--target-version",
+            ) from None
     update_service = UpdateService(version)
 
     if dry_run:
@@ -62,8 +71,8 @@ def perform_update_command(
         )
         get_console().print()
 
-    # Check if we can auto-update (skip during dry run)
-    if not dry_run and not update_service.can_auto_update():
+    # A dry run fails the same way as the real update would.
+    if not update_service.can_auto_update():
         get_console().print(
             "[yellow]⚠[/yellow] Automatic update not supported for your installation method."
         )
@@ -74,8 +83,17 @@ def perform_update_command(
         get_console().print(f"Update manually: [bold cyan]{update_cmd}[/bold cyan]")
         raise typer.Exit(1)
 
-    # Perform update check first (unless forced)
-    if not force and not dry_run:
+    if target_version is not None and not force and not dry_run:
+        if Version(target_version) == Version(version):
+            get_console().print(
+                f"[green]✓[/green] Already using version [bold cyan]{version}[/bold cyan]"
+            )
+            raise typer.Exit(0)
+        get_console().print(
+            f"Updating from [blue]{version}[/blue] to [green]{target_version}[/green]"
+        )
+        get_console().print()
+    elif not force and not dry_run:
         update_info = update_service.check_for_updates(use_cache=not no_cache)
         if not update_info["has_update"]:
             get_console().print(
@@ -88,13 +106,10 @@ def perform_update_command(
 
         current = update_info["current_version"]
         latest = update_info["latest_version"]
-        target = target_version or latest
-
-        if not dry_run:
-            get_console().print(
-                f"Updating from [blue]{current}[/blue] to [green]{target}[/green]"
-            )
-            get_console().print()
+        get_console().print(
+            f"Updating from [blue]{current}[/blue] to [green]{latest}[/green]"
+        )
+        get_console().print()
 
     # Perform the update
     success, message = update_service.perform_update(
@@ -106,10 +121,10 @@ def perform_update_command(
             get_console().print(
                 "\n[green]✓[/green] Dry run completed - automatic update is supported"
             )
-        else:
-            get_console().print("\n[red]✗[/red] Automatic update not available")
-            get_console().print("Manual update will be required")
-        raise typer.Exit(0)
+            raise typer.Exit(0)
+        get_console().print("\n[red]✗[/red] Automatic update not available")
+        get_console().print("Manual update will be required")
+        raise typer.Exit(1)
 
     if success:
         get_console().print("\n[green]✓[/green] Update completed successfully!")

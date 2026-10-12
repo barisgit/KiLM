@@ -226,44 +226,40 @@ class PyPIVersionChecker:
             json.dump(data, f)
 
 
-def update_via_pipx() -> bool:
-    """Update KiLM via pipx. Most reliable method for CLI tools."""
+def upgrade_command(
+    method: InstallMethod, target_version: str | None = None
+) -> list[str] | None:
+    """Return the command that updates kilm for an install method, as shown to users.
+
+    Without a target version the command upgrades to the latest release; with
+    one it installs exactly that version, which may be a downgrade. Returns
+    None for methods where kilm cannot update itself.
+    """
+    spec = f"kilm=={target_version}" if target_version else "kilm"
+    if method == "pipx":
+        if target_version:
+            return ["pipx", "install", "--force", spec]
+        return ["pipx", "upgrade", "kilm"]
+    if method == "uv":
+        if target_version:
+            return ["uv", "tool", "install", spec]
+        return ["uv", "tool", "upgrade", "kilm"]
+    if method in ("pip", "pip-venv"):
+        return ["pip", "install", "--upgrade", spec]
+    return None
+
+
+def run_upgrade(command: list[str]) -> bool:
+    """Run an upgrade command from `upgrade_command` and report success."""
+    # pip runs through this interpreter so it updates the running environment.
+    argv = [sys.executable, "-m", *command] if command[0] == "pip" else command
     try:
         result = subprocess.run(
-            ["pipx", "upgrade", "kilm"], capture_output=True, text=True, timeout=300
+            argv, capture_output=True, text=True, timeout=300, check=False
         )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, OSError):
         return False
-
-
-def update_via_pip() -> bool:
-    """Update KiLM via pip."""
-    try:
-        # Use same Python interpreter that's running KiLM
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "kilm"],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def update_via_uv() -> bool:
-    """Update KiLM via uv."""
-    try:
-        result = subprocess.run(
-            ["uv", "tool", "upgrade", "kilm"],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
+    return result.returncode == 0
 
 
 class UpdateManager:
@@ -287,53 +283,37 @@ class UpdateManager:
         except (InvalidVersion, AttributeError):
             return False
 
-    def get_update_instruction(self) -> str:
+    def get_update_instruction(self, target_version: str | None = None) -> str:
         """Get update instruction for the detected installation method."""
+        command = upgrade_command(self.installation_method, target_version)
+        if command:
+            return " ".join(command)
         instructions: dict[InstallMethod, str] = {
-            "pipx": "pipx upgrade kilm",
-            "pip": "pip install --upgrade kilm",
-            "pip-venv": "pip install --upgrade kilm",
-            "uv": "uv tool upgrade kilm",
             "conda": "Conda package not yet available (planned for future)",
             "homebrew": "Homebrew package not yet available (planned for future)",
             "nix": "nix flake update, then rebuild the configuration or profile"
             " that installs kilm",
             "unknown": "Update KiLM with the tool that installed it",
         }
-        return instructions[self.installation_method]
+        return instructions.get(self.installation_method, "")
 
     def can_auto_update(self) -> bool:
         """Check if automatic update is possible for this installation method."""
-        return self.installation_method in ["pipx", "pip", "pip-venv", "uv"]
+        return upgrade_command(self.installation_method) is not None
 
-    def perform_update(self) -> tuple[bool, str]:
-        """Execute update using detected installation method.
-        Returns: (success: bool, message: str)
+    def perform_update(self, target_version: str | None = None) -> tuple[bool, str]:
+        """Install the latest release, or `target_version` when given.
+
+        Returns: (success, message)
         """
-        if not self.can_auto_update():
+        command = upgrade_command(self.installation_method, target_version)
+        if command is None:
             instruction = self.get_update_instruction()
             return False, f"Manual update required: {instruction}"
-
-        update_functions = {
-            "pipx": update_via_pipx,
-            "pip": update_via_pip,
-            "pip-venv": update_via_pip,
-            "uv": update_via_uv,
-        }
-
-        update_func = update_functions.get(self.installation_method)
-        if update_func:
-            try:
-                success = update_func()
-                if success:
-                    return True, "KiLM updated successfully!"
-                instruction = self.get_update_instruction()
-                return False, f"Auto-update failed. Try manually: {instruction}"
-            except Exception as e:
-                return False, f"Update error: {e!s}"
-        else:
-            instruction = self.get_update_instruction()
-            return False, f"Unsupported installation method. Run: {instruction}"
+        if run_upgrade(command):
+            return True, "KiLM updated successfully!"
+        instruction = self.get_update_instruction(target_version)
+        return False, f"Auto-update failed. Try manually: {instruction}"
 
 
 class UpdateService:
@@ -470,14 +450,13 @@ class UpdateService:
         if dry_run:
             return self._show_dry_run_info(target_version)
 
-        # Check if update is needed (unless forced)
-        if not force:
+        # A target version is installed as asked, even when it is older.
+        if not force and target_version is None:
             update_info = self.check_for_updates()
             if not update_info["has_update"]:
                 return True, "Already using the latest version!"
 
-        # Perform the update
-        return self.manager.perform_update()
+        return self.manager.perform_update(target_version)
 
     def _show_dry_run_info(self, target_version: str | None = None) -> tuple[bool, str]:
         """Show what would happen during an update."""
@@ -488,7 +467,7 @@ class UpdateService:
         method = self.manager.installation_method
         can_auto_update = self.manager.can_auto_update()
         package_spec = f"kilm=={target_version}" if target_version else "kilm"
-        update_cmd = self.manager.get_update_instruction()
+        update_cmd = self.manager.get_update_instruction(target_version)
 
         console.print(
             Panel(

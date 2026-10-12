@@ -1,5 +1,6 @@
 """Tests for the update service functionality including installation detection and update operations."""
 
+import subprocess
 import sys
 from pathlib import Path, PureWindowsPath
 from unittest.mock import Mock, patch
@@ -423,6 +424,49 @@ class TestUpdateService:
             assert success is True
             assert message == "Update successful"
             mock_perform.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("method", "target_version", "expected_argv"),
+        [
+            ("pipx", None, ["pipx", "upgrade", "kilm"]),
+            ("pipx", "1.0.5", ["pipx", "install", "--force", "kilm==1.0.5"]),
+            ("uv", None, ["uv", "tool", "upgrade", "kilm"]),
+            ("uv", "1.0.5", ["uv", "tool", "install", "kilm==1.0.5"]),
+            ("pip", None, [sys.executable, "-m", "pip", "install", "--upgrade", "kilm"]),
+            (
+                "pip-venv",
+                "1.0.5",
+                [sys.executable, "-m", "pip", "install", "--upgrade", "kilm==1.0.5"],
+            ),
+        ],
+    )
+    def test_perform_update_installs_the_target_version(
+        self, monkeypatch, method, target_version, expected_argv
+    ):
+        """The installer receives the requested version, even a downgrade."""
+        with patch(
+            "kicad_lib_manager.services.update_service.detect_installation_method",
+            return_value=method,
+        ):
+            service = UpdateService("1.0.0")
+        calls = []
+
+        def fake_run(argv, **_kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+        monkeypatch.setattr(
+            "kicad_lib_manager.services.update_service.subprocess.run", fake_run
+        )
+        # Already up to date: only a target version (or --force) installs.
+        with patch.object(service, "check_for_updates") as mock_check:
+            mock_check.return_value = {"has_update": False}
+            success, _ = service.perform_update(
+                target_version=target_version, force=target_version is None
+            )
+
+        assert success is True
+        assert calls == [expected_argv]
 
     def test_dry_run_info_display(self, update_service):
         """Test dry run information display."""

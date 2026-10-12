@@ -359,6 +359,63 @@ class TestUpdatePerformCommand:
             target_version="1.0.5", force=False, dry_run=False
         )
 
+    def test_perform_dry_run_unsupported_method_exits_nonzero(
+        self, runner, mock_update_service, mock_version
+    ):
+        """A dry run fails like the real run when automatic update is impossible."""
+        mock_update_service.can_auto_update.return_value = False
+        mock_update_service.get_installation_method.return_value = "homebrew"
+        mock_update_service.get_update_instructions.return_value = "brew upgrade kilm"
+
+        result = runner.invoke(perform_app, ["--dry-run"])
+
+        assert result.exit_code == 1
+        assert "Automatic update not supported" in result.stdout
+        mock_update_service.perform_update.assert_not_called()
+
+    def test_perform_target_version_when_up_to_date(
+        self, runner, mock_update_service, mock_version
+    ):
+        """A target version installs even when no newer release exists."""
+        mock_update_service.can_auto_update.return_value = True
+        mock_update_service.check_for_updates.return_value = {
+            "has_update": False,
+            "current_version": "1.0.0",
+            "latest_version": "1.0.0",
+        }
+        mock_update_service.perform_update.return_value = (True, "done")
+
+        result = runner.invoke(perform_app, ["--target-version", "0.9.0"])
+
+        assert result.exit_code == 0
+        assert "Updating from 1.0.0 to 0.9.0" in result.stdout
+        mock_update_service.perform_update.assert_called_with(
+            target_version="0.9.0", force=False, dry_run=False
+        )
+
+    def test_perform_target_version_already_installed(
+        self, runner, mock_update_service, mock_version
+    ):
+        """Asking for the installed version changes nothing without --force."""
+        mock_update_service.can_auto_update.return_value = True
+
+        result = runner.invoke(perform_app, ["--target-version", "1.0.0"])
+
+        assert result.exit_code == 0
+        assert "Already using version 1.0.0" in result.stdout
+        mock_update_service.perform_update.assert_not_called()
+
+    def test_perform_rejects_invalid_target_version(
+        self, runner, mock_update_service, mock_version
+    ):
+        """A target that is not a version is a usage error, not an install."""
+        mock_update_service.can_auto_update.return_value = True
+
+        result = runner.invoke(perform_app, ["--target-version", ">=2"])
+
+        assert result.exit_code == 2
+        mock_update_service.perform_update.assert_not_called()
+
     def test_perform_no_cache(self, runner, mock_update_service, mock_version):
         """Test perform command with no-cache flag."""
         mock_update_service.can_auto_update.return_value = True
