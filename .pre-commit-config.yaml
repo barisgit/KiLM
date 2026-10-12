@@ -1,6 +1,8 @@
 # Hooks run the tool versions locked in uv.lock through `uv run`, so they match
-# `just check` and CI on every OS. `just setup` installs them. Tests stay out of
-# the hook to keep commits fast; `just check` runs them.
+# `just check` and CI on every OS. `just setup` points git at .githooks/, whose
+# script runs the committing checkout's locked pre-commit, so each worktree uses
+# its own uv.lock. Tests stay out of the hook to keep commits fast; `just check`
+# runs them.
 minimum_pre_commit_version: "4.4.0"
 repos:
   - repo: local

@@ -14,7 +14,7 @@ default:
 setup: _require-tools
     uv sync
     pnpm --dir docs install --frozen-lockfile
-    uv run pre-commit install
+    git config core.hooksPath .githooks
     @echo "Ready. Next: just check (everything CI runs), just test, just docs-dev"
 
 # Run every required check without modifying files; CI runs this.

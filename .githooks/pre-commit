@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs pre-commit from the committing checkout's uv.lock, so every worktree uses
+# its own locked tool versions. `just setup` sets core.hooksPath to this folder.
+exec uv run --locked pre-commit run --hook-stage pre-commit
