@@ -19,6 +19,7 @@ from kicad_lib_manager.utils.template import (
     create_template_metadata,
     create_template_structure,
     find_all_templates,
+    find_potential_variables,
     render_filename,
     render_filename_custom,
     render_template_file,
@@ -371,6 +372,14 @@ def test_rendered_files_keep_markup_characters(tmp_path: Path) -> None:
     render_template_file(source, target, {"project_name": "R&D <1>"})
 
     assert target.read_text() == "R&D <1>"
+
+def test_variable_scan_skips_directories_make_does_not_copy(tmp_path: Path) -> None:
+    """Dependencies and VCS data do not contribute variable suggestions."""
+    (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
+    (tmp_path / "node_modules" / "pkg" / "index.js").write_text('author = "Someone"')
+    (tmp_path / "notes.txt").write_text('author = "Jane"')
+
+    assert find_potential_variables(tmp_path) == {"jane": ["Jane"]}
 
 if __name__ == "__main__":
     pytest.main()

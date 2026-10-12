@@ -42,6 +42,26 @@ DEFAULT_VARIABLE_PATTERNS = [
     r'author\s*[=:]\s*["\']([^"\']+)["\']',
 ]
 
+# Directory names never copied into a template, at any depth. The templates
+# directory is excluded to avoid copying templates into themselves.
+EXCLUDED_DIRECTORIES = frozenset(
+    {
+        "venv",
+        "env",
+        ".venv",
+        ".env",
+        ".git",
+        "node_modules",
+        "__pycache__",
+        "dist",
+        "build",
+        ".pytest_cache",
+        ".idea",
+        ".vscode",
+        TEMPLATES_DIR,
+    }
+)
+
 # KiCad file extensions
 KICAD_PROJECT_EXT = ".kicad_pro"
 KICAD_SCHEMATIC_EXT = ".kicad_sch"
@@ -241,7 +261,8 @@ def find_potential_variables(
     gitignore_spec = get_gitignore_spec(directory)
 
     # Walk directory
-    for root, _, files in os.walk(directory):
+    for root, dirs, files in os.walk(directory):
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRECTORIES]
         rel_root = os.path.relpath(root, directory)
         if rel_root == ".":
             rel_root = ""
@@ -455,22 +476,7 @@ def create_template_structure(
             "gitwildmatch", additional_excludes
         )
 
-    # Define common directories to exclude
-    common_excludes = [
-        "venv",
-        "env",
-        ".venv",
-        ".env",
-        ".git",
-        "node_modules",
-        "__pycache__",
-        "dist",
-        "build",
-        ".pytest_cache",
-        ".idea",
-        ".vscode",
-        TEMPLATES_DIR,  # Avoid recursive copying of templates directory
-    ]
+    common_excludes = EXCLUDED_DIRECTORIES
 
     # Debug gitignore if available
     if gitignore_spec:
