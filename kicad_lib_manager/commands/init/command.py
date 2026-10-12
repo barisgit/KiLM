@@ -211,7 +211,7 @@ def init(  # noqa: PLR0913 -- each CLI option is a Typer parameter
                 metadata.get("env_var"),
                 set_current=set_current,
             ),
-            title="✅ Initialization Complete",
+            title="Initialization Complete",
             border_style="green",
         )
     )

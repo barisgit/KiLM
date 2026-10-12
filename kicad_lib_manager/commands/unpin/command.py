@@ -120,7 +120,7 @@ def _report(
                 f"[green]Unpinned {counts} in KiCad[/green]\n\n"
                 "[blue]• Created backup of kicad_common.json[/blue]\n"
                 "[yellow]• Restart KiCad for changes to take effect[/yellow]",
-                title="✅ Libraries Unpinned",
+                title="Libraries Unpinned",
                 border_style="green",
             )
         )

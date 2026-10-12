@@ -88,7 +88,7 @@ def _report(
                 f"[green]Pinned {counts} in KiCad[/green]\n\n"
                 "[blue]• Created backup of kicad_common.json[/blue]\n"
                 "[yellow]• Restart KiCad for changes to take effect[/yellow]",
-                title="✅ Libraries Pinned",
+                title="Libraries Pinned",
                 border_style="green",
             )
         )

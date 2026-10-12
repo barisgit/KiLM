@@ -134,7 +134,7 @@ def setup(  # noqa: PLR0913 -- each CLI option is a Typer parameter
             Panel(
                 "[bold green]Setup complete! Restart KiCad for changes to take "
                 "effect.[/bold green]",
-                title="[bold green]\u2705 Success[/bold green]",
+                title="[bold green]Success[/bold green]",
                 border_style="green",
             )
         )
