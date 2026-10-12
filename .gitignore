@@ -27,9 +27,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Sphinx documentation
-docs/_build/
-
 # IDE specific files
 .idea/
 .vscode/
@@ -48,7 +45,9 @@ TODO.md
 .claude/settings.local.json
 .claude/doc/
 temp/
-templates/
+
+# Parallel checkouts (git worktree add .worktrees/<name>)
+.worktrees/
 # Nix build output
 result
 result-*
