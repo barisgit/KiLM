@@ -265,7 +265,7 @@ class TestUpdateManager:
             ("pipx", "pipx upgrade kilm"),
             ("pip", "pip install --upgrade kilm"),
             ("pip-venv", "pip install --upgrade kilm"),
-            ("uv", "uv tool upgrade kilm"),
+            ("uv", "uv tool install kilm@latest"),
             ("conda", "Conda package not yet available (planned for future)"),
             ("homebrew", "Homebrew package not yet available (planned for future)"),
             (
@@ -430,7 +430,7 @@ class TestUpdateService:
         [
             ("pipx", None, ["pipx", "upgrade", "kilm"]),
             ("pipx", "1.0.5", ["pipx", "install", "--force", "kilm==1.0.5"]),
-            ("uv", None, ["uv", "tool", "upgrade", "kilm"]),
+            ("uv", None, ["uv", "tool", "install", "kilm@latest"]),
             ("uv", "1.0.5", ["uv", "tool", "install", "kilm==1.0.5"]),
             ("pip", None, [sys.executable, "-m", "pip", "install", "--upgrade", "kilm"]),
             (

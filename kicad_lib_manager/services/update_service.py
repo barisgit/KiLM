@@ -241,9 +241,10 @@ def upgrade_command(
             return ["pipx", "install", "--force", spec]
         return ["pipx", "upgrade", "kilm"]
     if method == "uv":
-        if target_version:
-            return ["uv", "tool", "install", spec]
-        return ["uv", "tool", "upgrade", "kilm"]
+        # `uv tool upgrade` keeps an exact pin from an earlier install and
+        # then succeeds without changing anything; `uv tool install` replaces
+        # the pin.
+        return ["uv", "tool", "install", spec if target_version else "kilm@latest"]
     if method in ("pip", "pip-venv"):
         return ["pip", "install", "--upgrade", spec]
     return None
