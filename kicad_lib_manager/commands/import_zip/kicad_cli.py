@@ -9,9 +9,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from kicad_lib_manager.commands.import_zip.formats import format_version
 from kicad_lib_manager.utils.console import get_console
-
-from .formats import format_version
 
 _KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
     Path.home() / "AppImages" / "kicad.appimage",
@@ -113,17 +112,19 @@ def _run(kicad_cli: Path, label: str, *args: str) -> bool:
     """Run kicad-cli with args; warn about label and return False on failure."""
     cmd = _build_kicad_cli_cmd(kicad_cli, *args)
     try:
-        subprocess.run(
+        subprocess.run(  # noqa: S603 -- cmd is kicad-cli with fixed upgrade arguments and temp paths
             cmd, capture_output=True, text=True, check=True, timeout=_TIMEOUT_SECONDS
         )
     except subprocess.TimeoutExpired:
         get_console().print(
-            f"[yellow]  warn: kicad-cli {args[0]} upgrade timed out for {label}, skipping[/yellow]"
+            f"[yellow]  warn: kicad-cli {args[0]} upgrade timed out for {label}, "
+            "skipping[/yellow]"
         )
         return False
     except subprocess.CalledProcessError as exc:
         get_console().print(
-            f"[yellow]  warn: kicad-cli {args[0]} upgrade failed for {label}: {exc.stderr.strip()}[/yellow]"
+            f"[yellow]  warn: kicad-cli {args[0]} upgrade failed for {label}: "
+            f"{exc.stderr.strip()}[/yellow]"
         )
         return False
     return True

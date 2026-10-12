@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from .errors import ImportFailure
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
 
 # KiCad stamps s-expression files with "(version YYYYMMDD)". A KiCad release
 # refuses files newer than the format it writes, so an import must not raise
@@ -43,7 +43,7 @@ def require_compatible(
     library: Path,
     kind: Literal["sym", "fp"],
 ) -> None:
-    """Raise ImportFailure when text's format is newer than limit.
+    """Raise ImportZipError when text's format is newer than limit.
 
     limit is the format of the target library (None: no limit). Merging a
     newer symbol under the library's older header makes the whole library
@@ -54,9 +54,10 @@ def require_compatible(
     version = format_version(text)
     if limit is None or version is None or version <= limit:
         return
-    raise ImportFailure(
+    msg = (
         f"{name} uses format {version}, newer than {library.name} ({limit}), "
         f"which KiCad releases that read the library cannot open. If every "
         f"KiCad using the library reads format {version}, run 'kicad-cli "
         f"{kind} upgrade {library}' and import again"
     )
+    raise ImportZipError(msg)

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from .helpers import SAMPLE_SYM_LIB
+from tests.import_zip.helpers import SAMPLE_SYM_LIB
 
 
 @pytest.fixture(autouse=True)

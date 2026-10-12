@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
-from .errors import ImportFailure
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
 
 
 def extract_symbol_blocks(text: str) -> list[str]:
@@ -50,7 +50,7 @@ def extract_symbol_blocks(text: str) -> list[str]:
 def symbol_name(block: str) -> str:
     """Name of a `(symbol "...")` block, "" when it has none."""
     m = re.match(r'\(symbol "([^"]+)"', block)
-    return m.group(1) if m else ""
+    return str(m.group(1)) if m else ""
 
 
 def fix_footprint_ref(
@@ -66,7 +66,7 @@ def fix_footprint_ref(
     def _replace(m: re.Match[str]) -> str:
         val = m.group(1)
         name = val.split(":", 1)[1] if ":" in val else val
-        if fp_refs and name in fp_refs:
+        if fp_refs is not None and name in fp_refs:
             val = fp_refs[name]
         elif ":" not in val:
             val = f"{default_lib}:{val}"
@@ -100,10 +100,11 @@ def merge_symbols(
     with fix_footprint_ref.
 
     Raises:
-        ImportFailure: library is not a KiCad symbol library.
+        ImportZipError: library is not a KiCad symbol library.
     """
     if not library.lstrip("\ufeff \t\r\n").startswith("(kicad_symbol_lib"):
-        raise ImportFailure("target is not a KiCad symbol library")
+        msg = "target is not a KiCad symbol library"
+        raise ImportZipError(msg)
     newline = "\r\n" if "\r\n" in library else "\n"
     present = {symbol_name(b) for b in extract_symbol_blocks(library)} | set(known)
 
@@ -117,8 +118,8 @@ def merge_symbols(
             continue
         present.add(name)
         added.append(name)
-        block = fix_footprint_ref(block, default_fp_lib, fp_refs)
-        new_blocks.append(block.replace("\n", newline))
+        fixed = fix_footprint_ref(block, default_fp_lib, fp_refs)
+        new_blocks.append(fixed.replace("\n", newline))
 
     if not new_blocks:
         return SymbolMerge(library, added, skipped)
