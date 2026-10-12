@@ -30,6 +30,7 @@ kilm template make <template_name> [project_path] [OPTIONS]
 - `--description TEXT`: A description for the template.
 - `--use-case TEXT`: Describe the intended use case for this template.
 - `--variable TEXT`: Define a variable for the template (key=value pair). Can be used multiple times. These variables can be used within template filenames using `%{variable}` syntax and within file content using Jinja2 `{{variable}}` syntax.
+- `--extends TEXT`: Name of a parent template that this template extends.
 - `--exclude TEXT`: Glob pattern (like `.gitignore`) to exclude specific files or directories from the template. Can be used multiple times.
 - `--output-directory DIRECTORY`:
   Specifies the directory where the `templates/<template_name>` structure will be created. Defaults to the `templates` directory within the KiLM library containing the current working directory.

@@ -1,4 +1,9 @@
 onlyBuiltDependencies:
-  - '@tailwindcss/oxide'
   - esbuild
-  - sharp
+
+overrides:
+  # GHSA-rj75-hqrm-r3gf: @expressive-code/core pins postcss-nested ^6, whose
+  # postcss-selector-parser ^6 has no patched release. postcss-nested 7 is the
+  # API-compatible line that depends on postcss-selector-parser ^7.
+  postcss-nested: ^7.0.2
+  postcss-selector-parser: ^7.1.6

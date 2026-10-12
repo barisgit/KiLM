@@ -142,24 +142,16 @@ sidebar:
 }
 
 /**
- * Sync a single embedded doc to the output directory
+ * Sync a single embedded doc to the output directory.
+ * Errors propagate so a one-shot sync (and therefore the build) fails instead of
+ * publishing a site with a missing command page.
  */
 function syncDoc(commandDoc: CommandDoc): void {
-  try {
-    const content = fs.readFileSync(commandDoc.embeddedPath, 'utf-8');
-    const processedContent = processEmbeddedDoc(content, commandDoc.commandName);
-    
-    // Ensure output directory exists
-    const outputDir = path.dirname(commandDoc.outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    fs.writeFileSync(commandDoc.outputPath, processedContent);
-    console.log(`Synced ${commandDoc.commandName}.mdx`);
-  } catch (error) {
-    console.error(`Failed to sync ${commandDoc.commandName}:`, error);
-  }
+  const content = fs.readFileSync(commandDoc.embeddedPath, 'utf-8');
+  const processedContent = processEmbeddedDoc(content, commandDoc.commandName);
+  fs.mkdirSync(path.dirname(commandDoc.outputPath), { recursive: true });
+  fs.writeFileSync(commandDoc.outputPath, processedContent);
+  console.log(`Synced ${path.basename(commandDoc.outputPath)}`);
 }
 
 /**
@@ -167,17 +159,10 @@ function syncDoc(commandDoc: CommandDoc): void {
  */
 function syncAllDocs(): void {
   console.log('Syncing embedded documentation...');
-  
-  const commandDocs = findCommandDocs();
-  
-  if (commandDocs.length === 0) {
-    console.warn('No embedded docs found');
-    return;
-  }
 
-  // Ensure output directory exists
-  if (!fs.existsSync(docsOutputDir)) {
-    fs.mkdirSync(docsOutputDir, { recursive: true });
+  const commandDocs = findCommandDocs();
+  if (commandDocs.length === 0) {
+    throw new Error(`No embedded docs found under ${commandsDir}`);
   }
 
   for (const commandDoc of commandDocs) {
@@ -187,79 +172,46 @@ function syncAllDocs(): void {
   console.log(`Synced ${commandDocs.length} embedded docs`);
 }
 
+/** File names inside a command directory that affect the generated pages. */
+const DOCS_SOURCE_FILES = new Set(['docs.mdx', 'docs.md', '.command']);
+
 /**
- * Watch embedded docs for changes and sync automatically
+ * Watch the commands directory and re-sync on any change to a docs source.
+ * chokidar 4+ no longer expands globs, so the directory itself is watched and
+ * other files are filtered out. Re-syncing everything is cheap (one small file
+ * per command) and also covers renames, new commands, and `.command` changes.
  */
 function watchDocs(): void {
-  console.log('Watching embedded docs for changes...');
-  
-  // Initial sync
+  cleanupDocs();
   syncAllDocs();
 
-  // Watch for changes using glob pattern to catch all relevant files
-  const watchPattern = `${commandsDir}/**/*`;
-  const watcher = chokidar.watch(watchPattern, {
-    persistent: true,
+  const watcher = chokidar.watch(commandsDir, {
     ignoreInitial: true,
+    ignored: (filePath, stats) =>
+      stats?.isFile() === true && !DOCS_SOURCE_FILES.has(path.basename(filePath)),
   });
 
   watcher
-    .on('add', (filePath: string) => {
-      console.log(`File added: ${filePath}`);
-      // Check if it's a docs file or .command file
-      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md') || filePath.endsWith('.command')) {
-        console.log('Re-syncing all docs due to new file...');
-        syncAllDocs();
-      }
-    })
-    .on('change', (filePath: string) => {
-      console.log(`File changed: ${filePath}`);
-      // Check if it's a docs file
-      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md')) {
-        // Find the specific command doc and sync it
-        const commandDocs = findCommandDocs();
-        const commandDoc = commandDocs.find(doc => doc.embeddedPath === filePath);
-        if (commandDoc) {
-          console.log(`${commandDoc.commandName} docs changed, syncing...`);
-          syncDoc(commandDoc);
+    .on('all', (event, filePath) => {
+      if (event === 'addDir' || event === 'unlinkDir' || DOCS_SOURCE_FILES.has(path.basename(filePath))) {
+        console.log(`${event}: ${path.relative(rootDir, filePath)}`);
+        try {
+          cleanupDocs();
+          syncAllDocs();
+        } catch (error) {
+          // Keep watching: the next edit may fix the problem.
+          console.error('Sync failed:', error);
         }
-      } else if (filePath.endsWith('.command')) {
-        // .command file changed, re-sync all docs to pick up new command names
-        console.log('Command file changed, re-syncing all docs...');
-        syncAllDocs();
       }
-    })
-    .on('unlink', (filePath: string) => {
-      console.log(`File removed: ${filePath}`);
-      // Check if it's a docs file or .command file
-      if (filePath.endsWith('docs.mdx') || filePath.endsWith('docs.md') || filePath.endsWith('.command')) {
-        console.log('Re-syncing all docs due to file removal...');
-        syncAllDocs();
-      }
-    })
-    .on('addDir', (dirPath: string) => {
-      console.log(`Directory added: ${dirPath}`);
-      // New directory might contain docs, re-sync all
-      console.log('Re-syncing all docs due to new directory...');
-      syncAllDocs();
-    })
-    .on('unlinkDir', (dirPath: string) => {
-      console.log(`Directory removed: ${dirPath}`);
-      // Directory removal might affect docs, re-sync all
-      console.log('Re-syncing all docs due to directory removal...');
-      syncAllDocs();
     })
     .on('error', (error: unknown) => {
       console.error('Watch error:', error);
     });
 
-  console.log(`Watching ${watchPattern} for embedded docs and command files`);
-  
-  // Keep the process running
+  console.log(`Watching ${commandsDir} for embedded docs and .command files`);
+
   process.on('SIGINT', () => {
-    console.log('\nStopping watch mode...');
-    watcher.close();
-    process.exit(0);
+    void watcher.close().then(() => process.exit(0));
   });
 }
 
@@ -289,19 +241,25 @@ function cleanupDocs(): void {
 }
 
 // CLI interface
-const command = process.argv[2];
+const command = process.argv[2] ?? 'sync';
 
-switch (command) {
-  case 'watch':
-    watchDocs();
-    break;
-  case 'clean':
-    cleanupDocs();
-    console.log('Cleaned up orphaned docs');
-    break;
-  case 'sync':
-  default:
-    cleanupDocs();
-    syncAllDocs();
-    break;
+try {
+  switch (command) {
+    case 'watch':
+      watchDocs();
+      break;
+    case 'clean':
+      cleanupDocs();
+      console.log('Cleaned up orphaned docs');
+      break;
+    case 'sync':
+      cleanupDocs();
+      syncAllDocs();
+      break;
+    default:
+      throw new Error(`Unknown command "${command}"; expected sync, watch, or clean`);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
 }

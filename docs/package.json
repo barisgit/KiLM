@@ -2,6 +2,7 @@
   "name": "kilm-docs",
   "type": "module",
   "version": "0.0.1",
+  "packageManager": "pnpm@10.34.6",
   "scripts": {
     "sync-docs": "tsx scripts/sync-embedded-docs.ts sync",
     "sync-docs:watch": "tsx scripts/sync-embedded-docs.ts watch",
@@ -13,25 +14,17 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.40.0",
+    "@astrojs/starlight": "^0.42.6",
     "@astrojs/starlight-tailwind": "^5.0.0",
-    "@tailwindcss/vite": "^4.3.2",
-    "astro": "^6.4.8",
-    "prettier": "^3.9.4",
-    "starlight-site-graph": "^0.5.0",
-    "tailwindcss": "^4.3.2"
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.8",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "chokidar": "^4.0.3",
-    "concurrently": "^9.2.5",
-    "sharp": "^0.34.5",
-    "tsx": "^4.22.4"
-  },
-  "pnpm": {
-    "overrides": {
-      "devalue": "^5.3.2",
-      "tar-fs": "^3.1.0"
-    }
+    "@types/node": "^22.0.0",
+    "chokidar": "^5.0.0",
+    "concurrently": "^10.0.6",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15"
   }
 }
