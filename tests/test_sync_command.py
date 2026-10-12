@@ -106,6 +106,22 @@ def test_sync_pulls_and_detects_new_libraries(upstream: Path, library: Path) -> 
     assert "kilm sync --auto-setup" in result.output
 
 
+def test_sync_counts_an_up_to_date_pull_in_any_language(
+    library: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Up to date is judged by HEAD, not by the wording of git's message."""
+    monkeypatch.setenv("LC_ALL", "de_DE.UTF-8")
+    monkeypatch.delenv("LANGUAGE", raising=False)
+    if "Already up to date" in _git(library, "pull"):
+        pytest.skip("git has no German translation here")
+
+    result = CliRunner().invoke(app, ["sync"])
+
+    assert result.exit_code == 0, result.output
+    assert "0 libraries synced" in result.output
+    assert "1 libraries up to date" in result.output
+
+
 def test_sync_dry_run_does_not_pull(upstream: Path, library: Path) -> None:
     """A dry run names the library and leaves it untouched."""
     _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")

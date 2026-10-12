@@ -111,7 +111,8 @@ def sync(
 
                 if result.returncode == 0:
                     output = result.stdout.strip() or "Already up to date."
-                    is_updated = "Already up to date" not in output
+                    # git words its messages in the user's language; HEAD is exact
+                    is_updated = _head_revision(lib_path) != revision_before_pull
 
                     if verbose:
                         get_console().print(f"    [green]Success: {output}[/green]")
