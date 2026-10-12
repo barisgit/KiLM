@@ -40,15 +40,18 @@ def read_file_with_encoding(file_path: Path, encodings: list[str] | None = None)
 def write_file_with_encoding(
     file_path: Path, content: str, encoding: str = "utf-8"
 ) -> None:
-    """Write content to a file with the specified encoding
+    """Replace file_path with content in the given encoding, atomically.
+
+    The content is encoded before the file is touched, and write_atomically
+    replaces the file in one step, so a failure leaves the old file intact.
+    Line endings are written as given, on every OS.
 
     Args:
         file_path: Path to the file to write
         content: Content to write
         encoding: Encoding to use (defaults to utf-8)
     """
-    with Path(file_path).open("w", encoding=encoding) as f:
-        f.write(content)
+    write_atomically(file_path, content.encode(encoding))
 
 
 def write_atomically(path: Path, data: bytes) -> None:

@@ -1,9 +1,15 @@
+"""Tests for KiCad environment variables and pinned libraries."""
+
 import json
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
-from kicad_lib_manager.utils.env_vars import update_kicad_env_vars
+from kicad_lib_manager.utils.env_vars import (
+    update_kicad_env_vars,
+    update_pinned_libraries,
+)
 
 
 def test_update_kicad_env_vars(tmp_path):
@@ -97,3 +103,38 @@ def test_update_kicad_env_vars(tmp_path):
 
     with pytest.raises(ValueError):
         update_kicad_env_vars(kicad_config, env_vars)
+
+
+class _EncoderFailure(OSError):
+    """Stands in for a disk error in the middle of writing JSON."""
+
+
+def _failing_iterencode(*_args: object, **_kwargs: object) -> Iterator[str]:
+    """Yield the start of a JSON document, then fail like a full disk."""
+    yield '{"environment": '
+    raise _EncoderFailure
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        lambda config: update_kicad_env_vars(config, {"KICAD_USER_LIB": "/new"}),
+        lambda config: update_pinned_libraries(config, symbol_libs=["NewLib"]),
+    ],
+    ids=["env_vars", "pinned_libraries"],
+)
+def test_failed_write_keeps_kicad_common(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    update: Callable[[Path], bool],
+) -> None:
+    """A write that fails part way leaves kicad_common.json as it was."""
+    kicad_common = tmp_path / "kicad_common.json"
+    original = json.dumps({"environment": {"vars": {}}, "session": {}})
+    kicad_common.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(json.JSONEncoder, "iterencode", _failing_iterencode)
+
+    with pytest.raises(_EncoderFailure):
+        update(tmp_path)
+
+    assert kicad_common.read_text(encoding="utf-8") == original

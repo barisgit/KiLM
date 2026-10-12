@@ -7,6 +7,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from kicad_lib_manager.utils.file_ops import write_atomically
+
 # Import Config here, but only use it when needed to avoid circular imports
 try:
     from ..services.config_service import Config
@@ -216,8 +218,7 @@ def update_kicad_env_vars(
         # Create backup before making changes
         create_backup(kicad_common, max_backups)
 
-        with Path(kicad_common).open("w") as f:
-            json.dump(config, f, indent=2)
+        write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
 
     return changes_needed
 
@@ -307,7 +308,6 @@ def update_pinned_libraries(
         # Create backup before making changes
         create_backup(kicad_common, max_backups)
 
-        with Path(kicad_common).open("w") as f:
-            json.dump(config, f, indent=2)
+        write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
 
     return changes_needed
