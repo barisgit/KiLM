@@ -37,12 +37,14 @@ class ImportTarget:
     """The libraries a run imports into, plus what the run has added so far.
 
     models maps the case-folded names of the model files in any *.3dshapes
-    dir of the library to their location; footprints holds the case-folded
-    file names in fp_dir; symbols holds symbol names added in the run.
-    File names compare case-insensitively, so a run adds the same files on
-    case-sensitive and case-insensitive filesystems and the library stays
-    usable on both. Each ZIP adds what it planned to these, in a dry run
-    too, so a dry run skips the same repeats a real run does.
+    dir of the library to their location; footprints maps the case-folded
+    names of the files in fp_dir to their names; symbols holds symbol names
+    added in the run. File names compare case-insensitively, so a run adds
+    the same files on case-sensitive and case-insensitive filesystems and
+    the library stays usable on both; references use the kept file's name.
+    Each file is added to these as soon as it is written, or planned in a
+    dry run, so later ZIPs skip it even when its own ZIP failed later on,
+    and a dry run skips the same repeats a real run does.
 
     sym_format and fp_format are the library formats imported files must
     not exceed (None: no limit). backup is the symbol library backup taken
@@ -58,7 +60,7 @@ class ImportTarget:
     sym_format: Optional[int] = None
     fp_format: Optional[int] = None
     models: dict[str, ModelRef] = field(default_factory=dict)
-    footprints: set[str] = field(default_factory=set)
+    footprints: dict[str, str] = field(default_factory=dict)
     symbols: set[str] = field(default_factory=set)
     backup: Optional[Path] = None
 
@@ -81,12 +83,15 @@ class ZipResult:
 class _Plan:
     """What importing one ZIP writes, worked out before the first write.
 
-    models starts as the target's and gains the ZIP's new models, so the
-    ZIP's footprints can reference them.
+    models and fp_names start as the target's and gain the ZIP's new files,
+    so the ZIP's footprints and symbols can reference them. model_copies
+    pairs each new model's source with its location; footprints maps the
+    case-folded names of new footprint files to their path and text.
     """
 
     models: dict[str, ModelRef]
-    model_copies: list[tuple[Path, Path]] = field(default_factory=list)
+    fp_names: dict[str, str]
+    model_copies: list[tuple[Path, ModelRef]] = field(default_factory=list)
     footprints: dict[str, tuple[Path, str]] = field(default_factory=dict)
     fp_refs: dict[str, str] = field(default_factory=dict)
     symbols: Optional[SymbolMerge] = None
@@ -96,7 +101,7 @@ class _Plan:
         return ZipResult(
             symbols=list(self.symbols.added) if self.symbols else [],
             footprints=[dest.name for dest, _ in self.footprints.values()],
-            models=[dest.name for _, dest in self.model_copies],
+            models=[ref.name for _, ref in self.model_copies],
         )
 
 
@@ -112,23 +117,18 @@ def import_zip_file(zip_path: Path, target: ImportTarget) -> ZipResult:
     Raises:
         ImportFailure: The ZIP is unreadable or holds files the library
             cannot take.
-        OSError: A write failed. Files written before it stay; a re-run
-            skips them.
+        OSError: A write failed. Files written before it stay, and later
+            ZIPs and re-runs skip them.
     """
     with tempfile.TemporaryDirectory(prefix="kilm_import_") as tmp:
         files = extract_part_files(zip_path, Path(tmp))
-        plan = _Plan(models=dict(target.models))
+        plan = _Plan(models=dict(target.models), fp_names=dict(target.footprints))
         _plan_models(files, target, plan)
         _plan_footprints(files, target, plan)
         _plan_symbols(files, target, plan)
         for line in plan.lines:
             console.print(line, markup=False, highlight=False)
-        if not target.dry_run:
-            _apply(plan, target)
-    target.models = plan.models
-    target.footprints.update(plan.footprints)
-    if plan.symbols:
-        target.symbols.update(plan.symbols.added)
+        _apply(plan, target)
     return plan.result()
 
 
@@ -181,21 +181,26 @@ def _plan_models(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
             plan.lines.append(f"  3D   reuse existing {known.path} for {f.name}")
         else:
             plan.lines.append(f"  3D   add: {f.name}")
-            plan.models[key] = ModelRef(target.model_prefix, f.name)
-            plan.model_copies.append((f, target.models_dir / f.name))
+            ref = ModelRef(target.model_prefix, f.name)
+            plan.models[key] = ref
+            plan.model_copies.append((f, ref))
 
 
 def _plan_footprints(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
     lib = target.fp_dir.stem
     for f in (f for f in files if f.suffix.lower() == ".kicad_mod"):
-        plan.fp_refs[f.stem] = f"{lib}:{f.stem}"
         key = f.name.casefold()
-        if key in target.footprints or key in plan.footprints:
-            plan.lines.append(f"  FP   skip (exists): {f.name}")
+        kept = plan.fp_names.get(key)
+        if kept is not None:
+            plan.fp_refs[f.stem] = f"{lib}:{Path(kept).stem}"
+            as_kept = "" if kept == f.name else f" as {kept}"
+            plan.lines.append(f"  FP   skip (exists{as_kept}): {f.name}")
             continue
         text = _read_vendor_text(f)
         text = target.upgrader.footprint(f.name, text, target.fp_format)
         require_compatible(f.name, text, target.fp_format, target.fp_dir, "fp")
+        plan.fp_names[key] = f.name
+        plan.fp_refs[f.stem] = f"{lib}:{f.stem}"
         plan.footprints[key] = (target.fp_dir / f.name, fix_3d_path(text, plan.models))
         plan.lines.append(f"  FP   add: {f.name}")
 
@@ -221,14 +226,26 @@ def _plan_symbols(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
 
 
 def _apply(plan: _Plan, target: ImportTarget) -> None:
-    for src, dest in plan.model_copies:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        write_atomically(dest, src.read_bytes())
-    for dest, text in plan.footprints.values():
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        write_atomically(dest, text.encode("utf-8"))
+    """Write the plan (unless a dry run) and record each file in target.
+
+    Each file is recorded right after its write, so when a later write
+    fails, the files already in the library stay known to the run.
+    """
+    for src, ref in plan.model_copies:
+        if not target.dry_run:
+            dest = target.models_dir / ref.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            write_atomically(dest, src.read_bytes())
+        target.models[ref.name.casefold()] = ref
+    for key, (dest, text) in plan.footprints.items():
+        if not target.dry_run:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            write_atomically(dest, text.encode("utf-8"))
+        target.footprints[key] = dest.name
     if plan.symbols and plan.symbols.added:
-        if target.backup is None:
-            target.backup = create_backup(target.sym_lib)
-            console.print(f"  Backup: {target.backup}", style="dim", markup=False)
-        write_atomically(target.sym_lib, plan.symbols.text.encode("utf-8"))
+        if not target.dry_run:
+            if target.backup is None:
+                target.backup = create_backup(target.sym_lib)
+                console.print(f"  Backup: {target.backup}", style="dim", markup=False)
+            write_atomically(target.sym_lib, plan.symbols.text.encode("utf-8"))
+        target.symbols.update(plan.symbols.added)

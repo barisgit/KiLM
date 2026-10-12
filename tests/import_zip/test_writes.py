@@ -45,6 +45,50 @@ def test_failed_symbol_write_leaves_library_intact(
     assert not list(sym_lib.parent.glob(".*.tmp"))
 
 
+def test_files_written_before_a_failed_write_are_kept_for_later_zips(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    # A later ZIP must skip what a failed ZIP already wrote, not replace it.
+    from kicad_lib_manager.utils.file_ops import write_atomically as real_write
+
+    def fail_symbol_writes(path: Path, data: bytes) -> None:
+        if path.suffix == ".kicad_sym":
+            _no_space(0)
+        real_write(path, data)
+
+    a = zip_with(
+        tmp_path,
+        "a",
+        {
+            "A/KiCad/A.kicad_sym": '(kicad_symbol_lib\n\t(symbol "A"\n\t)\n)\n',
+            "A/KiCad/Shared.kicad_mod": '(footprint "Shared" (descr "from a"))\n',
+            "A/3D/Shared.stp": "STEP from a",
+        },
+    )
+    b = zip_with(
+        tmp_path,
+        "b",
+        {
+            "B/KiCad/Shared.kicad_mod": '(footprint "Shared" (descr "from b"))\n',
+            "B/3D/Shared.stp": "STEP from b",
+        },
+    )
+
+    with patch(
+        "kicad_lib_manager.commands.import_zip.importer.write_atomically",
+        side_effect=fail_symbol_writes,
+    ):
+        result = run_import(str(a), str(b))
+
+    assert result.exit_code == 1, result.output
+    assert "FP   skip (exists): Shared.kicad_mod" in result.output
+    assert "3D   skip (exists): Shared.stp" in result.output
+    fp = library_tree / "footprints" / "SAMPLELIB.pretty" / "Shared.kicad_mod"
+    assert "from a" in fp.read_text(encoding="utf-8")
+    model = next(library_tree.glob("*.3dshapes/Shared.stp"))
+    assert model.read_text(encoding="utf-8") == "STEP from a"
+
+
 def test_symbol_library_is_backed_up_once_per_run(
     tmp_path: Path, library_tree: Path, mock_config: MagicMock
 ) -> None:

@@ -254,3 +254,38 @@ def test_file_names_differing_only_in_case_are_one_file(
     assert summary(dry.output) == summary(real.output)
     fp_dir = library_tree / "footprints" / "SAMPLELIB.pretty"
     assert [p.name for p in fp_dir.iterdir()] == ["Foo.kicad_mod"]
+
+
+@pytest.mark.parametrize("kept_from", ["library", "earlier ZIP"])
+def test_symbols_reference_the_kept_spelling_of_a_skipped_footprint(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock, kept_from: str
+) -> None:
+    # On case-sensitive filesystems "SAMPLELIB:foo" would not find Foo.kicad_mod.
+    fp_dir = library_tree / "footprints" / "SAMPLELIB.pretty"
+    zips = [
+        zip_with(
+            tmp_path,
+            "b",
+            {
+                "B/KiCad/B.kicad_sym": (
+                    '(kicad_symbol_lib\n\t(symbol "B"\n'
+                    '\t\t(property "Footprint" "foo")\n\t)\n)\n'
+                ),
+                "B/KiCad/foo.kicad_mod": '(footprint "foo")\n',
+            },
+        )
+    ]
+    if kept_from == "library":
+        (fp_dir / "Foo.kicad_mod").write_text('(footprint "Foo")\n')
+    else:
+        zips.insert(
+            0, zip_with(tmp_path, "a", {"A/KiCad/Foo.kicad_mod": '(footprint "Foo")\n'})
+        )
+
+    result = run_import(*map(str, zips))
+
+    assert result.exit_code == 0, result.output
+    assert "FP   skip (exists as Foo.kicad_mod): foo.kicad_mod" in result.output
+    sym_text = (library_tree / "symbols" / "SAMPLELIB.kicad_sym").read_text()
+    assert '"Footprint" "SAMPLELIB:Foo"' in sym_text
+    assert [p.name for p in fp_dir.iterdir()] == ["Foo.kicad_mod"]

@@ -83,7 +83,9 @@ def build_target(
         sym_format=file_format_version(sym_lib),
         fp_format=footprint_lib_version(fp_dir),
         models=models,
-        footprints={p.name.casefold() for p in fp_dir.iterdir() if p.is_file()},
+        footprints={
+            p.name.casefold(): p.name for p in sorted(fp_dir.iterdir()) if p.is_file()
+        },
     )
 
 
