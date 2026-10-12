@@ -154,6 +154,33 @@ class TestInstallationDetection:
         assert detector.detect_virtual_env() is True
         assert detector.detect() == "pip-venv"
 
+    def test_detect_nix_installation(self, monkeypatch):
+        """Interpreters in the Nix store are Nix installs, even inside a venv."""
+        monkeypatch.setenv("VIRTUAL_ENV", "/home/user/project/.venv")
+
+        detector = InstallationDetector(
+            executable_path=Path("/nix/store/abc123-python3-3.12.9/bin/python3.12")
+        )
+        assert detector.detect() == "nix"
+
+    def test_system_python_installed_by_pip(self, monkeypatch):
+        """Outside any environment, pip's INSTALLER record identifies pip."""
+        monkeypatch.setattr(sys, "prefix", sys.base_prefix)
+
+        detector = InstallationDetector(
+            executable_path=Path("/usr/bin/python3"), installer="pip"
+        )
+        assert detector.detect() == "pip"
+
+    def test_unrecognized_installation_is_unknown(self, monkeypatch):
+        """Without evidence of an installer, detection does not guess pip."""
+        monkeypatch.setattr(sys, "prefix", sys.base_prefix)
+
+        detector = InstallationDetector(
+            executable_path=Path("/usr/bin/python3"), installer=None
+        )
+        assert detector.detect() == "unknown"
+
     def test_platform_detection(self):
         """Test platform detection methods."""
         # Test Windows detection
@@ -223,7 +250,7 @@ class TestUpdateManager:
 
     def test_can_auto_update_unsupported_methods(self, monkeypatch):
         """Test auto-update support for unsupported installation methods."""
-        for method in ["conda", "homebrew"]:
+        for method in ["conda", "homebrew", "nix", "unknown"]:
             with patch(
                 "kicad_lib_manager.services.update_service.detect_installation_method"
             ) as mock_detect:
@@ -240,6 +267,12 @@ class TestUpdateManager:
             ("uv", "uv tool upgrade kilm"),
             ("conda", "Conda package not yet available (planned for future)"),
             ("homebrew", "Homebrew package not yet available (planned for future)"),
+            (
+                "nix",
+                "nix flake update, then rebuild the configuration or profile"
+                " that installs kilm",
+            ),
+            ("unknown", "Update KiLM with the tool that installed it"),
         ]
 
         for method, expected in test_cases:

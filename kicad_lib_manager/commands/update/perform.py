@@ -71,7 +71,7 @@ def perform_update_command(
         update_cmd = update_service.get_update_instructions()
 
         get_console().print(f"Installation method: [bold]{method}[/bold]")
-        get_console().print(f"Please run manually: [bold cyan]{update_cmd}[/bold cyan]")
+        get_console().print(f"Update manually: [bold cyan]{update_cmd}[/bold cyan]")
         raise typer.Exit(1)
 
     # Perform update check first (unless forced)

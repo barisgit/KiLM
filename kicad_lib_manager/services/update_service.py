@@ -5,16 +5,32 @@ Handles installation method detection, PyPI integration, and update execution.
 # PEP 810: on Python 3.15+ these imports load on first use.
 __lazy_modules__ = {"packaging.version", "requests"}
 
+import importlib.metadata
 import json
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path, PurePath
-from typing import Any
+from typing import Any, Literal
 
 import requests
 from packaging.version import InvalidVersion, Version
+
+
+InstallMethod = Literal[
+    "pipx", "conda", "uv", "nix", "pip-venv", "homebrew", "pip", "unknown"
+]
+"""How KiLM was installed; decides how it can be updated."""
+
+
+def read_installer() -> str | None:
+    """Return the installer recorded for kilm (INSTALLER file), if any."""
+    try:
+        installer = importlib.metadata.distribution("kilm").read_text("INSTALLER")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    return installer.strip() if installer else None
 
 
 class InstallationDetector:
@@ -24,9 +40,13 @@ class InstallationDetector:
         self,
         executable_path: PurePath | None = None,
         platform_name: str | None = None,
+        *,
+        installer: str | None = "",
     ):
         self.executable_path = executable_path or Path(sys.executable)
         self.platform_name = platform_name or os.name
+        # "" means "read it from the installed distribution".
+        self.installer = read_installer() if installer == "" else installer
         # Forward slashes on every platform so the path patterns below
         # (".local/share/pipx", "uv/tools", ...) also match Windows paths.
         self.executable_str = self.executable_path.as_posix()
@@ -98,9 +118,15 @@ class InstallationDetector:
         homebrew_paths = ["/opt/homebrew/", "/usr/local/Cellar/"]
         return any(self.executable_str.startswith(path) for path in homebrew_paths)
 
-    def detect(self) -> str:
-        """Detect installation method with priority order.
-        Returns: 'pipx' | 'conda' | 'uv' | 'pip-venv' | 'homebrew' | 'pip'
+    def detect_nix(self) -> bool:
+        """Detect a Nix install: the interpreter lives in the Nix store."""
+        return self.executable_str.startswith("/nix/store/")
+
+    def detect(self) -> InstallMethod:
+        """Detect the installation method, most specific evidence first.
+
+        Returns "unknown" rather than guessing when nothing identifies the
+        installer, so callers never suggest a command that cannot work.
         """
         # Priority order matters - more specific first
         if self.detect_pipx():
@@ -112,20 +138,23 @@ class InstallationDetector:
         if self.detect_uv():
             return "uv"
 
+        if self.detect_nix():
+            return "nix"
+
         if self.detect_virtual_env():
             return "pip-venv"
 
         if self.detect_homebrew():
             return "homebrew"
 
-        return "pip"
+        if self.installer == "pip":
+            return "pip"
+
+        return "unknown"
 
 
-# TODO: Add strong typing
-def detect_installation_method() -> str:
-    """Detect how KiLM was installed to determine appropriate update strategy.
-    Returns: 'pipx' | 'pip' | 'pip-venv' | 'uv' | 'conda' | 'homebrew'
-    """
+def detect_installation_method() -> InstallMethod:
+    """Detect how KiLM was installed to determine appropriate update strategy."""
     detector = InstallationDetector()
     return detector.detect()
 
@@ -243,7 +272,7 @@ class UpdateManager:
     def __init__(self, current_version: str):
         self.version_checker = PyPIVersionChecker("kilm")
         self.current_version = current_version
-        self.installation_method = detect_installation_method()
+        self.installation_method: InstallMethod = detect_installation_method()
 
     def check_latest_version(self) -> str | None:
         """Check for latest version available on PyPI."""
@@ -260,15 +289,18 @@ class UpdateManager:
 
     def get_update_instruction(self) -> str:
         """Get update instruction for the detected installation method."""
-        instructions = {
+        instructions: dict[InstallMethod, str] = {
             "pipx": "pipx upgrade kilm",
             "pip": "pip install --upgrade kilm",
             "pip-venv": "pip install --upgrade kilm",
             "uv": "uv tool upgrade kilm",
             "conda": "Conda package not yet available (planned for future)",
             "homebrew": "Homebrew package not yet available (planned for future)",
+            "nix": "nix flake update, then rebuild the configuration or profile"
+            " that installs kilm",
+            "unknown": "Update KiLM with the tool that installed it",
         }
-        return instructions.get(self.installation_method, "Check your package manager")
+        return instructions[self.installation_method]
 
     def can_auto_update(self) -> bool:
         """Check if automatic update is possible for this installation method."""
@@ -280,7 +312,7 @@ class UpdateManager:
         """
         if not self.can_auto_update():
             instruction = self.get_update_instruction()
-            return False, f"Manual update required. Run: {instruction}"
+            return False, f"Manual update required: {instruction}"
 
         update_functions = {
             "pipx": update_via_pipx,
@@ -387,7 +419,7 @@ class UpdateService:
             message_lines.extend(
                 [
                     f"Installation method: [bold]{method}[/bold] (manual update required)",
-                    f"Run: [bold cyan]{update_cmd}[/bold cyan]",
+                    f"Update manually: [bold cyan]{update_cmd}[/bold cyan]",
                 ]
             )
 
@@ -407,7 +439,7 @@ class UpdateService:
         """Check if an update is available."""
         return self.manager.is_newer_version_available(latest_version)
 
-    def get_installation_method(self) -> str:
+    def get_installation_method(self) -> InstallMethod:
         """Get detected installation method."""
         return self.manager.installation_method
 
