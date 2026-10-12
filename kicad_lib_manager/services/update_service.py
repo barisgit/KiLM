@@ -160,70 +160,84 @@ def detect_installation_method() -> InstallMethod:
 
 
 class PyPIVersionChecker:
-    """Responsible PyPI API client with caching and proper headers."""
+    """PyPI client for the latest release of a package, cached for a day.
 
-    def __init__(self, package_name: str, version: str = "unknown"):
+    A cached answer younger than `CACHE_TTL_SECONDS` is returned without a
+    request. Otherwise PyPI is asked with the cached ETag, so an unchanged
+    release costs a 304 answer.
+    """
+
+    CACHE_TTL_SECONDS = 24 * 60 * 60
+
+    def __init__(
+        self,
+        package_name: str,
+        version: str = "unknown",
+        *,
+        cache_file: Path | None = None,
+    ):
         self.package_name = package_name
         self.base_url = f"https://pypi.org/pypi/{package_name}/json"
-        self.cache_file = Path.home() / ".cache" / "kilm" / "version_check.json"
+        self.cache_file = cache_file or (
+            Path.home() / ".cache" / "kilm" / "version_check.json"
+        )
         self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
 
-    def check_latest_version(self) -> str | None:
-        """Check latest version from PyPI with caching and rate limiting.
-        Returns None if check fails or is rate limited.
+    def check_latest_version(self, *, use_cache: bool = True) -> str | None:
+        """Return the latest released version, or None when it is unknown.
+
+        With `use_cache` a fresh cached answer is returned without a request.
+        Network and response errors return None and never raise, so an
+        offline machine only loses the update notice.
         """
+        cached_data = self._load_cache()
+        cached_version = cached_data.get("version") if cached_data else None
+        if use_cache and cached_data and self._is_fresh(cached_data):
+            return cached_version
+
+        headers = {"User-Agent": self.user_agent}
+        if cached_data and cached_data.get("etag"):
+            headers["If-None-Match"] = cached_data["etag"]
         try:
-            headers = {"User-Agent": self.user_agent}
-
-            # Use cached ETag if available
-            cached_data = self._load_cache()
-            if cached_data is not None and "etag" in cached_data:
-                headers["If-None-Match"] = cached_data["etag"]
-
             response = requests.get(self.base_url, headers=headers, timeout=10)
-
             if response.status_code == 304:  # Not Modified
-                return cached_data.get("version") if cached_data else None
-
-            if response.status_code == 200:
-                data = response.json()
-                latest_version = data["info"]["version"]
-
-                # Cache response with ETag
-                self._save_cache(
-                    {
-                        "version": latest_version,
-                        "etag": response.headers.get("ETag"),
-                        "timestamp": time.time(),
-                    }
-                )
-
-                return latest_version
-
-        except (requests.RequestException, KeyError, json.JSONDecodeError):
+                latest_version = cached_version
+                etag = cached_data.get("etag") if cached_data else None
+            elif response.status_code == 200:
+                latest_version = response.json()["info"]["version"]
+                etag = response.headers.get("ETag")
+            else:
+                return None
+        except (requests.RequestException, KeyError, ValueError):
             # Fail silently - don't block CLI functionality
-            pass
+            return None
 
-        return None
+        if latest_version:
+            self._save_cache(
+                {"version": latest_version, "etag": etag, "timestamp": time.time()}
+            )
+        return latest_version
+
+    def _is_fresh(self, data: dict) -> bool:
+        return time.time() - data.get("timestamp", 0) < self.CACHE_TTL_SECONDS
 
     def _load_cache(self) -> dict | None:
-        """Load cached version data."""
-        if self.cache_file.exists():
-            try:
-                with Path(self.cache_file).open() as f:
-                    data = json.load(f)
-                    # Cache valid for 24 hours
-                    if time.time() - data.get("timestamp", 0) < 86400:
-                        return data
-            except (json.JSONDecodeError, KeyError):
-                pass
-        return None
+        """Load cached version data of any age; None when absent or unreadable."""
+        try:
+            with self.cache_file.open() as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
 
     def _save_cache(self, data: dict):
-        """Save version data to cache."""
-        self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with Path(self.cache_file).open("w") as f:
-            json.dump(data, f)
+        """Save version data to cache; a cache that cannot be written is skipped."""
+        try:
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with self.cache_file.open("w") as f:
+                json.dump(data, f)
+        except OSError:
+            pass
 
 
 def upgrade_command(
@@ -271,9 +285,9 @@ class UpdateManager:
         self.current_version = current_version
         self.installation_method: InstallMethod = detect_installation_method()
 
-    def check_latest_version(self) -> str | None:
-        """Check for latest version available on PyPI."""
-        return self.version_checker.check_latest_version()
+    def check_latest_version(self, *, use_cache: bool = True) -> str | None:
+        """Return the latest kilm release, from a fresh cache unless bypassed."""
+        return self.version_checker.check_latest_version(use_cache=use_cache)
 
     def is_newer_version_available(self, latest_version: str) -> bool:
         """Compare versions to determine if update is available."""
@@ -335,11 +349,7 @@ class UpdateService:
             - method: installation method identifier
             - supports_auto_update: whether automatic update is supported
         """
-        latest_version = (
-            self.manager.check_latest_version()
-            if use_cache
-            else self.manager.version_checker.check_latest_version()
-        )
+        latest_version = self.manager.check_latest_version(use_cache=use_cache)
         has_update = False
 
         if latest_version:

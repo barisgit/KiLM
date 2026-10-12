@@ -10,6 +10,7 @@ import requests
 
 from kicad_lib_manager.services.update_service import (
     InstallationDetector,
+    PyPIVersionChecker,
     UpdateManager,
     UpdateService,
     detect_installation_method,
@@ -489,25 +490,25 @@ class TestPyPIVersionChecker:
     """Test PyPI version checking functionality."""
 
     @pytest.fixture
-    def version_checker(self):
-        """Create a PyPIVersionChecker instance for testing."""
-        from kicad_lib_manager.services.update_service import PyPIVersionChecker
+    def version_checker(self, tmp_path):
+        """A checker whose cache lives in the test's temporary directory."""
+        return PyPIVersionChecker(
+            "kilm", "1.0.0", cache_file=tmp_path / "version_check.json"
+        )
 
-        return PyPIVersionChecker("kilm", "1.0.0")
-
-    def test_cache_file_location(self, version_checker):
-        """Test that cache file is created in the correct location."""
-        assert version_checker.cache_file.name == "version_check.json"
-        assert "kilm" in str(version_checker.cache_file)
+    @staticmethod
+    def pypi_response(version: str = "1.1.0") -> Mock:
+        """A successful PyPI JSON API response for `version`."""
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"info": {"version": version}}
+        response.headers.get.return_value = "etag123"
+        return response
 
     @patch("requests.get")
     def test_successful_version_check(self, mock_get, version_checker):
         """Test successful version check from PyPI."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"info": {"version": "1.1.0"}}
-        mock_response.headers.get.return_value = "etag123"
-        mock_get.return_value = mock_response
+        mock_get.return_value = self.pypi_response()
 
         version = version_checker.check_latest_version()
 
@@ -523,19 +524,32 @@ class TestPyPIVersionChecker:
         assert version is None
 
     @patch("requests.get")
+    def test_fresh_cache_answers_without_network(self, mock_get, version_checker):
+        """Within a day of the last check the cached version is the answer."""
+        mock_get.return_value = self.pypi_response("1.1.0")
+        version_checker.check_latest_version()
+        mock_get.reset_mock()
+
+        assert version_checker.check_latest_version() == "1.1.0"
+        mock_get.assert_not_called()
+
+    @patch("requests.get")
+    def test_bypassing_the_cache_queries_pypi(self, mock_get, version_checker):
+        """use_cache=False asks PyPI even when the cache is fresh."""
+        mock_get.return_value = self.pypi_response("1.1.0")
+        version_checker.check_latest_version()
+        mock_get.return_value = self.pypi_response("1.2.0")
+
+        assert version_checker.check_latest_version(use_cache=False) == "1.2.0"
+
+    @patch("requests.get")
     def test_not_modified_response(self, mock_get, version_checker):
-        """Test handling of 304 Not Modified response."""
-        # First, create cached data with correct key names
-        import time
+        """A 304 answer keeps the cached version."""
+        mock_get.return_value = self.pypi_response("1.0.5")
+        version_checker.check_latest_version()
+        not_modified = Mock()
+        not_modified.status_code = 304
+        mock_get.return_value = not_modified
 
-        version_checker._save_cache(
-            {"version": "1.0.5", "etag": "etag123", "timestamp": time.time()}
-        )
-
-        mock_response = Mock()
-        mock_response.status_code = 304
-        mock_get.return_value = mock_response
-
-        version = version_checker.check_latest_version()
-
-        assert version == "1.0.5"
+        assert version_checker.check_latest_version(use_cache=False) == "1.0.5"
+        assert mock_get.call_args.kwargs["headers"]["If-None-Match"] == "etag123"
