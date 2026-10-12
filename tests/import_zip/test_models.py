@@ -1,0 +1,256 @@
+"""3D model placement and the model references written into footprints."""
+
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from kicad_lib_manager.commands.import_zip.importer import ModelRef, fix_3d_path
+
+from .helpers import run_import, summary, zip_with
+
+LIB_MODELS = {
+    "somepart.stp": ModelRef("${LIB}/SAMPLELIB.3dshapes", "somepart.stp"),
+    "somepart.step": ModelRef("${LIB}/SAMPLELIB.3dshapes", "somepart.step"),
+    "somepart.stp.gz": ModelRef("${LIB}/SAMPLELIB.3dshapes", "somepart.stp.gz"),
+    "somepart.step.gz": ModelRef("${LIB}/SAMPLELIB.3dshapes", "somepart.step.gz"),
+}
+
+
+def _footprint(library_tree: Path, name: str) -> str:
+    return (library_tree / "footprints" / "SAMPLELIB.pretty" / name).read_text()
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '(model "C:/Vendor/somepart.stp"',
+        '(model "C:/Vendor/somepart.step"',
+        '(model "C:/Vendor/somepart.stp.gz"',
+        '(model "C:/Vendor/somepart.step.gz"',
+        '(model "C:\\\\Vendor\\\\3D\\\\SomePart.STEP"',
+        "(model somepart.stp",
+        "(model somepart.step",
+        "(model somepart.stp.gz",
+        "(model somepart.step.gz",
+    ],
+)
+def test_fix_3d_path_points_known_models_at_the_library(raw: str) -> None:
+    # Regression: a misordered alternation matched a compound extension's own
+    # prefix ("step" inside "step.gz") and left the rest dangling.
+    result = fix_3d_path(raw, LIB_MODELS)
+
+    assert result.startswith('(model "${LIB}/SAMPLELIB.3dshapes/somepart.')
+    assert result.count('"') == 2
+    assert result.endswith('"')
+
+
+def test_fix_3d_path_keeps_references_to_other_models() -> None:
+    text = '(model "${KICAD9_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_0603_1608Metric.wrl"'
+
+    assert fix_3d_path(text, LIB_MODELS) == text
+
+
+def test_footprint_reference_to_a_stock_model_is_kept(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    ref = '(model "${KICAD9_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_0603_1608Metric.wrl"'
+    zip_path = zip_with(
+        tmp_path, "C", {"C.kicad_mod": f'(footprint "C"\n\t{ref}\n\t)\n)\n'}
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert ref in _footprint(library_tree, "C.kicad_mod")
+
+
+def test_fallback_models_use_library_env_var(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    (library_tree / "kilm.yaml").write_text(
+        "name: mylib\nenv_var: KICAD_LIB_MYLIB\n", encoding="utf-8"
+    )
+    zip_path = zip_with(
+        tmp_path,
+        "M1",
+        {
+            "M1/KiCad/M1.kicad_mod": '(footprint "M1"\n\t(model "C:/x/M1.stp"\n\t)\n)\n',
+            "M1/3D/M1.stp": "STEP",
+        },
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    fp = _footprint(library_tree, "M1.kicad_mod")
+    assert '(model "${KICAD_LIB_MYLIB}/SAMPLELIB.3dshapes/M1.stp"' in fp
+
+
+def test_fallback_models_without_env_var_use_absolute_path(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    zip_path = zip_with(
+        tmp_path,
+        "M2",
+        {
+            "M2/KiCad/M2.kicad_mod": '(footprint "M2"\n\t(model "M2.stp"\n\t)\n)\n',
+            "M2/3D/M2.stp": "STEP",
+        },
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    fp = _footprint(library_tree, "M2.kicad_mod")
+    assert (library_tree / "SAMPLELIB.3dshapes").resolve().as_posix() in fp
+
+
+def test_split_library_fallback_models_dir_named_after_library(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    (library_tree / "symbols" / "OTHER.kicad_sym").write_text("(kicad_symbol_lib\n)\n")
+    zip_path = zip_with(tmp_path, "M3", {"M3/3D/M3.stp": "STEP"})
+
+    result = run_import("-s", "SAMPLELIB", str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert (library_tree / f"{library_tree.name}.3dshapes" / "M3.stp").exists()
+    assert "3D model paths will be absolute to this machine" in result.output
+
+
+def test_models_dir_prefers_library_named_dir(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    (library_tree / "AAA.3dshapes").mkdir()
+    (library_tree / "SAMPLELIB.3dshapes").mkdir()
+    zip_path = zip_with(tmp_path, "M4", {"M4/3D/M4.stp": "STEP"})
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert (library_tree / "SAMPLELIB.3dshapes" / "M4.stp").exists()
+    assert not (library_tree / "AAA.3dshapes" / "M4.stp").exists()
+
+
+def test_model_in_other_models_dir_is_reused(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    (library_tree / "Aaa.3dshapes").mkdir()
+    (library_tree / "Bbb.3dshapes").mkdir()
+    (library_tree / "Bbb.3dshapes" / "Part.step").write_text("STEP")
+    (library_tree / "kilm.yaml").write_text("name: mylib\nenv_var: KICAD_LIB_MYLIB\n")
+    zip_path = zip_with(
+        tmp_path,
+        "Reuse",
+        {
+            "R/KiCad/RFP.kicad_mod": '(footprint "RFP"\n\t(model "x/Part.step"\n\t)\n)\n',
+            "R/3D/Part.step": "STEP",
+        },
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert (
+        "3D   reuse existing ${KICAD_LIB_MYLIB}/Bbb.3dshapes/Part.step for Part.step"
+        in result.output
+    )
+    assert not (library_tree / "Aaa.3dshapes" / "Part.step").exists()
+    fp = _footprint(library_tree, "RFP.kicad_mod")
+    assert '(model "${KICAD_LIB_MYLIB}/Bbb.3dshapes/Part.step"' in fp
+
+
+def test_registered_3d_library_receives_models(
+    tmp_path: Path, category_tree: Path
+) -> None:
+    zip_path = zip_with(
+        tmp_path,
+        "CatPart",
+        {
+            "CatPart/KiCad/CatPartFP.kicad_mod": (
+                '(footprint "CatPartFP"\n\t(model "C:/x/CatPart.stp"\n\t)\n)\n'
+            ),
+            "CatPart/3D/CatPart.stp": "STEP",
+        },
+    )
+
+    result = run_import("-s", "CAT_IC", "-f", "CAT_QFN", str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    fp = category_tree / "footprints" / "CAT_QFN.pretty" / "CatPartFP.kicad_mod"
+    assert '(model "${KICAD_3D_CAT_MODELS}/CatPart.stp"' in fp.read_text()
+    assert (category_tree / "CAT.3dshapes" / "CatPart.stp").exists()
+    assert not (category_tree / "CAT_IC.3dshapes").exists()
+
+
+def test_absolute_paths_from_other_model_dirs_are_warned(
+    tmp_path: Path, category_tree: Path
+) -> None:
+    (category_tree / "Old.3dshapes").mkdir()
+    (category_tree / "Old.3dshapes" / "Legacy.step").write_text("STEP")
+    zip_path = zip_with(tmp_path, "W", {"W/3D/New.step": "STEP"})
+
+    result = run_import("-s", "CAT_IC", "-f", "CAT_QFN", str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert "3D model paths will be absolute to this machine" in result.output
+
+
+def test_hidden_files_in_model_dirs_are_ignored(
+    tmp_path: Path, category_tree: Path
+) -> None:
+    # A .DS_Store in an extra dir without a library env var must not count as
+    # a model (it would trigger the absolute-path warning on its own).
+    (category_tree / "Old.3dshapes").mkdir()
+    (category_tree / "Old.3dshapes" / ".DS_Store").write_text("x")
+    zip_path = zip_with(tmp_path, "H", {"H/3D/New.step": "STEP"})
+
+    result = run_import("-s", "CAT_IC", "-f", "CAT_QFN", str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert "absolute to this machine" not in result.output
+
+
+def test_dry_run_reports_model_added_earlier_as_skip(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    a = zip_with(tmp_path, "a", {"A/3D/Shared.step": "STEP"})
+    b = zip_with(tmp_path, "b", {"B/3D/Shared.step": "STEP"})
+
+    result = run_import("--dry-run", str(a), str(b))
+
+    assert result.exit_code == 0, result.output
+    assert result.output.count("3D   add: Shared.step") == 1
+    assert "3D   skip (exists): Shared.step" in result.output
+    assert "reuse existing" not in result.output
+
+
+def test_file_names_differing_only_in_case_are_one_file(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    # A library must hold the same files on case-sensitive and
+    # case-insensitive filesystems, and dry runs must count what real runs add.
+    a = zip_with(
+        tmp_path,
+        "a",
+        {"A/KiCad/Foo.kicad_mod": '(footprint "Foo")\n', "A/3D/Foo.stp": "STEP"},
+    )
+    b = zip_with(
+        tmp_path,
+        "b",
+        {"B/KiCad/foo.kicad_mod": '(footprint "foo")\n', "B/3D/foo.stp": "STEP"},
+    )
+
+    dry = run_import("--dry-run", str(a), str(b))
+    real = run_import(str(a), str(b))
+
+    assert real.exit_code == 0, real.output
+    assert summary(real.output) == [
+        "  Symbols   added: 0",
+        "  Footprints added: 1",
+        "  3D models  added: 1",
+    ]
+    assert summary(dry.output) == summary(real.output)
+    fp_dir = library_tree / "footprints" / "SAMPLELIB.pretty"
+    assert [p.name for p in fp_dir.iterdir()] == ["Foo.kicad_mod"]
