@@ -1,40 +1,70 @@
-"""File operation utilities"""
+"""Reading and writing KiCad library tables and other files KiLM changes."""
 
 import os
 import re
 import shutil
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal, TypedDict
+
+_DEFAULT_ENCODINGS = ("utf-8", "utf-16", "iso-8859-1")
+
+# One (lib ...) entry per line, as KiCad writes library tables.
+_LIB_ENTRY_RE = re.compile(r"^\s*\(lib\s+(.*?)\)\s*$", re.MULTILINE)
+_LIB_NAME_RE = re.compile(r'\(name\s+"([^"]+)"\)')
+# Optional properties of an entry; "url" is accepted for "uri" too.
+_LIB_PROPERTY_RES: dict[Literal["uri", "type", "description"], re.Pattern[str]] = {
+    "uri": re.compile(r'\((?:uri|url)\s+"([^"]+)"\)'),
+    "type": re.compile(r'\(type\s+"([^"]+)"\)'),
+    "description": re.compile(r'\(descr\s+"([^"]+)"\)'),
+}
 
 
-def read_file_with_encoding(file_path: Path, encodings: list[str] | None = None) -> str:
-    """Read a file trying multiple encodings until successful
+class _LibraryTableProperties(TypedDict, total=False):
+    """Optional properties of a library table entry."""
 
-    Args:
-        file_path: Path to the file to read
-        encodings: List of encodings to try. Defaults to ['utf-8', 'utf-16', 'iso-8859-1']
+    uri: str
+    type: str
+    description: str
 
-    Returns:
-        The file contents as a string
+
+class LibraryTableEntry(_LibraryTableProperties):
+    """A library in sym-lib-table or fp-lib-table; only name is always present."""
+
+    name: str
+
+
+def read_file_with_encoding(
+    file_path: Path, encodings: Sequence[str] = _DEFAULT_ENCODINGS
+) -> str:
+    """Return the text of file_path in the first of encodings that decodes it.
+
+    Line endings are normalized to LF as in text mode. An empty encodings
+    sequence returns "".
 
     Raises:
-        UnicodeDecodeError: If none of the encodings work
+        UnicodeDecodeError: No encoding decodes the file; the error is the
+            last encoding's.
     """
-    if encodings is None:
-        encodings = ["utf-8", "utf-16", "iso-8859-1"]
-
-    last_error = None
+    data = file_path.read_bytes()
+    error: UnicodeDecodeError | None = None
     for encoding in encodings:
-        try:
-            with Path(file_path).open(encoding=encoding) as f:
-                return f.read()
-        except UnicodeDecodeError as e:
-            last_error = e
-            continue
-
-    if last_error:
-        raise last_error
+        text = _decode(data, encoding)
+        if isinstance(text, str):
+            return text.replace("\r\n", "\n").replace("\r", "\n")
+        error = text
+    if error is not None:
+        raise error
     return ""
+
+
+def _decode(data: bytes, encoding: str) -> str | UnicodeDecodeError:
+    """Return data decoded with encoding, or the decoding error."""
+    try:
+        return data.decode(encoding)
+    except UnicodeDecodeError as e:
+        return e
 
 
 def write_file_with_encoding(
@@ -45,23 +75,18 @@ def write_file_with_encoding(
     The content is encoded before the file is touched, and write_atomically
     replaces the file in one step, so a failure leaves the old file intact.
     Line endings are written as given, on every OS.
-
-    Args:
-        file_path: Path to the file to write
-        content: Content to write
-        encoding: Encoding to use (defaults to utf-8)
     """
     write_atomically(file_path, content.encode(encoding))
 
 
 def write_atomically(path: Path, data: bytes) -> None:
-    """Replace path with data so readers see the old or the new file, never a partial one.
+    """Replace path with data so readers see the old or new file, never a partial one.
 
     The data goes to a hidden sibling first, which keeps the final rename on
     one filesystem and therefore atomic, and is flushed to disk before the
-    rename. A symlinked path is followed. The new file takes over an existing file's permission bits; a new
-    file gets the default ones (0o666 less the umask). On failure the sibling
-    is removed and path is unchanged.
+    rename. A symlinked path is followed. The new file takes over an existing
+    file's permission bits; a new file gets the default ones (0o666 less the
+    umask). On failure the sibling is removed and path is unchanged.
     """
     path = path.resolve()  # write through a symlink instead of replacing it
     tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
@@ -81,237 +106,97 @@ def write_atomically(path: Path, data: bytes) -> None:
         raise
 
 
-def validate_lib_table(table_path: Path, create_if_missing: bool = True) -> None:
-    """Validate a KiCad library table file
+def validate_lib_table(
+    table_path: Path,
+    create_if_missing: bool = True,  # noqa: FBT001, FBT002 -- LibraryService passes it positionally; make it keyword-only once it passes it by name
+) -> None:
+    """Check that table_path is a KiCad library table, creating an empty one if allowed.
 
-    Args:
-        table_path: Path to the library table
-        create_if_missing: If True, create the table if it doesn't exist
+    The table kind follows the file name: fp-lib-table is a footprint table,
+    anything else a symbol table.
 
     Raises:
-        ValueError: If the table format is invalid
+        ValueError: The table is missing and create_if_missing is False, or
+            its content is not a table of its kind.
     """
-    # Determine table type from filename
     table_type = "fp" if table_path.name == "fp-lib-table" else "sym"
-
-    # Create table if it doesn't exist
     if not table_path.exists():
-        if create_if_missing:
-            write_file_with_encoding(
-                table_path, f"({table_type}_lib_table\n  (version 7)\n)\n"
-            )
-        else:
-            raise ValueError(f"Library table not found: {table_path}")
+        if not create_if_missing:
+            msg = f"Library table not found: {table_path}"
+            raise ValueError(msg)
+        write_file_with_encoding(
+            table_path, f"({table_type}_lib_table\n  (version 7)\n)\n"
+        )
 
-    # Read and validate content
     content = read_file_with_encoding(table_path)
-
-    # Check if the content starts with the correct table type and ends with a closing parenthesis
     if not content.startswith(
         f"({table_type}_lib_table"
     ) or not content.rstrip().endswith(")"):
-        raise ValueError(f"Invalid library table format in {table_path}")
-
-
-def add_symbol_lib(
-    lib_name: str,
-    lib_path: str,
-    description: str,
-    sym_table: Path,
-    dry_run: bool = False,
-) -> bool:
-    """Add a symbol library to the KiCad configuration
-
-    Args:
-        lib_name: The name of the library
-        lib_path: The path to the library file
-        description: A description of the library
-        sym_table: Path to the symbol library table file
-        dry_run: If True, don't make any changes
-
-    Returns:
-        True if the library was added, False if it already exists
-    """
-    content = read_file_with_encoding(sym_table)
-
-    # Check if library already exists
-    if re.search(rf'\(lib \(name "{re.escape(lib_name)}"\)', content):
-        return False
-
-    if dry_run:
-        return True
-
-    # Add the library
-    lines = content.splitlines()
-    last_line = lines[-1]
-
-    if last_line.strip() == ")":
-        lines = lines[:-1]
-
-        # Add the new library entry
-        entry = f'  (lib (name "{lib_name}")(type "KiCad")(uri "{lib_path}")(options "")(descr "{description}"))'
-        lines.append(entry)
-        lines.append(")")
-
-        # Write with UTF-8 encoding
-        write_file_with_encoding(sym_table, "\n".join(lines) + "\n")
-
-        return True
-    raise ValueError("Invalid symbol library table format: missing closing parenthesis")
-
-
-def add_footprint_lib(
-    lib_name: str,
-    lib_path: str,
-    description: str,
-    fp_table: Path,
-    dry_run: bool = False,
-) -> bool:
-    """Add a footprint library to the KiCad configuration
-
-    Args:
-        lib_name: The name of the library
-        lib_path: The path to the library directory
-        description: A description of the library
-        fp_table: Path to the footprint library table file
-        dry_run: If True, don't make any changes
-
-    Returns:
-        True if the library was added, False if it already exists
-    """
-    content = read_file_with_encoding(fp_table)
-
-    # Check if library already exists
-    if re.search(rf'\(lib \(name "{re.escape(lib_name)}"\)', content):
-        return False
-
-    if dry_run:
-        return True
-
-    # Add the library
-    lines = content.splitlines()
-    last_line = lines[-1]
-
-    if last_line.strip() == ")":
-        lines = lines[:-1]
-
-        # Add the new library entry
-        entry = f'  (lib (name "{lib_name}")(type "KiCad")(uri "{lib_path}")(options "")(descr "{description}"))'
-        lines.append(entry)
-        lines.append(")")
-
-        # Write with UTF-8 encoding
-        write_file_with_encoding(fp_table, "\n".join(lines) + "\n")
-
-        return True
-    raise ValueError(
-        "Invalid footprint library table format: missing closing parenthesis"
-    )
+        msg = f"Invalid library table format in {table_path}"
+        raise ValueError(msg)
 
 
 def list_libraries(kicad_lib_dir: str) -> tuple[list[str], list[str]]:
-    """List all available libraries in the repository
+    """List the symbol and footprint libraries in a KiLM library directory.
 
-    Args:
-        kicad_lib_dir: The KiCad library directory
+    Symbol libraries are the symbols/*.kicad_sym files, footprint libraries
+    the footprints/*.pretty directories; both are returned by name.
 
     Returns:
-        A tuple of (symbol libraries, footprint libraries)
+        (symbol library names, footprint library names)
 
     Raises:
-        FileNotFoundError: If the KiCad library directory is not found
+        FileNotFoundError: kicad_lib_dir does not exist.
     """
     kicad_lib_path = Path(kicad_lib_dir)
-
     if not kicad_lib_path.exists():
-        raise FileNotFoundError(f"KiCad library directory not found at {kicad_lib_dir}")
+        msg = f"KiCad library directory not found at {kicad_lib_dir}"
+        raise FileNotFoundError(msg)
 
-    symbols = []
-    footprints = []
-
-    # Find symbol libraries
-    symbols_dir = kicad_lib_path / "symbols"
-    if symbols_dir.exists():
-        symbols = [f.stem for f in symbols_dir.glob("*.kicad_sym") if f.is_file()]
-
-    # Find footprint libraries
-    footprints_dir = kicad_lib_path / "footprints"
-    if footprints_dir.exists():
-        footprints = [d.stem for d in footprints_dir.glob("*.pretty") if d.is_dir()]
-
+    symbols = [
+        f.stem for f in (kicad_lib_path / "symbols").glob("*.kicad_sym") if f.is_file()
+    ]
+    footprints = [
+        d.stem for d in (kicad_lib_path / "footprints").glob("*.pretty") if d.is_dir()
+    ]
     return symbols, footprints
 
 
-def list_configured_libraries(kicad_config: Path) -> tuple[list[dict], list[dict]]:
-    """List all libraries currently configured in KiCad
+def list_configured_libraries(
+    kicad_config: Path,
+) -> tuple[list[LibraryTableEntry], list[LibraryTableEntry]]:
+    """List the libraries in KiCad's sym-lib-table and fp-lib-table.
 
-    Args:
-        kicad_config: Path to the KiCad configuration directory
+    A missing table lists no libraries; entries without a name are skipped.
 
     Returns:
-        A tuple of (symbol libraries, footprint libraries) as lists of dictionaries
-        containing library details
-
-    Raises:
-        FileNotFoundError: If library tables are not found
+        (symbol library entries, footprint library entries)
     """
-    sym_table = kicad_config / "sym-lib-table"
-    fp_table = kicad_config / "fp-lib-table"
+    return (
+        _read_lib_table(kicad_config / "sym-lib-table"),
+        _read_lib_table(kicad_config / "fp-lib-table"),
+    )
 
-    symbol_libs = []
-    footprint_libs = []
 
-    if sym_table.exists():
-        content = read_file_with_encoding(sym_table)
+def _read_lib_table(table_path: Path) -> list[LibraryTableEntry]:
+    if not table_path.exists():
+        return []
+    content = read_file_with_encoding(table_path)
+    entries: list[LibraryTableEntry] = []
+    for match in _LIB_ENTRY_RE.finditer(content):
+        entry = _parse_lib_entry(str(match.group(1)))
+        if entry is not None:
+            entries.append(entry)
+    return entries
 
-        # Match each complete (lib ...) entry on its own line
-        # This is more robust than trying to match up to the first ')'
-        for match in re.finditer(r"^\s*\(lib\s+(.*?)\)\s*$", content, re.MULTILINE):
-            entry = match.group(1)
 
-            name_match = re.search(r'\(name\s+"([^"]+)"\)', entry)
-            if not name_match:
-                continue
-            lib_info = {"name": name_match.group(1)}
-
-            # Extract other properties (support both uri and url just in case)
-            uri_match = re.search(r'\((?:uri|url)\s+"([^"]+)"\)', entry)
-            if uri_match:
-                lib_info["uri"] = uri_match.group(1)
-
-            type_match = re.search(r'\(type\s+"([^"]+)"\)', entry)
-            if type_match:
-                lib_info["type"] = type_match.group(1)
-
-            descr_match = re.search(r'\(descr\s+"([^"]+)"\)', entry)
-            if descr_match:
-                lib_info["description"] = descr_match.group(1)
-
-            symbol_libs.append(lib_info)
-
-    if fp_table.exists():
-        content = read_file_with_encoding(fp_table)
-
-        for match in re.finditer(r"^\s*\(lib\s+(.*?)\)\s*$", content, re.MULTILINE):
-            entry = match.group(1)
-
-            name_match = re.search(r'\(name\s+"([^"]+)"\)', entry)
-            if not name_match:
-                continue
-            lib_info = {"name": name_match.group(1)}
-
-            uri_match = re.search(r'\((?:uri|url)\s+"([^"]+)"\)', entry)
-            if uri_match:
-                lib_info["uri"] = uri_match.group(1)
-
-            type_match = re.search(r'\(type\s+"([^"]+)"\)', entry)
-            if type_match:
-                lib_info["type"] = type_match.group(1)
-
-            descr_match = re.search(r'\(descr\s+"([^"]+)"\)', entry)
-            if descr_match:
-                lib_info["description"] = descr_match.group(1)
-
-            footprint_libs.append(lib_info)
-
-    return symbol_libs, footprint_libs
+def _parse_lib_entry(entry: str) -> LibraryTableEntry | None:
+    name = _LIB_NAME_RE.search(entry)
+    if name is None:
+        return None
+    parsed: LibraryTableEntry = {"name": str(name.group(1))}
+    for key, pattern in _LIB_PROPERTY_RES.items():
+        value = pattern.search(entry)
+        if value is not None:
+            parsed[key] = str(value.group(1))
+    return parsed
