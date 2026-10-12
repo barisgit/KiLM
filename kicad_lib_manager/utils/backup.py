@@ -1,8 +1,10 @@
 """Timestamped backups of files that KiLM is about to change.
 
 A backup of ``<name>`` is the sibling ``<name>.backup.<stamp>``, where the
-stamp is the local time with microseconds. Stamps have a fixed width, so the
-name order of a file's backups is their creation order; pruning relies on it.
+stamp is the local time with microseconds. Stamps have a fixed width, so name
+order is time order, and pruning treats it as creation order. That holds
+while the local clock only moves forward: a clock set back, or the repeated
+hour when daylight saving time ends, can make a newer backup sort as older.
 Backups from releases that stamped whole seconds sort correctly among them.
 """
 
@@ -46,8 +48,8 @@ def unique_backup_path(file_path: Path) -> Path:
     """Return an unused backup path for file_path, named after the current time.
 
     When the name is taken (clocks can repeat a reading), the stamp moves
-    forward a microsecond at a time, which keeps name order equal to creation
-    order.
+    forward a microsecond at a time, so the new name still sorts after the
+    one it collided with.
     """
     stamp = datetime.now().astimezone()
     while (path := _backup_path(file_path, stamp)).exists():
@@ -58,7 +60,7 @@ def unique_backup_path(file_path: Path) -> Path:
 def manage_backup_history(
     file_path: Path, max_backups: int = DEFAULT_MAX_BACKUPS
 ) -> None:
-    """Delete the oldest backups of file_path beyond the newest max_backups."""
+    """Delete file_path's backups beyond the max_backups that sort last by name."""
     backups = sorted(file_path.parent.glob(f"{file_path.name}{_BACKUP_INFIX}*"))
     for old_backup in backups[:-max_backups]:
         old_backup.unlink()
