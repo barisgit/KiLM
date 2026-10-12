@@ -151,7 +151,8 @@ def test_newer_vendor_symbols_are_rejected(
     assert "kicad-cli sym upgrade" in result.output
     assert '(symbol "GoodPart"' in sym_lib.read_text()
     assert "embedded_fonts" not in sym_lib.read_text()
-    assert sym_lib.read_bytes().startswith(before[:-2])
+    # Everything before the closing parenthesis is kept byte for byte.
+    assert sym_lib.read_bytes().startswith(before.rstrip()[:-1])
     assert not (library_tree / "SAMPLELIB.3dshapes" / "NewPart.stp").exists()
 
 
