@@ -1,153 +1,69 @@
 ---
 title: Development Setup
-description: Complete guide for setting up a KiLM development environment with modern Python tooling.
+description: Set up a KiLM development checkout and run the same checks as CI.
 ---
 
-import { Steps, Aside } from "@astrojs/starlight/components";
-
-This guide covers setting up a professional development environment for KiLM with type safety, code quality tools, and testing infrastructure.
+import { Steps } from "@astrojs/starlight/components";
 
 ## Prerequisites
 
-- **Python 3.9+**: Required for KiLM development
-- **Git**: For version control and contribution workflow
-- **KiCad 6.x+**: For testing KiLM integration (run at least once)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/), which installs a
+  supported Python (3.10 or newer) when none is available
+- [just](https://just.systems/man/en/packages.html)
+- Git; on Windows, Git for Windows also provides the `sh` that `just` uses
+- [pnpm](https://pnpm.io/installation) and the Node.js version in
+  `docs/.node-version`, for the documentation site
+- KiCad, run at least once, to try KiLM against a real configuration
 
-## Development Workflow
+## Set up a checkout
 
 <Steps>
 
-1. **Clone the Repository**
-   
+1. Clone the repository, or your fork:
+
    ```bash
-   git clone https://github.com/barisgit/kilm.git
-   cd kilm
+   git clone https://github.com/barisgit/KiLM.git
+   cd KiLM
    ```
 
-2. **Create Virtual Environment**
-   
+2. Install the locked dependencies and the git hooks:
+
    ```bash
-   # Using Python's built-in venv
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   just setup
    ```
 
-3. **Install Development Dependencies**
-   
-   ```bash
-   # Install KiLM in editable mode with dev dependencies
-   pip install -e ".[dev]"
-   ```
+   Setup is safe to rerun, including in a new git worktree.
 
-   This installs:
-   - KiLM in editable mode (changes reflect immediately)
-   - Development tools: pytest, ruff, pyrefly
-   - Pre-commit hooks and coverage tools
+3. Run everything CI runs:
+
+   ```bash
+   just check
+   ```
 
 </Steps>
 
-## Verification
+Run the CLI from the checkout with `uv run kilm --help`.
 
-Verify your development setup:
+## Commands
 
-```bash
-# Check KiLM installation
-kilm --version
-kilm --help
+| Command | Purpose |
+| --- | --- |
+| `just` | List the commands. |
+| `just check` | Formatting check, lint (ruff), type check (ty), and tests. Never modifies files. |
+| `just test [args]` | Fast test run; arguments go to pytest, for example `just test -k sync`. |
+| `just cov` | Tests with coverage and the minimum threshold. |
+| `just fix` | Format the code and apply safe lint fixes. |
+| `just docs` | Build this documentation site. |
+| `just docs-dev` | Serve this documentation site with live reload. |
 
-# Verify KiCad detection
-kilm status
-```
+The git hook formats, lints, and type-checks staged Python files on commit. The
+tools run at the versions locked in `uv.lock`, the same as in CI.
 
-## Code Quality Standards
+## Standards
 
-KiLM follows strict code quality standards:
+The ruff rules and type-checker configuration live in `pyproject.toml`; fix the
+code rather than weakening a rule. Every suppression names its rule and gives a
+reason. [AGENTS.md](https://github.com/barisgit/KiLM/blob/main/AGENTS.md)
+describes the project layout, coding standards, and release process.
 
-### Type Safety (Required)
-```bash
-# Type checking with pyrefly (zero "Any" types allowed)
-pyrefly
-
-# Check for type issues
-pyrefly --check kicad_lib_manager/
-```
-
-### Code Formatting
-```bash
-# Format code with Ruff
-ruff format .
-
-# Check formatting without applying changes
-ruff format --check .
-```
-
-### Linting and Analysis
-```bash
-# Run Ruff linting and analysis
-ruff check .
-
-# Fix auto-fixable issues
-ruff check --fix .
-
-# Format imports and code
-ruff format .
-```
-
-### Testing
-```bash
-# Run all tests
-pytest
-
-# Run with coverage reporting
-pytest --cov=kicad_lib_manager --cov-report=html
-
-# Run specific test file
-pytest tests/test_config_commands.py
-
-# Run tests with verbose output
-pytest -v
-```
-
-## Development Tools
-
-### Pre-commit Hooks (Recommended)
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run all hooks on all files
-pre-commit run --all-files
-
-# Update hook repositories
-pre-commit autoupdate
-```
-
-### Quality Pipeline
-```bash
-# Run complete quality check (to be implemented)
-# This should include: pyrefly, ruff, pytest
-make quality  # or equivalent script
-```
-
-<Aside type="note">
-KiLM follows a **type-first development** approach. All code must have proper type hints with no `Any` types allowed.
-</Aside>
-
-## Project Architecture
-
-### Core Modules
-- **`cli.py`**: Typer-based command interface (modern CLI with better help/UX)
-- **`commands/`**: Individual command implementations  
-- **`library_manager.py`**: Core library management logic
-- **`config.py`**: KiCad configuration handling
-- **`utils/`**: File operations, backups, metadata, templates
-
-### Development Principles
-- **Professional code standards**: No emojis, no hardcoded values
-- **Cross-platform compatibility**: Support Windows, macOS, Linux
-- **SOLID principles**: Clean, maintainable architecture
-- **CLI-focused**: Simple, reliable command-line interface
-
-## Next Steps
-
-Ready to contribute? See the [Contributing Guide](/community/contributing/) for submission guidelines and coding standards.
+Ready to contribute? See the [Contributing Guide](/community/contributing/).

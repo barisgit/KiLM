@@ -1,75 +1,34 @@
 # Contributing to KiLM
 
-Thank you for your interest in contributing to KiLM (KiCad Library Manager)!
+Bug reports, feature requests, documentation fixes, and code are welcome.
+Search the [issues](https://github.com/barisgit/KiLM/issues) first; for a bug,
+include `kilm --version`, your KiCad version and operating system, the steps
+to reproduce, and the full error output.
 
-**[Complete Contributing Guide](https://kilm.aristovnik.me/community/contributing/)**
+## Development
 
-This file provides a quick reference. For detailed guidelines, development setup, and coding standards, see our comprehensive documentation.
-
-## Contribution Types
-
-- **Bug Reports** - Help identify and fix issues
-- **Feature Requests** - Share ideas for improvements  
-- **Documentation** - Improve guides and examples
-- **Testing** - Add tests or improve coverage
-- **Code** - Fix bugs or implement features
-
-## Quick Development Setup
+Install [uv](https://docs.astral.sh/uv/), [just](https://just.systems), and
+[pnpm](https://pnpm.io) with the Node version in `docs/.node-version` (setup also
+installs the docs dependencies).
 
 ```bash
-# 1. Fork and clone
-git clone https://github.com/YOUR-USERNAME/kilm.git
-cd kilm
-
-# 2. Set up development environment  
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 3. Install with dev dependencies
-pip install -e ".[dev]"
-
-# 4. Verify setup
-kilm --version
-pytest
+git clone https://github.com/<your-username>/KiLM.git
+cd KiLM
+just setup   # locked dependencies and git hooks; safe to rerun
+just check   # everything CI runs
 ```
 
-**[Complete Development Setup Guide](https://kilm.aristovnik.me/community/development/)**
+`just` lists the other commands (`test`, `cov`, `fix`, `docs`, `docs-dev`).
+[AGENTS.md](AGENTS.md) describes the layout, coding standards, and release
+process; it applies to human and AI contributors alike.
 
-## Quality Standards
+## Pull requests
 
-Before submitting, ensure your code meets our standards:
+1. Branch from `main` and keep each pull request to one change.
+2. Add a test with each feature, and a failing test first with each bug fix.
+3. Update the command's collocated `docs.mdx` when behavior changes.
+4. Run `just check`, then open the pull request with a conventional commit
+   title (`feat:`, `fix:`, `docs:`, `chore:`) and link the issue it closes.
 
-```bash
-# Type checking (required - zero "Any" types)
-pyrefly
-
-# Code formatting
-ruff format .
-
-# Linting 
-ruff check --fix .
-
-# Testing
-pytest --cov=kicad_lib_manager
-```
-
-## Pull Request Process
-
-1. **Create feature branch**: `git checkout -b feature/my-feature`
-2. **Make changes** following coding standards
-3. **Add tests** for new functionality  
-4. **Run quality checks** (above commands)
-5. **Commit** with descriptive messages (`feat:`, `fix:`, `docs:`)
-6. **Push and create PR** with clear description
-
-**[Complete Pull Request Guidelines](https://kilm.aristovnik.me/community/contributing/#pull-request-workflow)**
-
-## Getting Help
-
-- **Documentation**: [Official Documentation](https://kilm.aristovnik.me)
-- **Issues**: [GitHub Issues](https://github.com/barisgit/kilm/issues) for bugs and features
-- **Discussions**: [GitHub Discussions](https://github.com/barisgit/kilm/discussions) for questions
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions are licensed under the MIT
+License.

@@ -88,15 +88,15 @@ Add to a NixOS / home-manager config via the overlay:
 
 ## Contributing
 
-Contributions are welcome! See our comprehensive guides:
+Contributions are welcome. With [uv](https://docs.astral.sh/uv/),
+[just](https://just.systems), and [pnpm](https://pnpm.io) installed:
 
-- **[Contributing Guidelines](https://kilm.aristovnik.me/community/contributing/)** - Issue reporting, pull requests, coding standards
-- **[Development Setup](https://kilm.aristovnik.me/community/development/)** - Local development environment and tools
-
-**Quick Start for Contributors:**
 ```bash
-git clone https://github.com/barisgit/kilm.git
-cd kilm
-pip install -e ".[dev]"
-pytest  # Run all tests
+git clone https://github.com/barisgit/KiLM.git
+cd KiLM
+just setup   # locked dependencies and git hooks
+just check   # everything CI runs
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the pull request process and
+[AGENTS.md](AGENTS.md) for the layout and coding standards.

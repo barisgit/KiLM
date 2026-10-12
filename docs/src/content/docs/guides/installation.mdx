@@ -5,11 +5,11 @@ description: How to install KiLM on your system.
 
 import { Aside } from "@astrojs/starlight/components";
 
-KiLM (KiCad Library Manager) is a Python CLI tool that requires Python 3.9+ and KiCad 6.x+ to be installed and run at least once.
+KiLM (KiCad Library Manager) is a Python CLI tool that requires Python 3.10+ and KiCad 6.x+ to be installed and run at least once.
 
 ## System Requirements
 
-- **Python 3.9 or newer**
+- **Python 3.10 or newer**
 - **KiCad 6.x or newer** (must be launched at least once to create configuration directories)
 - **Operating System:** Windows, macOS, or Linux
 
@@ -87,8 +87,9 @@ For contributors or those wanting the latest development version:
 git clone https://github.com/barisgit/kilm.git
 cd kilm
 
-# Install in editable mode with development dependencies
-pip install -e ".[dev]"
+# Install the locked dependencies, then run the CLI from the checkout
+just setup
+uv run kilm --version
 ```
 
 See the [Development Setup](/community/development/) guide for more details.

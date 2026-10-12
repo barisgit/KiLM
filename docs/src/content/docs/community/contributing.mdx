@@ -56,21 +56,14 @@ Include the following information:
    Make your changes following the coding standards below.
 
 5. **Quality Checks**
-   
-   Run the complete quality pipeline:
+
+   Run everything CI runs; it never modifies files:
+
    ```bash
-   # Type checking (required - zero "Any" types)
-   pyrefly
-   
-   # Code formatting
-   ruff format .
-   
-   # Linting
-   ruff check --fix .
-   
-   # Tests with coverage
-   pytest --cov=kicad_lib_manager
+   just check
    ```
+
+   `just fix` formats the code and applies safe lint fixes.
 
 6. **Commit Changes**
    
@@ -97,27 +90,16 @@ Include the following information:
 
 ## Coding Standards
 
-### Type Safety (Mandatory)
-- **Complete type hints**: All functions must have proper type annotations
-- **Zero "Any" types**: Use specific types, protocols, or generics instead
-- **Type checking**: Code must pass `pyrefly` type checking without errors
+The full standards, project layout, and release process are in
+[AGENTS.md](https://github.com/barisgit/KiLM/blob/main/AGENTS.md). In short:
 
-### Code Quality
-- **Professional standards**: No emojis in code, comments, or output
-- **No hardcoding**: Use constants, configuration, or environment variables
-- **Cross-platform**: Use `pathlib.Path` for all file operations
-- **Error handling**: Consistent error patterns with informative messages
-
-### Testing Requirements
-- **New features**: Must include corresponding tests
-- **Bug fixes**: Add regression tests where applicable
-- **Coverage**: Aim for high test coverage of new code
-- **Integration tests**: Test KiCad integration where possible
-
-### Documentation
-- **Docstrings**: Use clear, concise docstrings for public functions
-- **Comments**: Explain complex logic, not obvious operations
-- **User-facing changes**: Update relevant documentation files
+- **Types**: complete type hints with no `Any`; the `ty` type checker must pass.
+- **Gates**: never weaken a ruff rule or threshold to pass a check. Every
+  suppression names its rule and states its reason.
+- **Code**: no emojis in code, comments, or output; `pathlib.Path` for paths;
+  identical behavior on Windows, macOS, and Linux.
+- **Tests**: a test with each feature, and a failing test first with each bug fix.
+- **Docs**: update the command's collocated `docs.mdx` when behavior changes.
 
 ## Code Review Process
 
@@ -129,7 +111,7 @@ All Pull Requests undergo review for:
 - **Documentation**: Clear and up-to-date
 
 <Aside type="tip">
-Running the quality checks locally before submitting saves time during review. Use the development tools outlined in the [Development Setup](/community/development/) guide.
+Running `just check` before you push saves a review round: CI runs the same command.
 </Aside>
 
 ## Getting Help
