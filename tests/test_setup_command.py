@@ -1,6 +1,7 @@
 """Tests for ``kilm setup`` against a temporary KiCad configuration."""
 
 import io
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -28,9 +29,7 @@ def kicad_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setattr(
-        setup_command, "find_environment_variables", lambda _name: None
-    )
+    monkeypatch.setattr(setup_command, "find_environment_variables", lambda _name: None)
     config = tmp_path / "kicad"
     config.mkdir()
     (config / "sym-lib-table").write_text(EMPTY_SYM_TABLE, encoding="utf-8")
@@ -109,3 +108,25 @@ def test_fix_invalid_uris_keeps_the_table_when_writing_fails(
         setup_command.fix_invalid_uris(kicad_config, backup_first=False)
 
     assert table.read_text(encoding="utf-8") == INVALID_URI_TABLE
+
+
+def test_setup_keeps_max_backups_when_pinning(
+    kicad_config: Path, library: Path
+) -> None:
+    """Pinning prunes ``kicad_common.json`` backups to ``--max-backups``."""
+    kicad_common = kicad_config / "kicad_common.json"
+    current_vars = {"KICAD_USER_LIB": library.as_posix()}
+    kicad_common.write_text(
+        json.dumps({"environment": {"vars": current_vars}}), encoding="utf-8"
+    )
+    for second in range(3):
+        old_backup = kicad_config / f"kicad_common.json.backup.20000101_00000{second}"
+        old_backup.write_text("{}", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app, ["setup", "--kicad-lib-dir", str(library), "--max-backups", "1"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Pinned 1 symbol and 1 footprint libraries" in result.output
+    assert len(list(kicad_config.glob("kicad_common.json.backup.*"))) == 1

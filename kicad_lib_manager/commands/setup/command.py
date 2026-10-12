@@ -564,6 +564,7 @@ def setup(
                     symbol_libs=symbol_libs,
                     footprint_libs=footprint_libs,
                     dry_run=dry_run,
+                    max_backups=max_backups,
                 )
 
                 if pinned_changes_needed:
