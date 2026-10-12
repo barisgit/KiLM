@@ -3,7 +3,7 @@ Tests for the update service functionality including installation detection and 
 """
 
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import Mock, patch
 
 import pytest
@@ -83,6 +83,23 @@ class TestInstallationDetection:
         )
         assert detector.detect_uv() is True
         assert detector.detect() == "uv"
+
+    @pytest.mark.parametrize(
+        ("executable", "expected"),
+        [
+            (r"C:\Users\user\pipx\venvs\kilm\Scripts\python.exe", "pipx"),
+            (
+                r"C:\Users\user\AppData\Roaming\uv\tools\kilm\Scripts\python.exe",
+                "uv",
+            ),
+        ],
+    )
+    def test_detect_windows_path_patterns(self, executable: str, expected: str) -> None:
+        """Path patterns match Windows executables with backslash separators."""
+        detector = InstallationDetector(
+            executable_path=PureWindowsPath(executable), platform_name="nt"
+        )
+        assert detector.detect() == expected
 
     def test_detect_pip_venv_installation_env_var(self, monkeypatch):
         """Test detection of pip in virtual environment via VIRTUAL_ENV."""
