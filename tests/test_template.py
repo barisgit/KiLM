@@ -1,336 +1,225 @@
-"""Tests for template utilities and commands."""
+"""Tests for the template utilities."""
 
 import json
-import shutil
-import tempfile
+from collections.abc import Sequence
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-import yaml
 
-from kicad_lib_manager.utils.template import (
+from kicad_lib_manager.utils.constants import (
     HOOKS_DIR,
-    POST_CREATE_HOOK,
     TEMPLATE_CONTENT_DIR,
-    TEMPLATE_METADATA,
     TEMPLATES_DIR,
-    create_project_from_template,
+)
+from kicad_lib_manager.utils.template.authoring import (
     create_template_metadata,
     create_template_structure,
+)
+from kicad_lib_manager.utils.template.constants import POST_CREATE_HOOK
+from kicad_lib_manager.utils.template.discovery import (
+    ConfiguredLibrary,
     find_all_templates,
-    find_potential_variables,
+)
+from kicad_lib_manager.utils.template.models import (
+    DiscoveredTemplate,
+    TemplateMetadata,
+    read_template_metadata,
+    write_template_metadata,
+)
+from kicad_lib_manager.utils.template.project import create_project_from_template
+from kicad_lib_manager.utils.template.rendering import (
     render_filename,
     render_filename_custom,
     render_template_file,
     render_template_string,
-    write_template_metadata,
 )
+from kicad_lib_manager.utils.template.selection import find_potential_variables
+
+PROJECT = {"project_name": "MyProject"}
+SPACED_PROJECT = {"project_name": "My Project"}
 
 
-class TestTemplateUtils:
-    """Tests for template utility functions."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.templates_dir = Path(self.temp_dir) / TEMPLATES_DIR
-        self.templates_dir.mkdir(exist_ok=True)
-
-    def teardown_method(self):
-        """Clean up test environment."""
-        shutil.rmtree(self.temp_dir)
-
-    def test_render_template_string(self):
-        """Test rendering a template string."""
-        template_str = "Hello, {{ name }}!"
-        variables = {"name": "World"}
-        result = render_template_string(template_str, variables)
-        assert result == "Hello, World!"
-
-    def test_render_filename(self):
-        """Test rendering a filename with variables."""
-        filename = "{{ project_name }}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename(filename, variables)
-        assert result == "MyProject.kicad_pro"
-
-    def test_render_filename_no_variables(self):
-        """Test rendering a filename with no variables."""
-        filename = "project.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename(filename, variables)
-        assert result == "project.kicad_pro"
-
-    def test_render_filename_custom_basic(self):
-        """Test basic custom filename rendering."""
-        filename = "%{project_name}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename_custom(filename, variables)
-        assert result == "MyProject.kicad_pro"
-
-    def test_render_filename_custom_lower(self):
-        """Test custom filename rendering with lower transformation."""
-        filename = "%{project_name.lower}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename_custom(filename, variables)
-        assert result == "myproject.kicad_pro"
-
-    def test_render_filename_custom_upper(self):
-        """Test custom filename rendering with upper transformation."""
-        filename = "%{project_name.upper}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename_custom(filename, variables)
-        assert result == "MYPROJECT.kicad_pro"
-
-    def test_render_filename_custom_replace(self):
-        """Test custom filename rendering with replace transformation."""
-        filename = "%{project_name.replace(' ', '-')}.kicad_pro"
-        variables = {"project_name": "My Project"}
-        result = render_filename_custom(filename, variables)
-        assert result == "My-Project.kicad_pro"
-
-    def test_render_filename_custom_chained(self):
-        """Test custom filename rendering with chained transformations."""
-        filename = "%{project_name.replace(' ', '-').lower}.kicad_pro"
-        variables = {"project_name": "My Project"}
-        result = render_filename_custom(filename, variables)
-        assert result == "my-project.kicad_pro"
-
-    def test_render_filename_custom_replace_quotes(self):
-        """Test custom filename rendering with quoted replace arguments."""
-        filename = "%{project_name.replace(' ', '_')}.kicad_pro"
-        variables = {"project_name": "My Project"}
-        result = render_filename_custom(filename, variables)
-        assert result == "My_Project.kicad_pro"
-
-    def test_render_filename_custom_missing_variable(self):
-        """Test custom filename rendering with missing variable."""
-        filename = "%{missing_var}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename_custom(filename, variables)
-        # Should return original when variable is missing
-        assert result == "%{missing_var}.kicad_pro"
-
-    def test_render_filename_fallback_to_jinja(self):
-        """Test that render_filename falls back to Jinja2 for backward compatibility."""
-        filename = "{{ project_name }}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename(filename, variables)
-        assert result == "MyProject.kicad_pro"
-
-    def test_render_filename_custom_priority(self):
-        """Test that custom syntax takes priority over Jinja2."""
-        filename = "%{project_name}.kicad_pro"
-        variables = {"project_name": "MyProject"}
-        result = render_filename(filename, variables)
-        assert result == "MyProject.kicad_pro"
-
-    def test_create_project_template_structure(self):
-        """Test creating a template structure."""
-        # Create a template directory
-        template_name = "test-template"
-        template_dir = self.templates_dir / template_name
-        template_dir.mkdir(exist_ok=True)
-
-        # Create template metadata
-        metadata = create_template_metadata(
-            name=template_name,
-            description="Test template",
-            use_case="For testing",
-            variables={
-                "project_name": {
-                    "description": "Project name",
-                    "default": "TestProject",
-                }
-            },
-        )
-
-        # Write metadata
-        write_template_metadata(template_dir, metadata)
-
-        # Check that metadata was written
-        metadata_file = template_dir / TEMPLATE_METADATA
-        assert metadata_file.exists()
-
-        # Read back metadata
-        with Path(metadata_file).open() as f:
-            read_metadata = yaml.safe_load(f)
-
-        # Check metadata contents
-        assert read_metadata is not None
-        assert read_metadata["name"] == template_name
-        assert read_metadata["description"] == "Test template"
-        assert read_metadata["use_case"] == "For testing"
-        assert "project_name" in read_metadata["variables"]
-
-    def test_render_template_file(self):
-        """Test rendering a template file."""
-        # Create a template file
-        template_dir = Path(self.temp_dir) / "template_files"
-        template_dir.mkdir(exist_ok=True)
-
-        template_file = template_dir / "test.txt.jinja2"
-        with Path(template_file).open("w") as f:
-            f.write("Hello, {{ name }}!")
-
-        # Render the template file
-        target_dir = Path(self.temp_dir) / "target"
-        target_dir.mkdir(exist_ok=True)
-
-        target_file = target_dir / "test.txt"
-
-        variables = {"name": "World"}
-
-        success = render_template_file(
-            source_file=template_file, target_file=target_file, variables=variables
-        )
-
-        assert success
-        assert target_file.exists()
-
-        # Check contents
-        with Path(target_file).open() as f:
-            content = f.read()
-
-        assert content == "Hello, World!"
+def test_render_template_string() -> None:
+    """Jinja2 placeholders are filled from the variables."""
+    assert render_template_string("Hello, {{ name }}!", {"name": "World"}) == (
+        "Hello, World!"
+    )
 
 
-class TestTemplateCreation:
-    """Tests for template creation functionality."""
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("{{ project_name }}.kicad_pro", "MyProject.kicad_pro"),
+        ("%{project_name}.kicad_pro", "MyProject.kicad_pro"),
+        ("project.kicad_pro", "project.kicad_pro"),
+    ],
+)
+def test_render_filename(filename: str, expected: str) -> None:
+    """Both placeholder syntaxes render; plain names stay unchanged."""
+    assert render_filename(filename, PROJECT) == expected
 
-    def setup_method(self):
-        """Set up test environment."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.template_dir = Path(self.temp_dir) / "template"
-        self.template_content_dir = self.template_dir / TEMPLATE_CONTENT_DIR
-        self.hooks_dir = self.template_dir / HOOKS_DIR
 
-        # Create template structure
-        self.template_dir.mkdir(exist_ok=True)
-        self.template_content_dir.mkdir(exist_ok=True)
-        self.hooks_dir.mkdir(exist_ok=True)
+@pytest.mark.parametrize(
+    ("filename", "variables", "expected"),
+    [
+        ("%{project_name}.kicad_pro", PROJECT, "MyProject.kicad_pro"),
+        ("%{project_name.lower}.kicad_pro", PROJECT, "myproject.kicad_pro"),
+        ("%{project_name.upper}.kicad_pro", PROJECT, "MYPROJECT.kicad_pro"),
+        (
+            "%{project_name.replace(' ', '-')}.kicad_pro",
+            SPACED_PROJECT,
+            "My-Project.kicad_pro",
+        ),
+        (
+            "%{project_name.replace(' ', '_')}.kicad_pro",
+            SPACED_PROJECT,
+            "My_Project.kicad_pro",
+        ),
+        (
+            "%{project_name.replace(' ', '-').lower}.kicad_pro",
+            SPACED_PROJECT,
+            "my-project.kicad_pro",
+        ),
+        ("%{missing_var}.kicad_pro", PROJECT, "%{missing_var}.kicad_pro"),
+    ],
+)
+def test_render_filename_custom(
+    filename: str, variables: dict[str, str], expected: str
+) -> None:
+    """Transformations apply in order; unknown variables stay as written."""
+    assert render_filename_custom(filename, variables) == expected
 
-        # Create metadata
-        metadata = {
-            "name": "test-template",
-            "description": "Test template",
-            "use_case": "For testing",
-            "variables": {
-                "project_name": {
-                    "description": "Project name",
-                    "default": "TestProject",
-                },
-                "directory_name": {
-                    "description": "Directory name",
-                    "default": "{{ project_name.lower.replace(' ', '-') }}",
-                },
-            },
-        }
 
-        # Write metadata
-        with Path(self.template_dir / TEMPLATE_METADATA).open("w") as f:
-            yaml.dump(metadata, f)
+def test_template_metadata_round_trip(tmp_path: Path) -> None:
+    """Written metadata reads back with the predefined variables added."""
+    metadata = create_template_metadata(
+        name="test-template",
+        description="Test template",
+        use_case="For testing",
+        variables={"author": {"description": "Author", "default": "Jane"}},
+    )
+    write_template_metadata(tmp_path, metadata)
 
-        # Create post-creation hook
-        with Path(self.hooks_dir / POST_CREATE_HOOK).open("w") as f:
-            f.write("""
-def post_create(context):
-    print(f"Project created successfully: {context['variables']['project_name']}")
-""")
+    read_back = read_template_metadata(tmp_path)
 
-        # Create template files
-        test_file = self.template_content_dir / "README.md.jinja2"
-        with Path(test_file).open("w") as f:
-            f.write("# {{ project_name }}\n\nThis is a test project.")
+    assert read_back == metadata
+    assert list(metadata.get("variables", {})) == [
+        "author",
+        "project_name",
+        "directory_name",
+        "project_filename",
+    ]
 
-        template_file = self.template_content_dir / "{{ project_name }}.txt.jinja2"
-        with Path(template_file).open("w") as f:
-            f.write("Hello from {{ project_name }}!")
 
-    def teardown_method(self):
-        """Clean up test environment."""
-        shutil.rmtree(self.temp_dir)
+def test_render_template_file(tmp_path: Path) -> None:
+    """A template file renders into its target."""
+    source = tmp_path / "test.txt.jinja2"
+    source.write_text("Hello, {{ name }}!", encoding="utf-8")
+    target = tmp_path / "target" / "test.txt"
 
-    def test_create_project_from_template(self):
-        """Test creating a project from a template."""
-        project_dir = Path(self.temp_dir) / "project"
+    assert render_template_file(source, target, {"name": "World"})
+    assert target.read_text(encoding="utf-8") == "Hello, World!"
 
-        variables = {"project_name": "MyProject", "directory_name": "my-project"}
 
-        # Mock the post-creation hook to avoid runtime errors
-        with patch("kicad_lib_manager.utils.template.run_post_create_hook"):
-            success = create_project_from_template(
-                template_dir=self.template_dir,
-                project_dir=project_dir,
-                variables=variables,
-                dry_run=False,
-                skip_hooks=False,
-            )
+def test_rendered_files_keep_markup_characters(tmp_path: Path) -> None:
+    """Variables are inserted verbatim, not HTML-escaped."""
+    source = tmp_path / "title.txt.jinja2"
+    source.write_text("{{ project_name }}", encoding="utf-8")
+    target = tmp_path / "title.txt"
 
-        assert success
+    render_template_file(source, target, {"project_name": "R&D <1>"})
 
-        # Check that files were created
-        assert (project_dir / "README.md").exists()
-        assert (project_dir / "MyProject.txt").exists()
+    assert target.read_text(encoding="utf-8") == "R&D <1>"
 
-        # Check contents
-        with Path(project_dir / "README.md").open() as f:
-            content = f.read()
 
-        assert content == "# MyProject\n\nThis is a test project."
+def _discovered(template_dir: Path, metadata: TemplateMetadata) -> DiscoveredTemplate:
+    return DiscoveredTemplate(
+        **metadata,
+        path=str(template_dir),
+        source_library="library",
+        library_path=str(template_dir.parent),
+    )
 
-        with Path(project_dir / "MyProject.txt").open() as f:
-            content = f.read()
 
-        assert content == "Hello from MyProject!"
+@pytest.fixture
+def template(tmp_path: Path) -> DiscoveredTemplate:
+    """A template with a rendered README, a renamed file, and a recording hook."""
+    template_dir = tmp_path / "template"
+    content_dir = template_dir / TEMPLATE_CONTENT_DIR
+    content_dir.mkdir(parents=True)
+    (content_dir / "README.md.jinja2").write_text(
+        "# {{ project_name }}\n\nThis is a test project.", encoding="utf-8"
+    )
+    (content_dir / "{{ project_name }}.txt.jinja2").write_text(
+        "Hello from {{ project_name }}!", encoding="utf-8"
+    )
+    (template_dir / HOOKS_DIR).mkdir()
+    (template_dir / HOOKS_DIR / POST_CREATE_HOOK).write_text(
+        "from pathlib import Path\n\n\ndef post_create(context):\n"
+        "    name = context['variables']['project_name']\n"
+        "    Path(context['project_dir'], 'hook.txt').write_text(name)\n",
+        encoding="utf-8",
+    )
+    return _discovered(template_dir, create_template_metadata("test-template"))
 
-    def test_create_project_dry_run(self):
-        """Test dry run of project creation."""
-        project_dir = Path(self.temp_dir) / "project_dry_run"
 
-        variables = {"project_name": "MyProject", "directory_name": "my-project"}
+def test_create_project_from_template(
+    template: DiscoveredTemplate, tmp_path: Path
+) -> None:
+    """Files render with the variables and the hook runs in the new project."""
+    project_dir = tmp_path / "project"
 
-        # Create project with dry run
-        success = create_project_from_template(
-            template_dir=self.template_dir,
-            project_dir=project_dir,
-            variables=variables,
-            dry_run=True,
-            skip_hooks=True,
-        )
+    assert create_project_from_template(template, project_dir, PROJECT)
 
-        assert success
+    assert sorted(path.name for path in project_dir.iterdir()) == [
+        "MyProject.txt",
+        "README.md",
+        "hook.txt",
+    ]
+    readme = (project_dir / "README.md").read_text(encoding="utf-8")
+    assert readme == "# MyProject\n\nThis is a test project."
+    text = (project_dir / "MyProject.txt").read_text(encoding="utf-8")
+    assert text == "Hello from MyProject!"
+    assert (project_dir / "hook.txt").read_text(encoding="utf-8") == "MyProject"
 
-        # Check that files were NOT created
-        assert not project_dir.exists()
+
+def test_create_project_dry_run_writes_nothing(
+    template: DiscoveredTemplate, tmp_path: Path
+) -> None:
+    """A dry run succeeds without creating the project directory."""
+    project_dir = tmp_path / "project"
+
+    assert create_project_from_template(template, project_dir, PROJECT, dry_run=True)
+    assert not project_dir.exists()
 
 
 class _LibraryConfig:
     """Config stand-in exposing only the libraries find_all_templates reads."""
 
-    def __init__(self, libraries: list[dict[str, str]]) -> None:
+    def __init__(self, libraries: list[ConfiguredLibrary]) -> None:
         self._libraries = libraries
 
-    def get_libraries(self) -> list[dict[str, str]]:
+    def get_libraries(self) -> Sequence[ConfiguredLibrary]:
         return self._libraries
 
 
 def test_find_all_templates_keeps_first_duplicate(tmp_path: Path) -> None:
     """The first configured library wins a template name clash."""
-    libraries = []
+    libraries: list[ConfiguredLibrary] = []
     for library_name in ("first", "second"):
         template_dir = tmp_path / library_name / TEMPLATES_DIR / "board"
         template_dir.mkdir(parents=True)
         write_template_metadata(
             template_dir, create_template_metadata("board", description=library_name)
         )
-        libraries.append({"name": library_name, "path": str(tmp_path / library_name)})
+        libraries.append(
+            ConfiguredLibrary(name=library_name, path=str(tmp_path / library_name))
+        )
 
     templates = find_all_templates(_LibraryConfig(libraries))
 
     board = templates["board"]
-    assert board["description"] == "first"
+    assert board.get("description") == "first"
     assert board["source_library"] == "first"
     assert board["library_path"] == str(tmp_path / "first")
 
@@ -339,15 +228,22 @@ def test_main_kicad_files_are_named_after_the_new_project(tmp_path: Path) -> Non
     """The main project, schematic, and PCB take the project_filename variable."""
     source = tmp_path / "source"
     source.mkdir()
-    (source / "Board.kicad_pro").write_text('{"meta": {"filename": "Board.kicad_pro"}}')
-    (source / "Board.kicad_sch").write_text('(kicad_sch (project "Board"))')
-    (source / "Board.kicad_pcb").write_text('(kicad_pcb (sheetfile "Board.kicad_sch"))')
+    (source / "Board.kicad_pro").write_text(
+        '{"meta": {"filename": "Board.kicad_pro"}}', encoding="utf-8"
+    )
+    (source / "Board.kicad_sch").write_text(
+        '(kicad_sch (project "Board"))', encoding="utf-8"
+    )
+    (source / "Board.kicad_pcb").write_text(
+        '(kicad_pcb (sheetfile "Board.kicad_sch"))', encoding="utf-8"
+    )
     template_dir = tmp_path / "template"
-    create_template_structure(source, template_dir, create_template_metadata("tpl"))
+    metadata = create_template_metadata("tpl")
+    create_template_structure(source, template_dir, metadata)
     project = tmp_path / "project"
 
     create_project_from_template(
-        template_dir,
+        _discovered(template_dir, metadata),
         project,
         {"project_name": "Widget", "project_filename": "Widget"},
         skip_hooks=True,
@@ -360,26 +256,18 @@ def test_main_kicad_files_are_named_after_the_new_project(tmp_path: Path) -> Non
     ]
     project_file = json.loads((project / "Widget.kicad_pro").read_text())
     assert project_file["meta"]["filename"] == "Widget.kicad_pro"
-    assert '(project "Widget")' in (project / "Widget.kicad_sch").read_text()
-    assert '(sheetfile "Widget.kicad_sch")' in (project / "Widget.kicad_pcb").read_text()
+    schematic = (project / "Widget.kicad_sch").read_text(encoding="utf-8")
+    assert '(project "Widget")' in schematic
+    pcb = (project / "Widget.kicad_pcb").read_text(encoding="utf-8")
+    assert '(sheetfile "Widget.kicad_sch")' in pcb
 
-def test_rendered_files_keep_markup_characters(tmp_path: Path) -> None:
-    """Variables are inserted verbatim, not HTML-escaped."""
-    source = tmp_path / "title.txt.jinja2"
-    source.write_text("{{ project_name }}")
-    target = tmp_path / "title.txt"
-
-    render_template_file(source, target, {"project_name": "R&D <1>"})
-
-    assert target.read_text() == "R&D <1>"
 
 def test_variable_scan_skips_directories_make_does_not_copy(tmp_path: Path) -> None:
     """Dependencies and VCS data do not contribute variable suggestions."""
     (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
-    (tmp_path / "node_modules" / "pkg" / "index.js").write_text('author = "Someone"')
-    (tmp_path / "notes.txt").write_text('author = "Jane"')
+    (tmp_path / "node_modules" / "pkg" / "index.js").write_text(
+        'author = "Someone"', encoding="utf-8"
+    )
+    (tmp_path / "notes.txt").write_text('author = "Jane"', encoding="utf-8")
 
     assert find_potential_variables(tmp_path) == {"jane": ["Jane"]}
-
-if __name__ == "__main__":
-    pytest.main()

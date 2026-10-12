@@ -101,9 +101,11 @@ def test_create_uses_template_from_requested_library(
 
 
 def test_list_filters_library_before_resolving_name_clashes(home: Path) -> None:
-    """--library lists that library's template even when an earlier one shares its name."""
+    """--library lists its template even when an earlier library shares the name."""
     for library_name in ("first", "second"):
-        add_template(add_library(home, library_name), "board", {}, description=library_name)
+        add_template(
+            add_library(home, library_name), "board", {}, description=library_name
+        )
 
     templates = json.loads(invoke("list", "--library", "second", "--json"))
 
@@ -119,7 +121,7 @@ def test_create_renders_percent_syntax_defaults(
     class AcceptDefault:
         def __init__(self, message: str, default: str) -> None:
             self.answer = default
-            offered[message.split()[0]] = default
+            offered[message.split(maxsplit=1)[0]] = default
 
         def ask(self) -> str:
             return self.answer
