@@ -76,7 +76,7 @@ def list_templates(
             " <template_name>\n"
             "[cyan]Verbose:[/cyan] kilm template list --verbose\n"
             "[cyan]Filter:[/cyan] kilm template list --library <library_name>",
-            title="[bold blue]💡 Quick Tips[/bold blue]",
+            title="[bold blue]Quick Tips[/bold blue]",
             border_style="blue",
         )
     )
@@ -84,7 +84,7 @@ def list_templates(
         Panel(
             f"[green]Libraries:[/green] {len(by_library)}\n"
             f"[green]Templates:[/green] {len(templates)}",
-            title="[bold cyan]📊 Summary[/bold cyan]",
+            title="[bold cyan]Summary[/bold cyan]",
             border_style="cyan",
             width=30,
         )
@@ -98,21 +98,20 @@ def _print_no_templates(library: str | None) -> None:
         panel = Panel(
             f"[yellow]No templates found in library '[cyan]{library}[/cyan]'."
             "[/yellow]\n\n"
-            "[cyan]💡 Try:[/cyan]\n"
+            "[cyan]Try:[/cyan]\n"
             "• List all libraries: [blue]kilm list-libraries[/blue]\n"
-            f"• Create template in '{library}': [blue]kilm template make"
-            f" --library {library}[/blue]\n"
+            "• Create a template: [blue]kilm template make[/blue]\n"
             "• List all templates: [blue]kilm template list[/blue]",
-            title="[bold yellow]⚠️ No Templates Found[/bold yellow]",
+            title="[bold yellow]No Templates Found[/bold yellow]",
             border_style="yellow",
         )
     else:
         panel = Panel(
             "[yellow]No templates found in any configured libraries.[/yellow]\n\n"
-            "[cyan]💡 Get Started:[/cyan]\n"
+            "[cyan]Get Started:[/cyan]\n"
             "• Create a template: [blue]kilm template make[/blue]\n"
             "• Check library configuration: [blue]kilm list-libraries[/blue]",
-            title="[bold yellow]⚠️ No Templates[/bold yellow]",
+            title="[bold yellow]No Templates[/bold yellow]",
             border_style="yellow",
         )
     get_console().print(panel)
