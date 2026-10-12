@@ -30,7 +30,7 @@ kilm config list [OPTIONS]
     _Example:_ `kilm config list --type github`
 
 - `-v, --verbose`:
-  Displays more detailed information about each library, reading from both `config.yaml` and the library's metadata file (`kilm.yaml` or `.kilm_cloud_metadata`). Shows path, description, version, environment variable, capabilities/model count, etc.
+  Displays more detailed information about each library, reading from both `config.yaml` and the library's metadata file (`kilm.yaml` or `.kilm_metadata`). Shows path, description, version, environment variable, and the library's features (symbols, footprints, templates) or 3D model count. Without a stated model count, the `.step`, `.stp`, `.wrl`, and `.wings` files are counted.
   _Example:_ `kilm config list --verbose`
 
 - `--help`:

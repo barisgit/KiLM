@@ -1,199 +1,260 @@
-"""Tests for KiCad Library Manager config commands."""
+"""Tests for the `kilm config` commands."""
+
+from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+import yaml
+from typer.testing import CliRunner, Result
 
-from kicad_lib_manager.main import app as main
+from kicad_lib_manager.commands.config import command, config_app
 from kicad_lib_manager.services.config_service import Config, LibraryDict
-
-# Sample test data
-TEST_LIBRARIES: list[LibraryDict] = [
-    LibraryDict(name="test-github-lib", path="/path/to/github/library", type="github"),
-    LibraryDict(name="test-cloud-lib", path="/path/to/cloud/library", type="cloud"),
-]
+from kicad_lib_manager.utils.constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 
 @pytest.fixture
-def mock_config(monkeypatch):
-    """Create a mock config for testing."""
-    config = Config()
-
-    # Mock the _load_config method to not actually load from disk
-    def mock_load_config():
-        config._config = {
-            "max_backups": 5,
-            "libraries": TEST_LIBRARIES.copy(),
-            "current_library": TEST_LIBRARIES[0]["path"],
-        }
-
-    monkeypatch.setattr(config, "_load_config", mock_load_config)
-
-    # Mock the save method to not actually write to disk
-    monkeypatch.setattr(config, "save", lambda: None)
-
-    # Return the config
-    config._load_config()
-    return config
+def libraries(tmp_path: Path) -> list[LibraryDict]:
+    """A GitHub and a cloud library whose directories exist."""
+    github = tmp_path / "github-lib"
+    cloud = tmp_path / "cloud-lib"
+    github.mkdir()
+    cloud.mkdir()
+    return [
+        LibraryDict(name="test-github-lib", path=str(github), type="github"),
+        LibraryDict(name="test-cloud-lib", path=str(cloud), type="cloud"),
+    ]
 
 
 @pytest.fixture
-def mock_config_class(monkeypatch, mock_config):
-    """Mock the Config class to return our mock config."""
+def config_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, libraries: list[LibraryDict]
+) -> Path:
+    """A configuration with both libraries, the GitHub one as default.
+
+    The commands load it instead of the user's configuration.
+    """
+    path = tmp_path / "config.yaml"
+    settings = {"libraries": libraries, "current_library": libraries[0]["path"]}
+    path.write_text(yaml.dump(settings), encoding="utf-8")
     monkeypatch.setattr(
-        "kicad_lib_manager.commands.config.command.Config", lambda: mock_config
+        command, "Config", lambda: Config(config_file=path, cache_dir=tmp_path)
     )
-    return mock_config
+    return path
 
 
-def test_config_list(mock_config_class):
-    """Test the 'kilm config list' command."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "list"])
-
-    assert result.exit_code == 0
-    assert "GitHub Libraries" in result.output
-    assert "Cloud Libraries" in result.output
-    assert "test-github-lib" in result.output
-    assert "test-cloud-lib" in result.output
-    assert "✓ Current" in result.output  # Current library should be marked
+def stored(config_file: Path) -> Config:
+    """The configuration as currently saved."""
+    return Config(config_file=config_file, cache_dir=config_file.parent)
 
 
-def test_config_list_verbose(mock_config_class):
-    """Test the 'kilm config list --verbose' command."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "list", "--verbose"])
+def invoke(*args: str, user_input: str | None = None) -> Result:
+    """Run `kilm config` with args."""
+    return CliRunner().invoke(config_app, list(args), input=user_input)
+
+
+@pytest.mark.usefixtures("config_file")
+def test_list_shows_both_types_and_the_default() -> None:
+    """The table lists each type and marks the default library."""
+    result = invoke("list")
 
     assert result.exit_code == 0
     assert "GitHub Libraries" in result.output
     assert "Cloud Libraries" in result.output
     assert "test-github-lib" in result.output
     assert "test-cloud-lib" in result.output
-    assert "✓ CURRENT" in result.output
+    assert "Current" in result.output
+    assert "GitHub: 1  Cloud: 1" in result.output
 
 
-def test_config_list_filtered(mock_config_class):
-    """Test the 'kilm config list --type github' command."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "list", "--type", "github"])
+@pytest.mark.usefixtures("config_file")
+def test_list_verbose_shows_metadata(libraries: list[LibraryDict]) -> None:
+    """Verbose panels show stored metadata, or count models without it."""
+    github = Path(libraries[0]["path"])
+    (github / GITHUB_METADATA_FILE).write_text(
+        yaml.dump(
+            {
+                "description": "Company parts",
+                "version": "1.2.0",
+                "capabilities": {"symbols": True, "footprints": False},
+            }
+        ),
+        encoding="utf-8",
+    )
+    cloud = Path(libraries[1]["path"])
+    (cloud / "sub").mkdir()
+    (cloud / "sub" / "part.step").touch()
+    (cloud / "part.wrl").touch()
+    (cloud / "notes.txt").touch()
+
+    result = invoke("list", "--verbose")
 
     assert result.exit_code == 0
-    assert "GitHub Libraries" in result.output
+    assert "CURRENT" in result.output
+    assert "Description: Company parts" in result.output
+    assert "Version: 1.2.0" in result.output
+    assert "Features: Symbols" in result.output
+    assert f"No {CLOUD_METADATA_FILE} metadata file found" in result.output
+    assert "3D Models: 2 (counted)" in result.output
+
+
+@pytest.mark.usefixtures("config_file")
+def test_list_filtered_by_type() -> None:
+    """--type shows only libraries of that type."""
+    result = invoke("list", "--type", "github")
+
+    assert result.exit_code == 0
     assert "test-github-lib" in result.output
     assert "Cloud Libraries" not in result.output
     assert "test-cloud-lib" not in result.output
 
 
 @pytest.mark.parametrize(
-    ("library_type", "message", "hint"),
+    ("library_type", "removed", "message", "hint"),
     [
-        ("github", "No GitHub libraries configured", "kilm init"),
-        ("cloud", "No cloud libraries configured", "kilm add-3d"),
+        ("github", "test-github-lib", "No GitHub libraries configured", "kilm init"),
+        ("cloud", "test-cloud-lib", "No cloud libraries configured", "kilm add-3d"),
     ],
 )
-def test_config_list_type_without_libraries(
-    mock_config_class, library_type, message, hint
-):
+def test_list_type_without_libraries(
+    config_file: Path, library_type: str, removed: str, message: str, hint: str
+) -> None:
     """A type filter without matches names that type and how to add one."""
-    mock_config_class.remove_library(
-        "test-github-lib" if library_type == "github" else "test-cloud-lib"
-    )
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "list", "--type", library_type])
+    stored(config_file).remove_library(removed)
+
+    result = invoke("list", "--type", library_type)
 
     assert result.exit_code == 0
     assert message in result.output
     assert hint in result.output
 
 
-def test_config_set_default(mock_config_class):
-    """Test the 'kilm config set-default' command."""
-    runner = CliRunner()
-    result = runner.invoke(
-        main, ["config", "set-default", "test-cloud-lib", "--type", "cloud"]
-    )
+def test_list_without_libraries(config_file: Path) -> None:
+    """Without any library the list explains how to add one."""
+    config = stored(config_file)
+    config.remove_library("test-github-lib")
+    config.remove_library("test-cloud-lib")
+
+    result = invoke("list")
+
+    assert result.exit_code == 0
+    assert "No libraries configured" in result.output
+
+
+def test_set_default_by_name(config_file: Path, libraries: list[LibraryDict]) -> None:
+    """A named library of the given type becomes the saved default."""
+    result = invoke("set-default", "test-cloud-lib", "--type", "cloud")
 
     assert result.exit_code == 0
     assert "Set cloud library 'test-cloud-lib' as default" in result.output
-    assert mock_config_class.get_current_library() == TEST_LIBRARIES[1]["path"]
+    assert stored(config_file).get_current_library() == libraries[1]["path"]
 
 
-def test_config_set_default_interactive(mock_config_class):
-    """Test the interactive 'kilm config set-default' command."""
-    runner = CliRunner()
-    # Simulate user selecting the cloud library (option 2)
-    result = runner.invoke(
-        main, ["config", "set-default", "--type", "cloud"], input="1\n"
-    )
+@pytest.mark.parametrize(("arguments", "index"), [((), 0), (("--type", "cloud"), 1)])
+def test_set_default_prompts_without_name(
+    config_file: Path,
+    libraries: list[LibraryDict],
+    arguments: tuple[str, ...],
+    index: int,
+) -> None:
+    """Without a name the libraries of the type are numbered and one is picked."""
+    library = libraries[index]
 
-    assert result.exit_code == 0
-    assert "Available cloud libraries:" in result.output
-    assert "1. test-cloud-lib" in result.output
-    assert "Set cloud library 'test-cloud-lib' as default" in result.output
-    assert mock_config_class.get_current_library() == TEST_LIBRARIES[1]["path"]
-
-
-def test_config_set_default_interactive_github(mock_config_class):
-    """Test the interactive 'kilm config set-default' command with GitHub libraries."""
-    runner = CliRunner()
-    # Simulate user selecting the GitHub library (option 1)
-    result = runner.invoke(main, ["config", "set-default"], input="1\n")
+    result = invoke("set-default", *arguments, user_input="5\n1\n")
 
     assert result.exit_code == 0
-    assert "Available github libraries:" in result.output
-    assert "1. test-github-lib" in result.output
-    assert "Set github library 'test-github-lib' as default" in result.output
-    assert mock_config_class.get_current_library() == TEST_LIBRARIES[0]["path"]
+    assert f"Available {library['type']} libraries:" in result.output
+    assert f"1. {library['name']}" in result.output
+    assert "5 is not in the range 1<=x<=1" in result.output
+    assert stored(config_file).get_current_library() == library["path"]
 
 
-def test_config_set_default_not_found(mock_config_class):
-    """Test 'kilm config set-default' with non-existent library."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "set-default", "non-existent-lib"])
+@pytest.mark.usefixtures("config_file")
+def test_set_default_unknown_name() -> None:
+    """An unknown name fails and points to config list."""
+    result = invoke("set-default", "non-existent-lib")
 
-    assert result.exit_code != 0
+    assert result.exit_code == 1
     assert "No github library named 'non-existent-lib' found" in result.output
+    assert "kilm config list" in result.output
 
 
-def test_config_remove(mock_config_class):
-    """Test the 'kilm config remove' command."""
-    runner = CliRunner()
-    # Use --force to bypass confirmation prompt
-    result = runner.invoke(main, ["config", "remove", "test-github-lib", "--force"])
+def test_set_default_without_libraries_of_type(config_file: Path) -> None:
+    """Without libraries of the type the command fails and says how to add one."""
+    stored(config_file).remove_library("test-cloud-lib")
+
+    result = invoke("set-default", "--type", "cloud")
+
+    assert result.exit_code == 1
+    assert "No cloud libraries configured." in result.output
+    assert "kilm add-3d" in result.output
+
+
+def test_remove_with_force(config_file: Path, libraries: list[LibraryDict]) -> None:
+    """--force removes without asking and saves the configuration."""
+    result = invoke("remove", "test-cloud-lib", "--force")
 
     assert result.exit_code == 0
-    assert "Removed library 'test-github-lib'" in result.output
-
-    # Verify the library was removed
-    remaining_libraries = mock_config_class.get_libraries()
-    assert len(remaining_libraries) == 1
-    assert remaining_libraries[0]["name"] == "test-cloud-lib"
+    assert "Removed library 'test-cloud-lib'" in result.output
+    assert "Note:" not in result.output
+    assert stored(config_file).get_libraries() == [libraries[0]]
 
 
-def test_config_remove_default_library_reports_cleared_default(mock_config_class):
+def test_remove_default_library_reports_cleared_default(config_file: Path) -> None:
     """Removing the default library says that no default is set any more."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "remove", "test-github-lib", "--force"])
+    result = invoke("remove", "test-github-lib", "--force")
 
     assert result.exit_code == 0
     assert "no default is set now" in result.output
-    assert mock_config_class.get_current_library() is None
+    assert stored(config_file).get_current_library() is None
 
 
-def test_config_remove_with_confirmation(mock_config_class):
-    """Test 'kilm config remove' with confirmation prompt."""
-    runner = CliRunner()
-    # Simulate user confirming the removal
-    result = runner.invoke(main, ["config", "remove", "test-github-lib"], input="y\n")
+def test_remove_asks_for_confirmation(config_file: Path) -> None:
+    """Without --force the libraries are described and removal needs a yes."""
+    result = invoke("remove", "test-github-lib", user_input="y\n")
 
     assert result.exit_code == 0
     assert "Will remove github library 'test-github-lib'" in result.output
+    assert "This is the current default library" in result.output
     assert "Removed library 'test-github-lib'" in result.output
+    assert len(stored(config_file).get_libraries()) == 1
 
 
-def test_config_remove_not_found(mock_config_class):
-    """Test 'kilm config remove' with non-existent library."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["config", "remove", "non-existent-lib", "--force"])
+def test_remove_cancelled_keeps_library(config_file: Path) -> None:
+    """Declining the confirmation keeps the configuration unchanged."""
+    result = invoke("remove", "test-github-lib", user_input="n\n")
 
-    assert result.exit_code != 0
+    assert result.exit_code == 0
+    assert "Operation cancelled." in result.output
+    assert len(stored(config_file).get_libraries()) == 2
+
+
+def test_remove_only_the_given_type(config_file: Path) -> None:
+    """--type removes one entry of a name registered for both types."""
+    config = stored(config_file)
+    config.add_library("test-github-lib", "/elsewhere", "cloud")
+
+    result = invoke("remove", "test-github-lib", "--type", "cloud", "--force")
+
+    assert result.exit_code == 0
+    assert [library["type"] for library in stored(config_file).get_libraries()] == [
+        "github",
+        "cloud",
+    ]
+
+
+def test_remove_every_type_reports_count(config_file: Path) -> None:
+    """Without --type every entry with the name goes, and the count is given."""
+    stored(config_file).add_library("test-github-lib", "/elsewhere", "cloud")
+
+    result = invoke("remove", "test-github-lib", "--force")
+
+    assert result.exit_code == 0
+    assert "Removed 2 instances of library 'test-github-lib'" in result.output
+
+
+@pytest.mark.usefixtures("config_file")
+def test_remove_unknown_name() -> None:
+    """An unknown name fails and points to config list."""
+    result = invoke("remove", "non-existent-lib", "--force")
+
+    assert result.exit_code == 1
     assert "No library named 'non-existent-lib' found" in result.output

@@ -1,8 +1,9 @@
+"""The `kilm config` command group."""
+
 import typer
 
-from .command import list_config, remove, set_default
+from kicad_lib_manager.commands.config.command import list_config, remove, set_default
 
-# Create Typer app with subcommands
 config_app = typer.Typer(
     name="config",
     help="Manage KiCad Library Manager configuration",
@@ -10,7 +11,6 @@ config_app = typer.Typer(
     no_args_is_help=True,
 )
 
-# Add subcommands
 config_app.command("list", help="List all configured libraries in kilm")(list_config)
 config_app.command("set-default", help="Set a library as the default for operations")(
     set_default
