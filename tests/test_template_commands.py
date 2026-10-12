@@ -198,3 +198,16 @@ def test_make_dry_run_lists_only_files_that_make_copies(
 
     included = [line.strip() for line in output.splitlines() if "+ " in line]
     assert included == ["+ notes.txt"]
+
+
+@pytest.mark.parametrize("library_args", [[], ["--library", "lib"]])
+def test_list_without_templates_suggests_existing_commands(
+    home: Path, library_args: list[str]
+) -> None:
+    """The hints for an empty listing name commands that exist."""
+    add_library(home, "lib")
+
+    output = invoke("list", *library_args)
+
+    assert "kilm list-libraries" not in output
+    assert "kilm config list" in output

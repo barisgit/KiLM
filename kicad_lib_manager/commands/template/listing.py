@@ -99,7 +99,7 @@ def _print_no_templates(library: str | None) -> None:
             f"[yellow]No templates found in library '[cyan]{library}[/cyan]'."
             "[/yellow]\n\n"
             "[cyan]Try:[/cyan]\n"
-            "• List all libraries: [blue]kilm list-libraries[/blue]\n"
+            "• List all libraries: [blue]kilm config list[/blue]\n"
             "• Create a template: [blue]kilm template make[/blue]\n"
             "• List all templates: [blue]kilm template list[/blue]",
             title="[bold yellow]No Templates Found[/bold yellow]",
@@ -110,7 +110,7 @@ def _print_no_templates(library: str | None) -> None:
             "[yellow]No templates found in any configured libraries.[/yellow]\n\n"
             "[cyan]Get Started:[/cyan]\n"
             "• Create a template: [blue]kilm template make[/blue]\n"
-            "• Check library configuration: [blue]kilm list-libraries[/blue]",
+            "• Check library configuration: [blue]kilm config list[/blue]",
             title="[bold yellow]No Templates[/bold yellow]",
             border_style="yellow",
         )
