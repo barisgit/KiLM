@@ -1043,12 +1043,12 @@ def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
                 all_templates[name]["source_library"] = library.get("name", "unknown")
                 all_templates[name]["library_path"] = library_path
             else:
+                # Libraries are searched in configured order, so the first one wins.
                 click.echo(
                     f"Warning: Duplicate template name '{name}' found.", err=True
                 )
-                click.echo(f"  Existing: {all_templates[name]['path']}", err=True)
-                click.echo(f"  New: {template['path']}", err=True)
-                all_templates[name] = template
+                click.echo(f"  Using: {all_templates[name]['path']}", err=True)
+                click.echo(f"  Ignoring: {template['path']}", err=True)
 
     return all_templates
 

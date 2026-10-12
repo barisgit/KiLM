@@ -18,6 +18,7 @@ from kicad_lib_manager.utils.template import (
     TEMPLATES_DIR,
     create_project_from_template,
     create_template_metadata,
+    find_all_templates,
     render_filename,
     render_filename_custom,
     render_template_file,
@@ -302,6 +303,35 @@ def post_create(context):
 
         # Check that files were NOT created
         assert not project_dir.exists()
+
+
+class _LibraryConfig:
+    """Config stand-in exposing only the libraries find_all_templates reads."""
+
+    def __init__(self, libraries: list[dict[str, str]]) -> None:
+        self._libraries = libraries
+
+    def get_libraries(self) -> list[dict[str, str]]:
+        return self._libraries
+
+
+def test_find_all_templates_keeps_first_duplicate(tmp_path: Path) -> None:
+    """The first configured library wins a template name clash."""
+    libraries = []
+    for library_name in ("first", "second"):
+        template_dir = tmp_path / library_name / TEMPLATES_DIR / "board"
+        template_dir.mkdir(parents=True)
+        write_template_metadata(
+            template_dir, create_template_metadata("board", description=library_name)
+        )
+        libraries.append({"name": library_name, "path": str(tmp_path / library_name)})
+
+    templates = find_all_templates(_LibraryConfig(libraries))
+
+    board = templates["board"]
+    assert board["description"] == "first"
+    assert board["source_library"] == "first"
+    assert board["library_path"] == str(tmp_path / "first")
 
 
 if __name__ == "__main__":
