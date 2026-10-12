@@ -7,8 +7,9 @@ change, and write cycle preserves what users or other tools added to the file.
 kilm.yaml entries that the typed view cannot hold at all (non-string keys and
 mistyped known fields) come back separately from `read_github_metadata_file`
 for `write_github_metadata` to put back.
-Read and write failures are reported on stderr and returned as None or False,
-because every caller treats unreadable metadata as missing.
+Writes replace the file atomically. Read and write failures are reported on
+stderr and returned as None or False, because every caller treats unreadable
+metadata as missing.
 """
 
 # PEP 810: on Python 3.15+ these imports load on first use.
@@ -29,6 +30,7 @@ from kicad_lib_manager.utils.constants import (
     MAX_ENV_VAR_NAME_LENGTH,
     MODEL_EXTENSIONS,
 )
+from kicad_lib_manager.utils.file_ops import write_atomically
 
 __all__ = [
     "CLOUD_METADATA_FILE",
@@ -218,10 +220,9 @@ def write_github_metadata(
         key: value for key, value in (unsupported or {}).items() if key not in metadata
     }
     document.update(metadata)
-    metadata_file = directory / GITHUB_METADATA_FILE
     try:
-        with metadata_file.open("w", encoding="utf-8") as f:
-            yaml.dump(document, f, default_flow_style=False)
+        text = yaml.dump(document, default_flow_style=False)
+        write_atomically(directory / GITHUB_METADATA_FILE, text.encode("utf-8"))
     except (OSError, yaml.YAMLError) as e:
         _report(f"Error writing metadata file: {e}")
         return False
@@ -250,10 +251,9 @@ def read_cloud_metadata(directory: Path) -> CloudMetadata | None:
 
 def write_cloud_metadata(directory: Path, metadata: CloudMetadata) -> bool:
     """Write metadata to directory's .kilm_metadata; return whether it succeeded."""
-    metadata_file = directory / CLOUD_METADATA_FILE
     try:
-        with metadata_file.open("w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2)
+        text = json.dumps(metadata, indent=2)
+        write_atomically(directory / CLOUD_METADATA_FILE, text.encode("utf-8"))
     except (OSError, TypeError, ValueError) as e:
         _report(f"Error writing cloud metadata file: {e}")
         return False

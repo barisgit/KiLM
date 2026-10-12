@@ -8,8 +8,10 @@ from kicad_lib_manager.utils.metadata import (
     generate_env_var_name,
     read_cloud_metadata,
     read_github_metadata,
+    write_cloud_metadata,
     write_github_metadata,
 )
+from tests.fault_injection import fail_writes
 
 
 def test_known_fields_are_checked_and_unknown_fields_kept(tmp_path: Path) -> None:
@@ -36,6 +38,22 @@ def test_round_trip_keeps_fields_kilm_does_not_know(tmp_path: Path) -> None:
     assert write_github_metadata(tmp_path, metadata)
 
     assert read_github_metadata(tmp_path) == {"name": "new", "maintainer": "Ada"}
+
+
+def test_failed_write_keeps_the_old_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that fails part way leaves the previous metadata in place."""
+    (tmp_path / "kilm.yaml").write_text("name: old\n", encoding="utf-8")
+    (tmp_path / ".kilm_metadata").write_text('{"name": "old"}', encoding="utf-8")
+    fail_writes(monkeypatch)
+
+    assert not write_github_metadata(tmp_path, {"name": "new"})
+    assert not write_cloud_metadata(tmp_path, {"name": "new"})
+
+    monkeypatch.undo()
+    assert read_github_metadata(tmp_path) == {"name": "old"}
+    assert read_cloud_metadata(tmp_path) == {"name": "old"}
 
 
 def test_missing_empty_and_unreadable_files(
