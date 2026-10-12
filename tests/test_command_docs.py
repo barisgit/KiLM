@@ -63,7 +63,8 @@ def _subtree(command: click.Command) -> list[click.Command]:
 
 
 def _subtree_flags(command: click.Command) -> frozenset[str]:
-    return frozenset().union(*(_own_flags(sub) for sub in _subtree(command)))
+    """Return the flags of ``command`` and every nested subcommand."""
+    return frozenset(flag for sub in _subtree(command) for flag in _own_flags(sub))
 
 
 def _package_dir(command: click.Command) -> Path:

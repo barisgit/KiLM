@@ -1,19 +1,186 @@
-"""Sync command implementation for KiCad Library Manager.
-Performs 'git pull' on all configured GitHub libraries (symbols/footprints).
+"""The ``sync`` command: ``git pull`` every configured GitHub library.
+
+After pulling, sync reports libraries whose new commits add symbol,
+footprint, or template content, since KiCad only sees those after
+``kilm setup``.
 """
 
+import shutil
 import subprocess
+from collections import Counter
+from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from kicad_lib_manager.commands.setup.command import setup
+from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
 
-from ...services.config_service import Config
+
+class _Outcome(Enum):
+    """What syncing one library did."""
+
+    UPDATED = "updated"
+    UP_TO_DATE = "up to date"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+NewContent = list[tuple[str, list[str]]]
+
+
+def _run_git(repository: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run git with ``args`` in ``repository`` and capture its text output.
+
+    Raises:
+        FileNotFoundError: git is not installed.
+    """
+    git = shutil.which("git")
+    if git is None:
+        msg = "git executable not found"
+        raise FileNotFoundError(msg)
+    return subprocess.run(  # noqa: S603 -- fixed git subcommands; the variable parts are revisions
+        [git, *args],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _head_revision(repository: Path) -> str | None:
+    """Return the commit HEAD points at, or None when git cannot tell."""
+    result = _run_git(repository, "rev-parse", "--verify", "--quiet", "HEAD")
+    revision = result.stdout.strip()
+    return revision if result.returncode == 0 and revision else None
+
+
+def _skip_reason(path: Path) -> str | None:
+    """Return why ``path`` cannot be pulled, or None when it is a git clone."""
+    if not path.exists():
+        return f"Path does not exist: {path}"
+    if not (path / ".git").is_dir():
+        return f"Not a git repository: {path}"
+    return None
+
+
+def _pull(path: Path, *, verbose: bool) -> tuple[_Outcome, list[str]]:
+    """Pull one library and return the outcome and any new content kinds."""
+    console = get_console()
+    revision_before_pull = _head_revision(path)
+    result = _run_git(path, "pull")
+    if result.returncode != 0:
+        console.print(f"    [red]Failed: {result.stderr.strip()}[/red]")
+        return _Outcome.FAILED, []
+
+    # git words its messages in the user's language; HEAD is exact.
+    updated = _head_revision(path) != revision_before_pull
+    if verbose:
+        output = result.stdout.strip() or "Already up to date."
+        console.print(f"    [green]Success: {output}[/green]")
+    if not updated:
+        console.print("    [blue]Up to date[/blue]")
+        return _Outcome.UP_TO_DATE, []
+
+    console.print("    [green]Updated[/green]")
+    new_content = check_for_library_changes(path, revision_before_pull or "HEAD~1")
+    if verbose and new_content:
+        console.print(
+            "    [yellow]Detected new library content: "
+            f"{', '.join(new_content)}[/yellow]"
+        )
+    return _Outcome.UPDATED, new_content
+
+
+def _sync_library(
+    library: LibraryDict, *, dry_run: bool, verbose: bool
+) -> tuple[_Outcome, list[str]]:
+    """Sync one configured library and return the outcome and new content."""
+    console = get_console()
+    name = library.get("name", "unnamed")
+    configured_path = library.get("path")
+    if not configured_path:
+        console.print(f"  [yellow]Skipping {name}: No path defined[/yellow]")
+        return _Outcome.SKIPPED, []
+    path = Path(configured_path)
+    reason = _skip_reason(path)
+    if reason is not None:
+        console.print(f"  [yellow]Skipping {name}: {reason}[/yellow]")
+        return _Outcome.SKIPPED, []
+
+    console.print(f"  [cyan]Syncing {name} at {path}...[/cyan]")
+    if dry_run:
+        console.print(f"    [blue]Dry run: would execute 'git pull' in {path}[/blue]")
+        return _Outcome.UPDATED, []
+    try:
+        return _pull(path, verbose=verbose)
+    except (OSError, subprocess.SubprocessError) as e:
+        console.print(f"    [red]Error: {e!s}[/red]")
+        return _Outcome.FAILED, []
+
+
+def _sync_all(
+    libraries: list[LibraryDict], *, dry_run: bool, verbose: bool
+) -> tuple[Counter[_Outcome], NewContent]:
+    """Sync every library; return the outcome counts and the new content."""
+    outcomes: Counter[_Outcome] = Counter()
+    new_content: NewContent = []
+    for library in libraries:
+        outcome, kinds = _sync_library(library, dry_run=dry_run, verbose=verbose)
+        outcomes[outcome] += 1
+        if kinds:
+            new_content.append((library.get("name", "unnamed"), kinds))
+    return outcomes, new_content
+
+
+def _print_summary(outcomes: Counter[_Outcome]) -> None:
+    """Print how many libraries ended in each outcome."""
+    console = get_console()
+    console.print("\n[bold cyan]Sync Summary:[/bold cyan]")
+    console.print(f"  [green]{outcomes[_Outcome.UPDATED]}[/green] libraries synced")
+    console.print(
+        f"  [blue]{outcomes[_Outcome.UP_TO_DATE]}[/blue] libraries up to date"
+    )
+    console.print(f"  [yellow]{outcomes[_Outcome.SKIPPED]}[/yellow] libraries skipped")
+    console.print(f"  [red]{outcomes[_Outcome.FAILED]}[/red] libraries failed")
+
+
+def _report_new_content(new_content: NewContent, *, auto_setup: bool) -> None:
+    """Report new library content, running setup when ``auto_setup`` is set."""
+    console = get_console()
+    if not new_content:
+        console.print(
+            "\n[blue]No new libraries detected that would require running "
+            "'kilm setup'.[/blue]"
+        )
+        console.print(
+            "[blue]Use 'kilm status' to check your current configuration.[/blue]"
+        )
+        return
+
+    console.print("\n[yellow]New library content detected in:[/yellow]")
+    for name, kinds in new_content:
+        console.print(f"  - [cyan]{name}[/cyan]: {', '.join(kinds)}")
+    if auto_setup:
+        console.print(
+            "\n[green]Running 'kilm setup' to configure new libraries...[/green]"
+        )
+        setup()
+        return
+    console.print(
+        "\n[yellow]You should run 'kilm setup' to configure the new libraries "
+        "in KiCad.[/yellow]"
+    )
+    console.print(
+        "[blue]Run 'kilm sync --auto-setup' next time to automatically run "
+        "setup after sync.[/blue]"
+    )
 
 
 def sync(
+    *,
     dry_run: Annotated[
         bool, typer.Option(help="Show what would be synced without making changes")
     ] = False,
@@ -35,293 +202,93 @@ def sync(
     and recommend running 'kilm setup' if needed. Use --auto-setup to run
     setup automatically when new libraries are detected.
     """
+    console = get_console()
     try:
-        config = Config()
-
-        # Get GitHub libraries from config (symbols/footprints)
-        libraries = config.get_libraries(library_type="github")
-
+        libraries = Config().get_libraries(library_type="github")
         if not libraries:
-            get_console().print(
-                "[yellow]No GitHub libraries configured. Use 'kilm init' to add a library.[/yellow]"
+            console.print(
+                "[yellow]No GitHub libraries configured. Use 'kilm init' to add a "
+                "library.[/yellow]"
             )
             return
-
-        get_console().print(
+        console.print(
             f"[cyan]Syncing {len(libraries)} KiCad GitHub libraries...[/cyan]"
         )
-
-        updated_count = 0  # Actually changed
-        up_to_date_count = 0  # Already at latest version
-        skipped_count = 0  # Could not sync (not git, etc.)
-        failed_count = 0  # Git pull failed
-
-        # Track libraries that have changes that might require setup
-        libraries_with_changes: list[tuple[str, Path, list[str]]] = []
-
-        for lib in libraries:
-            lib_name = lib.get("name", "unnamed")
-            lib_path = lib.get("path")
-
-            if not lib_path:
-                get_console().print(
-                    f"  [yellow]Skipping {lib_name}: No path defined[/yellow]"
-                )
-                skipped_count += 1
-                continue
-
-            lib_path = Path(lib_path)
-            if not lib_path.exists():
-                get_console().print(
-                    f"  [yellow]Skipping {lib_name}: Path does not exist: {lib_path}[/yellow]"
-                )
-                skipped_count += 1
-                continue
-
-            git_dir = lib_path / ".git"
-            if not git_dir.exists() or not git_dir.is_dir():
-                get_console().print(
-                    f"  [yellow]Skipping {lib_name}: Not a git repository: {lib_path}[/yellow]"
-                )
-                skipped_count += 1
-                continue
-
-            # Prepare to run git pull
-            get_console().print(f"  [cyan]Syncing {lib_name} at {lib_path}...[/cyan]")
-
-            if dry_run:
-                get_console().print(
-                    f"    [blue]Dry run: would execute 'git pull' in {lib_path}[/blue]"
-                )
-                updated_count += 1
-                continue
-
-            try:
-                # Run git pull
-                result = subprocess.run(
-                    ["git", "pull"],
-                    cwd=lib_path,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-
-                if result.returncode == 0:
-                    output = result.stdout.strip() or "Already up to date."
-                    is_updated = "Already up to date" not in output
-
-                    if verbose:
-                        get_console().print(f"    [green]Success: {output}[/green]")
-                        # Also show the short status for consistency
-                        if is_updated:
-                            get_console().print("    [green]Updated[/green]")
-                        else:
-                            get_console().print("    [blue]Up to date[/blue]")
-                    elif is_updated:
-                        get_console().print("    [green]Updated[/green]")
-                    else:
-                        get_console().print("    [blue]Up to date[/blue]")
-
-                    # Update counters regardless of verbose flag
-                    if is_updated:
-                        updated_count += 1
-                    else:
-                        up_to_date_count += 1
-
-                    # Check if there are new library files that would require setup
-                    if is_updated:
-                        changes_require_setup = check_for_library_changes(lib_path)
-                        if changes_require_setup:
-                            libraries_with_changes.append(
-                                (lib_name, lib_path, changes_require_setup)
-                            )
-                            if verbose:
-                                get_console().print(
-                                    f"    [yellow]Detected new library content: {', '.join(changes_require_setup)}[/yellow]"
-                                )
-                else:
-                    get_console().print(
-                        f"    [red]Failed: {result.stderr.strip()}[/red]"
-                    )
-                    failed_count += 1
-
-            except Exception as e:
-                get_console().print(f"    [red]Error: {e!s}[/red]")
-                failed_count += 1
-
-        # Summary
-        get_console().print("\n[bold cyan]Sync Summary:[/bold cyan]")
-        get_console().print(f"  [green]{updated_count}[/green] libraries synced")
-        get_console().print(f"  [blue]{up_to_date_count}[/blue] libraries up to date")
-        get_console().print(f"  [yellow]{skipped_count}[/yellow] libraries skipped")
-        get_console().print(f"  [red]{failed_count}[/red] libraries failed")
-
-        # If libraries with changes were detected, suggest running setup
-        if libraries_with_changes:
-            get_console().print("\n[yellow]New library content detected in:[/yellow]")
-            for lib_name, _lib_path, changes in libraries_with_changes:
-                get_console().print(
-                    f"  - [cyan]{lib_name}[/cyan]: {', '.join(changes)}"
-                )
-
-            if auto_setup:
-                get_console().print(
-                    "\n[green]Running 'kilm setup' to configure new libraries...[/green]"
-                )
-                # Import at runtime to avoid circular imports
-                try:
-                    from ...commands.setup.command import setup as setup_cmd
-
-                    setup_cmd()
-                except ImportError:
-                    get_console().print(
-                        "[red]Error: Could not import setup command. Please run 'kilm setup' manually.[/red]"
-                    )
-            else:
-                get_console().print(
-                    "\n[yellow]You should run 'kilm setup' to configure the new libraries in KiCad.[/yellow]"
-                )
-                get_console().print(
-                    "[blue]Run 'kilm sync --auto-setup' next time to automatically run setup after sync.[/blue]"
-                )
-        else:
-            get_console().print(
-                "\n[blue]No new libraries detected that would require running 'kilm setup'.[/blue]"
-            )
-            get_console().print(
-                "[blue]Use 'kilm status' to check your current configuration.[/blue]"
-            )
-
+        outcomes, new_content = _sync_all(libraries, dry_run=dry_run, verbose=verbose)
     except Exception as e:
-        get_console().print(f"[red]Error: {e}[/red]")
+        console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
 
+    _print_summary(outcomes)
+    # Outside the try: setup reports its own errors through typer.Exit.
+    _report_new_content(new_content, auto_setup=auto_setup)
 
-# TODO: Should be in services or utils
-def check_for_library_changes(lib_path: Path) -> list[str]:
-    """Check if git pull changes indicate new libraries that would require setup.
-    Uses git diff to analyze what files were added/changed in the pull.
+
+def check_for_library_changes(lib_path: Path, since: str = "HEAD~1") -> list[str]:
+    """Return the kinds of library content added between ``since`` and HEAD.
+
+    The kinds are ``symbols``, ``footprints``, and ``templates``: content that
+    KiCad only sees after ``kilm setup``. Added, modified, and renamed paths
+    count; deletions do not. When git cannot compare the revisions (for
+    example, ``since`` predates the first commit), every kind the library
+    currently contains is returned instead.
 
     Args:
-        lib_path: Path to the library directory
-
-    Returns:
-        List of change types found ('symbols', 'footprints', 'templates') or empty list if none
+        lib_path: The library's git clone.
+        since: The revision to compare HEAD with, normally HEAD before a pull.
     """
-    changes = []
-
     try:
-        # Get the diff between HEAD~1 and HEAD to see what changed in the pull
-        result = subprocess.run(
-            ["git", "diff", "--name-status", "HEAD~1", "HEAD"],
-            cwd=lib_path,
-            capture_output=True,
-            text=True,
-            check=False,
+        result = _run_git(
+            lib_path, "diff", "--name-only", "--diff-filter=AMR", since, "HEAD"
         )
-
-        if result.returncode != 0:
-            # If we can't get the diff (e.g., first commit), fall back to checking current state
-            return _check_current_library_state(lib_path)
-
-        diff_output = result.stdout.strip()
-        if not diff_output:
-            return changes
-
-        # Parse the diff output to find relevant changes
-        for line in diff_output.split("\n"):
-            if not line.strip():
-                continue
-
-            # Parse git diff --name-status format: STATUS\tPATH
-            parts = line.split("\t", 1)
-            if len(parts) != 2:
-                continue
-
-            status, path = parts
-            # Only consider added (A) or modified (M) files, ignore deletions
-            if status not in ["A", "M", "R"]:
-                continue
-
-            # Check for symbol library changes
-            if _is_symbol_library_change(path) and "symbols" not in changes:
-                changes.append("symbols")
-
-            # Check for footprint library changes
-            if _is_footprint_library_change(path) and "footprints" not in changes:
-                changes.append("footprints")
-
-            # Check for template changes
-            if _is_template_change(path) and "templates" not in changes:
-                changes.append("templates")
-
-    except Exception:
-        # If git diff fails, fall back to checking current state
+    except OSError:
+        return _check_current_library_state(lib_path)
+    if result.returncode != 0:
         return _check_current_library_state(lib_path)
 
+    changes: list[str] = []
+    for path in result.stdout.splitlines():
+        for kind, matches in _CONTENT_KINDS:
+            if kind not in changes and matches(path):
+                changes.append(kind)
     return changes
 
 
 def _is_symbol_library_change(path: str) -> bool:
-    """Check if a path change indicates a symbol library change."""
-    # Look for .kicad_sym files in symbols directory
+    """Return whether ``path`` is a symbol library file."""
     return path.startswith("symbols/") and path.endswith(".kicad_sym")
 
 
 def _is_footprint_library_change(path: str) -> bool:
-    """Check if a path change indicates a footprint library change."""
-    # Look for .pretty directories or files within them
-    return (path.startswith("footprints/") and path.endswith(".pretty")) or (
-        path.startswith("footprints/") and ".pretty/" in path
+    """Return whether ``path`` is a footprint library or a file inside one."""
+    return path.startswith("footprints/") and (
+        path.endswith(".pretty") or ".pretty/" in path
     )
 
 
 def _is_template_change(path: str) -> bool:
-    """Check if a path change indicates a template change."""
-    # Look for metadata.yaml files in template directories
+    """Return whether ``path`` is a project template's metadata file."""
     return path.startswith("templates/") and path.endswith("metadata.yaml")
 
 
+_CONTENT_KINDS = (
+    ("symbols", _is_symbol_library_change),
+    ("footprints", _is_footprint_library_change),
+    ("templates", _is_template_change),
+)
+
+
 def _check_current_library_state(lib_path: Path) -> list[str]:
-    """Fallback method to check current library state when git diff is not available.
-    This is used when we can't determine what changed in the pull.
-    """
-    changes = []
-
-    # Check for symbol libraries (.kicad_sym files)
-    symbols_path = lib_path / "symbols"
-    if (
-        symbols_path.exists()
-        and symbols_path.is_dir()
-        and any(
-            f.name.endswith(".kicad_sym") for f in symbols_path.glob("**/*.kicad_sym")
-        )
-    ):
+    """Return every kind of library content ``lib_path`` currently contains."""
+    changes: list[str] = []
+    if any((lib_path / "symbols").glob("**/*.kicad_sym")):
         changes.append("symbols")
-
-    # Check for footprint libraries (.pretty directories)
-    footprints_path = lib_path / "footprints"
-    if (
-        footprints_path.exists()
-        and footprints_path.is_dir()
-        and any(
-            f.is_dir() and f.name.endswith(".pretty")
-            for f in footprints_path.glob("**/*.pretty")
-        )
-    ):
+    if any(path.is_dir() for path in (lib_path / "footprints").glob("**/*.pretty")):
         changes.append("footprints")
-
-    # Check for project templates (directories with metadata.yaml)
-    templates_path = lib_path / "templates"
-    if (
-        templates_path.exists()
-        and templates_path.is_dir()
-        and any(
-            (f / "metadata.yaml").exists()
-            for f in templates_path.glob("*")
-            if f.is_dir()
-        )
+    if any(
+        (path / "metadata.yaml").exists()
+        for path in (lib_path / "templates").glob("*")
+        if path.is_dir()
     ):
         changes.append("templates")
-
     return changes

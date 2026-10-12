@@ -1,198 +1,225 @@
-"""Unpin command implementation for KiCad Library Manager (Typer version)."""
+"""The ``unpin`` command: remove libraries from KiCad's quick-access lists."""
 
-import json
+from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.panel import Panel
 
+from kicad_lib_manager.commands.kicad_common import (
+    KICAD_COMMON_FILE,
+    PINNED_FOOTPRINTS_KEY,
+    PINNED_SYMBOLS_KEY,
+    as_list,
+    load_json_object,
+    pinned_names,
+    save_json_object,
+    session_of,
+)
+from kicad_lib_manager.services.library_service import LibraryService
+from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.console import get_console
 
-from ...services.library_service import LibraryService
-from ...utils.backup import create_backup
+NO_SESSION = (
+    "[yellow]No session information found in KiCad configuration, "
+    "nothing to unpin[/yellow]"
+)
 
 
-def unpin(
-    symbols: list[str] | None = typer.Option(
-        None,
-        "--symbols",
-        "-s",
-        help="Symbol libraries to unpin (can be specified multiple times)",
-    ),
-    footprints: list[str] | None = typer.Option(
-        None,
-        "--footprints",
-        "-f",
-        help="Footprint libraries to unpin (can be specified multiple times)",
-    ),
-    all_libraries: bool = typer.Option(False, "--all", help="Unpin all libraries"),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be done without making changes"
-    ),
-    max_backups: int = typer.Option(
-        5, "--max-backups", help="Maximum number of backups to keep"
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show verbose output for debugging"
-    ),
+def _find_kicad_common(*, verbose: bool) -> Path:
+    """Return the path of kicad_common.json; exit when KiCad is not configured."""
+    console = get_console()
+    try:
+        kicad_config = LibraryService.find_kicad_config()
+    except Exception as e:
+        console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
+        raise typer.Exit(1) from e
+    if verbose:
+        console.print(f"Found KiCad configuration at: [blue]{kicad_config}[/blue]")
+    return kicad_config / KICAD_COMMON_FILE
+
+
+def _all_pinned(kicad_common: Path, *, verbose: bool) -> tuple[list[str], list[str]]:
+    """Return every pinned symbol and footprint library.
+
+    Exits with status 1 when the file cannot be read, and with status 0 when
+    nothing is pinned.
+    """
+    console = get_console()
+    try:
+        session = session_of(load_json_object(kicad_common))
+    except Exception as e:
+        console.print(f"[red]Error reading pinned libraries: {e}[/red]")
+        raise typer.Exit(1) from e
+    if session is None:
+        console.print(NO_SESSION)
+        raise typer.Exit
+    symbols = pinned_names(session, PINNED_SYMBOLS_KEY)
+    footprints = pinned_names(session, PINNED_FOOTPRINTS_KEY)
+    if verbose and symbols:
+        console.print(f"Found [cyan]{len(symbols)}[/cyan] pinned symbol libraries")
+    if verbose and footprints:
+        console.print(
+            f"Found [cyan]{len(footprints)}[/cyan] pinned footprint libraries"
+        )
+    if not symbols and not footprints:
+        console.print("[yellow]No pinned libraries found, nothing to unpin[/yellow]")
+        raise typer.Exit
+    return symbols, footprints
+
+
+def _remove_pins(
+    kicad_common: Path,
+    unpinned: dict[str, list[str]],
+    *,
+    dry_run: bool,
+    max_backups: int,
+) -> bool | None:
+    """Remove the libraries in ``unpinned`` from the pinned lists they name.
+
+    ``unpinned`` maps a pinned-list key to the libraries to remove from it.
+    Returns whether any pinned list changes, or None when the file has no
+    session. Unless ``dry_run`` is set, a changed file is backed up and then
+    replaced atomically.
+    """
+    config = load_json_object(kicad_common)
+    session = session_of(config)
+    if session is None:
+        return None
+    changed = False
+    for key, libraries in unpinned.items():
+        if key not in session or not libraries:
+            continue
+        current = as_list(session[key])
+        kept = [library for library in current if library not in libraries]
+        if len(kept) != len(current):
+            changed = True
+            session[key] = kept
+    if changed and not dry_run:
+        config["session"] = session
+        create_backup(kicad_common, max_backups)
+        save_json_object(kicad_common, config)
+    return changed
+
+
+def _report(
+    symbols: list[str], footprints: list[str], *, changed: bool, dry_run: bool
 ) -> None:
-    """Unpin libraries in KiCad"""
-    # Handle None values from optional parameters
-    symbols = symbols or []
-    footprints = footprints or []
+    """Print the outcome of an unpin request."""
+    console = get_console()
+    counts = f"{len(symbols)} symbol and {len(footprints)} footprint libraries"
+    if not changed:
+        console.print(
+            "[yellow]No changes needed, libraries already unpinned in KiCad[/yellow]"
+        )
+    elif dry_run:
+        console.print(f"[yellow]Would unpin {counts} in KiCad[/yellow]")
+    else:
+        console.print(
+            Panel(
+                f"[green]Unpinned {counts} in KiCad[/green]\n\n"
+                "[blue]• Created backup of kicad_common.json[/blue]\n"
+                "[yellow]• Restart KiCad for changes to take effect[/yellow]",
+                title="Libraries Unpinned",
+                border_style="green",
+            )
+        )
 
-    # Enforce mutual exclusivity of --all with --symbols/--footprints
-    if all_libraries and (symbols or footprints):
-        get_console().print(
-            "[red]Error: '--all' cannot be used with '--symbols' or '--footprints'[/red]"
+
+def _print_names(kind: str, names: list[str]) -> None:
+    """List ``names`` under a heading for the ``kind`` of library."""
+    if not names:
+        return
+    console = get_console()
+    console.print(f"\n[bold cyan]Unpinned {kind} Libraries:[/bold cyan]")
+    for name in sorted(names):
+        console.print(f"  • [cyan]{name}[/cyan]")
+
+
+def unpin(  # noqa: PLR0913 -- each CLI option is a Typer parameter
+    *,
+    symbols: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--symbols",
+            "-s",
+            help="Symbol libraries to unpin (can be specified multiple times)",
+        ),
+    ] = None,
+    footprints: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--footprints",
+            "-f",
+            help="Footprint libraries to unpin (can be specified multiple times)",
+        ),
+    ] = None,
+    all_libraries: Annotated[
+        bool, typer.Option("--all", help="Unpin all libraries")
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", help="Show what would be done without making changes"
+        ),
+    ] = False,
+    max_backups: Annotated[
+        int, typer.Option("--max-backups", help="Maximum number of backups to keep")
+    ] = 5,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show verbose output for debugging"),
+    ] = False,
+) -> None:
+    """Unpin libraries in KiCad."""
+    console = get_console()
+    selected_symbols = symbols or []
+    selected_footprints = footprints or []
+    if all_libraries and (selected_symbols or selected_footprints):
+        console.print(
+            "[red]Error: '--all' cannot be used with '--symbols' or "
+            "'--footprints'[/red]"
         )
         raise typer.Exit(1)
 
-    # Find KiCad configuration
-    try:
-        kicad_config = LibraryService.find_kicad_config()
-        if verbose:
-            get_console().print(
-                f"Found KiCad configuration at: [blue]{kicad_config}[/blue]"
-            )
-    except Exception as e:
-        get_console().print(f"[red]Error finding KiCad configuration: {e}[/red]")
-        raise typer.Exit(1) from e
-
-    # Get the kicad_common.json file
-    kicad_common = kicad_config / "kicad_common.json"
+    kicad_common = _find_kicad_common(verbose=verbose)
     if not kicad_common.exists():
-        get_console().print(
-            "[yellow]KiCad common configuration file not found, nothing to unpin[/yellow]"
+        console.print(
+            "[yellow]KiCad common configuration file not found, "
+            "nothing to unpin[/yellow]"
         )
         return
 
-    # If --all is specified, unpin all libraries
     if all_libraries:
-        try:
-            with kicad_common.open() as f:
-                config = json.load(f)
-
-            # Get all pinned libraries from kicad_common.json
-            if "session" in config:
-                symbols = config["session"].get("pinned_symbol_libs", [])
-                footprints = config["session"].get("pinned_fp_libs", [])
-
-                if verbose:
-                    if symbols:
-                        get_console().print(
-                            f"Found [cyan]{len(symbols)}[/cyan] pinned symbol libraries"
-                        )
-                    if footprints:
-                        get_console().print(
-                            f"Found [cyan]{len(footprints)}[/cyan] pinned footprint libraries"
-                        )
-            else:
-                get_console().print(
-                    "[yellow]No session information found in KiCad configuration, nothing to unpin[/yellow]"
-                )
-                return
-
-            if not symbols and not footprints:
-                get_console().print(
-                    "[yellow]No pinned libraries found, nothing to unpin[/yellow]"
-                )
-                return
-        except Exception as e:
-            get_console().print(f"[red]Error reading pinned libraries: {e}[/red]")
-            raise typer.Exit(1) from e
-
-    # If no libraries are specified, print an error
-    if not symbols and not footprints and not all_libraries:
-        get_console().print("[red]Error: No libraries specified to unpin[/red]")
-        get_console().print(
-            "[yellow]Use --symbols, --footprints, or --all to specify libraries to unpin[/yellow]"
+        selected_symbols, selected_footprints = _all_pinned(
+            kicad_common, verbose=verbose
+        )
+    elif not selected_symbols and not selected_footprints:
+        console.print("[red]Error: No libraries specified to unpin[/red]")
+        console.print(
+            "[yellow]Use --symbols, --footprints, or --all to specify libraries "
+            "to unpin[/yellow]"
         )
         raise typer.Exit(1)
 
-    # Ensure we have lists (Typer already handles this)
-    symbols = symbols or []
-    footprints = footprints or []
-
-    # Unpin the libraries by removing them from the kicad_common.json file
     try:
-        with kicad_common.open() as f:
-            config = json.load(f)
-
-        changes_needed = False
-
-        # Ensure session section exists
-        if "session" not in config:
-            get_console().print(
-                "[yellow]No session information found in KiCad configuration, nothing to unpin[/yellow]"
-            )
-            return
-
-        # Handle symbol libraries
-        if "pinned_symbol_libs" in config["session"] and symbols:
-            current_symbols = config["session"]["pinned_symbol_libs"]
-            new_symbols = [lib for lib in current_symbols if lib not in symbols]
-
-            if len(new_symbols) != len(current_symbols):
-                changes_needed = True
-                if not dry_run:
-                    config["session"]["pinned_symbol_libs"] = new_symbols
-
-        # Handle footprint libraries
-        if "pinned_fp_libs" in config["session"] and footprints:
-            current_footprints = config["session"]["pinned_fp_libs"]
-            new_footprints = [
-                lib for lib in current_footprints if lib not in footprints
-            ]
-
-            if len(new_footprints) != len(current_footprints):
-                changes_needed = True
-                if not dry_run:
-                    config["session"]["pinned_fp_libs"] = new_footprints
-
-        # Write changes if needed
-        if changes_needed and not dry_run:
-            # Create backup before making changes
-            create_backup(kicad_common, max_backups)
-
-            with kicad_common.open("w") as f:
-                json.dump(config, f, indent=2)
-
-        if changes_needed:
-            if dry_run:
-                get_console().print(
-                    f"[yellow]Would unpin {len(symbols) if symbols else 0} symbol and {len(footprints) if footprints else 0} footprint libraries in KiCad[/yellow]"
-                )
-            else:
-                success_msg = f"[green]Unpinned {len(symbols) if symbols else 0} symbol and {len(footprints) if footprints else 0} footprint libraries in KiCad[/green]"
-                get_console().print(
-                    Panel(
-                        f"{success_msg}\n\n"
-                        f"[blue]• Created backup of kicad_common.json[/blue]\n"
-                        f"[yellow]• Restart KiCad for changes to take effect[/yellow]",
-                        title="✅ Libraries Unpinned",
-                        border_style="green",
-                    )
-                )
-        else:
-            get_console().print(
-                "[yellow]No changes needed, libraries already unpinned in KiCad[/yellow]"
-            )
-
-        if verbose:
-            if symbols:
-                get_console().print(
-                    "\n[bold cyan]Unpinned Symbol Libraries:[/bold cyan]"
-                )
-                for symbol in sorted(symbols):
-                    get_console().print(f"  • [cyan]{symbol}[/cyan]")
-
-            if footprints:
-                get_console().print(
-                    "\n[bold cyan]Unpinned Footprint Libraries:[/bold cyan]"
-                )
-                for footprint in sorted(footprints):
-                    get_console().print(f"  • [cyan]{footprint}[/cyan]")
-
+        changed = _remove_pins(
+            kicad_common,
+            {
+                PINNED_SYMBOLS_KEY: selected_symbols,
+                PINNED_FOOTPRINTS_KEY: selected_footprints,
+            },
+            dry_run=dry_run,
+            max_backups=max_backups,
+        )
     except Exception as e:
-        get_console().print(f"[red]Error unpinning libraries: {e}[/red]")
+        console.print(f"[red]Error unpinning libraries: {e}[/red]")
         raise typer.Exit(1) from e
+    if changed is None:
+        console.print(NO_SESSION)
+        return
+
+    _report(selected_symbols, selected_footprints, changed=changed, dry_run=dry_run)
+    if verbose:
+        _print_names("Symbol", selected_symbols)
+        _print_names("Footprint", selected_footprints)
