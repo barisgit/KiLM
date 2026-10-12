@@ -1,3 +1,1 @@
-"""
-KiCad Library Manager - Library management utilities for KiCad
-"""
+"""KiCad Library Manager: manage KiCad libraries across projects and machines."""

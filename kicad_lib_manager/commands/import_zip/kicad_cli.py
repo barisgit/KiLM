@@ -1,7 +1,6 @@
 """Finding kicad-cli and upgrading vendor files with it."""
 
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -9,11 +8,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from rich.console import Console
-
-from .formats import format_version
-
-console = Console()
+from kicad_lib_manager.commands.import_zip.formats import format_version
+from kicad_lib_manager.services.kicad_config import version_key
+from kicad_lib_manager.utils.console import get_console
 
 _KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
     Path.home() / "AppImages" / "kicad.appimage",
@@ -33,11 +30,9 @@ def _windows_kicad_cli_candidates() -> list[Path]:
     """
     program_files = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
     found = program_files.glob("KiCad/*/bin/kicad-cli.exe")
-
-    def version_key(path: Path) -> list[int]:
-        return [int(n) for n in re.findall(r"\d+", path.parent.parent.name)]
-
-    return sorted(found, key=version_key, reverse=True)
+    return sorted(
+        found, key=lambda path: version_key(path.parent.parent.name), reverse=True
+    )
 
 
 def detect_kicad_cli() -> Path | None:
@@ -115,17 +110,19 @@ def _run(kicad_cli: Path, label: str, *args: str) -> bool:
     """Run kicad-cli with args; warn about label and return False on failure."""
     cmd = _build_kicad_cli_cmd(kicad_cli, *args)
     try:
-        subprocess.run(
+        subprocess.run(  # noqa: S603 -- cmd is kicad-cli with fixed upgrade arguments and temp paths
             cmd, capture_output=True, text=True, check=True, timeout=_TIMEOUT_SECONDS
         )
     except subprocess.TimeoutExpired:
-        console.print(
-            f"[yellow]  warn: kicad-cli {args[0]} upgrade timed out for {label}, skipping[/yellow]"
+        get_console().print(
+            f"[yellow]  warn: kicad-cli {args[0]} upgrade timed out for {label}, "
+            "skipping[/yellow]"
         )
         return False
     except subprocess.CalledProcessError as exc:
-        console.print(
-            f"[yellow]  warn: kicad-cli {args[0]} upgrade failed for {label}: {exc.stderr.strip()}[/yellow]"
+        get_console().print(
+            f"[yellow]  warn: kicad-cli {args[0]} upgrade failed for {label}: "
+            f"{exc.stderr.strip()}[/yellow]"
         )
         return False
     return True
@@ -136,7 +133,7 @@ def _within_limit(text: str, limit: int | None, suffix: str) -> bool:
     version = format_version(text)
     if limit is None or version is None or version <= limit:
         return True
-    console.print(
+    get_console().print(
         f"[dim]  kicad-cli writes format {version}, newer than {limit} in the "
         f"target library; keeping vendor {suffix} formats[/dim]"
     )

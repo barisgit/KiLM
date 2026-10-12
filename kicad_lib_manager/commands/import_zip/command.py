@@ -10,18 +10,21 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 
-from ...services.config_service import Config
-from .errors import ImportFailure
-from .importer import ImportTarget, ZipResult, import_zip_file
-from .kicad_cli import Upgrader, detect_kicad_cli
-from .target import build_target
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
+from kicad_lib_manager.commands.import_zip.importer import (
+    ImportTarget,
+    ZipResult,
+    import_zip_file,
+)
+from kicad_lib_manager.commands.import_zip.kicad_cli import Upgrader, detect_kicad_cli
+from kicad_lib_manager.commands.import_zip.target import LibrarySelection, build_target
+from kicad_lib_manager.services.config_service import Config
+from kicad_lib_manager.utils.console import get_console
 
-console = Console()
 
-
-def import_zip(
+def import_zip(  # noqa: PLR0913 -- each CLI option is a Typer parameter
+    *,
     zip_files: Annotated[
         list[Path],
         typer.Argument(
@@ -41,7 +44,10 @@ def import_zip(
         typer.Option(
             "--symbol-lib",
             "-s",
-            help="Symbol library to add to, e.g. MyLib_IC (required if there are several)",
+            help=(
+                "Symbol library to add to, e.g. MyLib_IC "
+                "(required if there are several)"
+            ),
         ),
     ] = None,
     footprint_lib: Annotated[
@@ -49,7 +55,10 @@ def import_zip(
         typer.Option(
             "--footprint-lib",
             "-f",
-            help="Footprint library to add to, e.g. MyLib_QFN (required if there are several)",
+            help=(
+                "Footprint library to add to, e.g. MyLib_QFN "
+                "(required if there are several)"
+            ),
         ),
     ] = None,
     kicad_cli_path: Annotated[
@@ -65,7 +74,7 @@ def import_zip(
         ),
     ] = False,
 ) -> None:
-    """Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the configured library.
+    """Import vendor KiCad ZIPs into the configured library.
 
     Each ZIP should be a standard SamacSys multi-EDA archive (as downloaded
     from Mouser or component search) or an UltraLibrarian KiCad export.
@@ -75,10 +84,13 @@ def import_zip(
     """
     upgrader = Upgrader(_resolve_kicad_cli(kicad_cli_path))
     target = build_target(
-        Config(), library, symbol_lib, footprint_lib, upgrader, dry_run
+        Config(),
+        LibrarySelection(library, symbol_lib, footprint_lib),
+        upgrader,
+        dry_run=dry_run,
     )
     if dry_run:
-        console.print("[yellow]Dry run - no changes will be made[/yellow]")
+        get_console().print("[yellow]Dry run - no changes will be made[/yellow]")
 
     totals = ZipResult()
     failed: list[str] = []
@@ -89,22 +101,22 @@ def import_zip(
         else:
             totals.extend(result)
 
-    _print_summary(totals, dry_run)
+    _print_summary(totals, dry_run=dry_run)
     if failed:
-        console.print(f"[red]Failed to import: {', '.join(failed)}[/red]")
+        get_console().print(f"[red]Failed to import: {', '.join(failed)}[/red]")
         raise typer.Exit(1)
 
 
 def _resolve_kicad_cli(path: Path | None) -> Path | None:
-    """kicad-cli to upgrade with: path when given (it must exist), else a detected one."""
+    """Return path, which must exist, else a detected kicad-cli; None if none."""
     if path is not None and not path.exists():
-        console.print(f"[red]kicad-cli not found at: {path}[/red]")
+        get_console().print(f"[red]kicad-cli not found at: {path}[/red]")
         raise typer.Exit(1)
     kicad_cli = path or detect_kicad_cli()
     if kicad_cli:
-        console.print(f"[dim]kicad-cli: {kicad_cli}[/dim]")
+        get_console().print(f"[dim]kicad-cli: {kicad_cli}[/dim]")
     else:
-        console.print("[dim]kicad-cli not found - format upgrade skipped[/dim]")
+        get_console().print("[dim]kicad-cli not found - format upgrade skipped[/dim]")
     return kicad_cli
 
 
@@ -114,30 +126,33 @@ def _import_one(zip_path: Path, target: ImportTarget) -> ZipResult | None:
     A failed ZIP does not stop the run; the caller imports the rest.
     """
     if not zip_path.exists():
-        console.print(f"[red]Skipping {zip_path.name}: file not found[/red]")
+        get_console().print(f"[red]Skipping {zip_path.name}: file not found[/red]")
         return None
-    console.print(f"\n[cyan]Importing {zip_path.name}[/cyan]")
+    get_console().print(f"\n[cyan]Importing {zip_path.name}[/cyan]")
     try:
         return import_zip_file(zip_path, target)
-    except (ImportFailure, OSError) as exc:
-        console.print(f"  error: {zip_path.name}: {exc}", style="red", markup=False)
+    except (ImportZipError, OSError) as exc:
+        get_console().print(
+            f"  error: {zip_path.name}: {exc}", style="red", markup=False
+        )
         return None
 
 
-def _print_summary(totals: ZipResult, dry_run: bool) -> None:
-    console.print("\n[bold]Summary:[/bold]")
-    console.print(f"  Symbols   added: {len(totals.symbols)}")
-    console.print(f"  Footprints added: {len(totals.footprints)}")
-    console.print(f"  3D models  added: {len(totals.models)}")
+def _print_summary(totals: ZipResult, *, dry_run: bool) -> None:
+    get_console().print("\n[bold]Summary:[/bold]")
+    get_console().print(f"  Symbols   added: {len(totals.symbols)}")
+    get_console().print(f"  Footprints added: {len(totals.footprints)}")
+    get_console().print(f"  3D models  added: {len(totals.models)}")
 
     if dry_run:
-        console.print(
+        get_console().print(
             "\n[dim]Dry run complete - run without --dry-run to apply changes.[/dim]"
         )
     elif totals.symbols or totals.footprints or totals.models:
-        console.print("\n[green]Import complete.[/green]")
-        console.print(
-            "[dim]Note: If this library is not yet configured in KiCad, run 'kilm setup' to register it.[/dim]"
+        get_console().print("\n[green]Import complete.[/green]")
+        get_console().print(
+            "[dim]Note: If this library is not yet configured in KiCad, "
+            "run 'kilm setup' to register it.[/dim]"
         )
     else:
-        console.print("\n[dim]Nothing new added.[/dim]")
+        get_console().print("\n[dim]Nothing new added.[/dim]")

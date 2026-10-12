@@ -1,55 +1,72 @@
-"""
-Utilities for backup management
+"""Timestamped backups of files that KiLM is about to change.
+
+A backup of ``<name>`` is the sibling ``<name>.backup.<stamp>``, where the
+stamp is the local time with microseconds. Stamps have a fixed width, so name
+order is time order, and pruning treats it as creation order. That holds
+while the local clock only moves forward: a clock set back, or the repeated
+hour when daylight saving time ends, can make a newer backup sort as older.
+Backups from releases that stamped whole seconds sort correctly among them.
 """
 
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
+from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS
 
-def create_backup(file_path: Path, max_backups: int = 5) -> Path:
-    """
-    Create a timestamped backup of a file and maintain a limited history
+_STAMP_FORMAT = "%Y%m%d_%H%M%S_%f"
+_BACKUP_INFIX = ".backup."
+
+
+def create_backup(file_path: Path, max_backups: int = DEFAULT_MAX_BACKUPS) -> Path:
+    """Copy file_path to a new backup and keep only its newest max_backups backups.
+
+    The backup keeps the file's metadata (shutil.copy2). It never replaces an
+    earlier backup, even one taken at the same clock reading.
 
     Args:
-        file_path: Path to the file to back up
-        max_backups: Maximum number of backups to keep
+        file_path: File to back up.
+        max_backups: Number of backups of the file to keep, this one included.
 
     Returns:
-        Path to the created backup
+        Path of the new backup.
 
     Raises:
-        FileNotFoundError: If the file to back up doesn't exist
+        FileNotFoundError: file_path does not exist.
     """
     if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
+        msg = f"File not found: {file_path}"
+        raise FileNotFoundError(msg)
 
-    # Create timestamp for the backup
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = file_path.with_suffix(f"{file_path.suffix}.backup.{timestamp}")
-
-    # Create the backup
+    backup_path = unique_backup_path(file_path)
     shutil.copy2(file_path, backup_path)
-
-    # Clean up old backups
     manage_backup_history(file_path, max_backups)
-
     return backup_path
 
 
-def manage_backup_history(file_path: Path, max_backups: int = 5) -> None:
-    """
-    Maintain a limited history of backups, removing the oldest ones
+def unique_backup_path(file_path: Path) -> Path:
+    """Return an unused backup path for file_path, named after the current time.
 
-    Args:
-        file_path: Path to the original file
-        max_backups: Maximum number of backups to keep
+    When the name is taken (clocks can repeat a reading), the stamp moves
+    forward a microsecond at a time, so the new name still sorts after the
+    one it collided with.
     """
-    # Find all backups for this file
-    pattern = f"{file_path.name}.backup.*"
-    backups = sorted(file_path.parent.glob(pattern))
+    stamp = datetime.now().astimezone()
+    while (path := _backup_path(file_path, stamp)).exists():
+        stamp += timedelta(microseconds=1)
+    return path
 
-    # Remove oldest backups if we have too many
-    if len(backups) > max_backups:
-        for old_backup in backups[:-max_backups]:
-            old_backup.unlink()
+
+def manage_backup_history(
+    file_path: Path, max_backups: int = DEFAULT_MAX_BACKUPS
+) -> None:
+    """Delete file_path's backups beyond the max_backups that sort last by name."""
+    backups = sorted(file_path.parent.glob(f"{file_path.name}{_BACKUP_INFIX}*"))
+    for old_backup in backups[:-max_backups]:
+        old_backup.unlink()
+
+
+def _backup_path(file_path: Path, stamp: datetime) -> Path:
+    return file_path.with_name(
+        f"{file_path.name}{_BACKUP_INFIX}{stamp.strftime(_STAMP_FORMAT)}"
+    )

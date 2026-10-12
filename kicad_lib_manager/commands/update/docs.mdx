@@ -21,6 +21,8 @@ kilm update perform [OPTIONS]
 
 Running `kilm update` without a subcommand prints the available subcommands.
 
+The latest version found on PyPI is cached for a day in `~/.cache/kilm/version_check.json`; within that day `check`, `info`, `perform`, and the update notice in `kilm --help` reuse it unless a bypass option is given.
+
 ## Subcommands
 
 ### check
@@ -40,9 +42,9 @@ Shows the current version, whether a newer one exists, the detected installation
 
 Installs the update. If KiLM is already up to date, it exits without changes unless `--force` is given.
 
-- `--target-version`, `-t` `TEXT`: Version to install. Currently only `--dry-run` output uses it; an actual update always installs the latest release.
+- `--target-version`, `-t` `TEXT`: Install this version instead of the latest release, even if it is older than the installed one. Without `--force`, asking for the installed version changes nothing. A value that is not a version number is rejected with status `2`.
 - `--force`, `-f`: Reinstall even if KiLM is already up to date.
-- `--dry-run`: Show what would be updated without changing anything.
+- `--dry-run`: Show the command that would run without changing anything. Like a real update, it exits with status `1` when the installation method does not support automatic updates.
 - `--no-cache`: Bypass the cached version check and query PyPI.
 
 Every subcommand also accepts `--help`.
@@ -54,11 +56,17 @@ Every subcommand also accepts `--help`.
 | **pipx** | Yes | `pipx upgrade kilm` |
 | **pip** | Yes | `pip install --upgrade kilm` |
 | **pip (venv)** | Yes | `pip install --upgrade kilm` |
-| **uv** | Yes | `uv tool upgrade kilm` |
+| **uv** | Yes | `uv tool install kilm@latest` |
 | **conda** | No | Not yet published |
 | **homebrew** | No | Not yet published |
+| **nix** | No | `nix flake update`, then rebuild the configuration or profile that installs kilm |
+| **unknown** | No | Update KiLM with the tool that installed it |
 
-For methods without automatic updates, `kilm update perform` prints the manual command and exits with status `1`.
+KiLM reports **unknown** when nothing identifies the installer, for example a distribution package, rather than guessing pip.
+
+With `--target-version`, the automatic methods install that exact version: `pipx install --force kilm==VERSION`, `uv tool install kilm==VERSION`, or `pip install --upgrade kilm==VERSION`.
+
+For methods without automatic updates, `kilm update perform` prints the manual instruction and exits with status `1`. When the installer itself fails, it prints the last lines of the installer's error output and the command to run by hand, and exits with status `1`.
 
 ## Examples
 

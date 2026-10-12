@@ -71,7 +71,7 @@ kilm setup [OPTIONS]
 ## Behavior Details
 
 - **Library Selection:** By default (without `--all-libraries`), `setup` configures only the _current_ symbol/footprint library and the _current_ 3D model library registered in KiLM. Use `--all-libraries` to configure all registered libraries, or `--symbol-lib-dirs` / `--threed-lib-dirs` to configure specific named libraries.
-- **Environment Variables:** KiLM attempts to read metadata (e.g., `kilm.yaml` or `.kilm_cloud_metadata`) to find the correct environment variable name (like `KICAD_COMPANY_LIB`) associated with each library path. If specific `--kicad-lib-dir` or `--kicad-3d-dir` options are given, they might influence default variables like `KICAD_USER_LIB` or `KICAD_3D_LIB`.
+- **Environment Variables:** KiLM attempts to read metadata (e.g., `kilm.yaml` or `.kilm_metadata`) to find the correct environment variable name (like `KICAD_COMPANY_LIB`) associated with each library path. If specific `--kicad-lib-dir` or `--kicad-3d-dir` options are given, they might influence default variables like `KICAD_USER_LIB` or `KICAD_3D_LIB`.
 - **Backups:** Backups are crucial for recovery if KiCad's configuration gets corrupted. They are stored in the same directory as the KiCad configuration files and are named with a timestamp.
 
 ## Examples

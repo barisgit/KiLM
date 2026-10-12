@@ -31,6 +31,7 @@ LEAVES = sorted(name for name in COMMANDS if name not in GROUPS)
 
 
 def _usage_line(command: str) -> str:
+    """Return the ``Usage:`` line of ``kilm <command> --help``."""
     result = CliRunner().invoke(app, [command, "--help"])
     assert result.exit_code == 0, result.output
     return next(line for line in result.output.splitlines() if "Usage:" in line)
@@ -38,6 +39,7 @@ def _usage_line(command: str) -> str:
 
 @pytest.mark.parametrize("command", LEAVES)
 def test_leaf_command_usage_has_no_subcommand_placeholder(command: str) -> None:
+    """A leaf command's usage line does not promise subcommands (issue #13)."""
     usage = _usage_line(command)
     assert "COMMAND" not in usage
     assert "[ARGS]" not in usage
@@ -45,6 +47,7 @@ def test_leaf_command_usage_has_no_subcommand_placeholder(command: str) -> None:
 
 @pytest.mark.parametrize("command", GROUPS)
 def test_group_has_subcommands_and_keeps_placeholder(command: str) -> None:
+    """A real group has subcommands and shows the subcommand placeholder."""
     group = COMMANDS[command]
     assert isinstance(group, click.Group)
     assert group.commands, f"{command} is a group without subcommands; use app.command"

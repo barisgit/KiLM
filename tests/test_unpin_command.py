@@ -1,100 +1,116 @@
-"""
-Tests for the unpin command functionality.
-"""
+"""Tests for ``kilm unpin`` against a temporary KiCad configuration."""
 
+import json
 from pathlib import Path
-from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
-from kicad_lib_manager.main import app as main
+from kicad_lib_manager.main import app
+from kicad_lib_manager.services.library_service import LibraryService
+from kicad_lib_manager.utils.kicad_common import (
+    JsonObject,
+    load_json_object,
+    session_of,
+)
+from tests.fault_injection import fail_writes
+
+CONFLICT = "'--all' cannot be used with '--symbols' or '--footprints'"
 
 
-class TestUnpinCommand:
-    """Test cases for the unpin command."""
+@pytest.fixture
+def kicad_common(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Return a kicad_common.json with two pinned symbol and footprint libraries."""
+    monkeypatch.setattr(
+        LibraryService, "find_kicad_config", staticmethod(lambda: tmp_path)
+    )
+    path = tmp_path / "kicad_common.json"
+    session = {
+        "pinned_symbol_libs": ["sym_a", "sym_b"],
+        "pinned_fp_libs": ["fp_a", "fp_b"],
+        "remember_open_files": False,
+    }
+    path.write_text(json.dumps({"session": session}, indent=2), encoding="utf-8")
+    return path
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
 
-    def test_mutual_exclusivity_all_with_symbols(self):
-        """Test that --all cannot be used with --symbols."""
-        result = self.runner.invoke(main, ["unpin", "--all", "--symbols", "lib1"])
-        assert result.exit_code == 1  # Typer validation error exit code
-        assert (
-            "'--all' cannot be used with '--symbols' or '--footprints'" in result.output
-        )
+def _session(path: Path) -> JsonObject:
+    """Return the ``session`` section of the kicad_common.json at ``path``."""
+    session = session_of(load_json_object(path))
+    assert session is not None
+    return session
 
-    def test_mutual_exclusivity_all_with_footprints(self):
-        """Test that --all cannot be used with --footprints."""
-        result = self.runner.invoke(main, ["unpin", "--all", "--footprints", "lib1"])
-        assert result.exit_code == 1  # Typer validation error exit code
-        assert (
-            "'--all' cannot be used with '--symbols' or '--footprints'" in result.output
-        )
 
-    def test_mutual_exclusivity_all_with_both(self):
-        """Test that --all cannot be used with both --symbols and --footprints."""
-        result = self.runner.invoke(
-            main, ["unpin", "--all", "--symbols", "lib1", "--footprints", "lib2"]
-        )
-        assert result.exit_code == 1  # Typer validation error exit code
-        assert (
-            "'--all' cannot be used with '--symbols' or '--footprints'" in result.output
-        )
+@pytest.mark.parametrize(
+    "selection",
+    [
+        ["--symbols", "lib1"],
+        ["--footprints", "lib1"],
+        ["--symbols", "lib1", "--footprints", "lib2"],
+    ],
+)
+def test_all_cannot_be_combined_with_a_selection(selection: list[str]) -> None:
+    """``--all`` with explicit libraries fails before touching KiCad."""
+    result = CliRunner().invoke(app, ["unpin", "--all", *selection])
 
-    def test_mutual_exclusivity_all_only(self):
-        """Test that --all can be used without --symbols or --footprints."""
-        with patch(
-            "kicad_lib_manager.services.library_service.LibraryService.find_kicad_config"
-        ) as mock_find_config:
-            mock_find_config.return_value = Path("/tmp/kicad")
+    assert result.exit_code == 1
+    assert CONFLICT in result.output
 
-            with patch("pathlib.Path.exists") as mock_exists:
-                mock_exists.return_value = True
 
-                with patch("builtins.open") as mock_open:
-                    mock_open.return_value.__enter__.return_value.read.return_value = (
-                        '{"session": {"pinned_symbol_libs": [], "pinned_fp_libs": []}}'
-                    )
+def test_unpin_without_selection_fails(kicad_common: Path) -> None:
+    """Nothing to unpin is an error that names the options."""
+    result = CliRunner().invoke(app, ["unpin"])
 
-                    # Should not raise an error
-                    result = self.runner.invoke(main, ["unpin", "--all"])
-                    # Exit code 0 means success, or 1 if no libraries found (which is expected)
-                    assert result.exit_code in [0, 1]
+    assert result.exit_code == 1
+    assert "No libraries specified to unpin" in result.output
+    assert _session(kicad_common)["pinned_symbol_libs"] == ["sym_a", "sym_b"]
 
-    def test_mutual_exclusivity_symbols_only(self):
-        """Test that --symbols can be used without --all."""
-        with patch(
-            "kicad_lib_manager.services.library_service.LibraryService.find_kicad_config"
-        ) as mock_find_config:
-            mock_find_config.return_value = Path("/tmp/kicad")
 
-            with patch("pathlib.Path.exists") as mock_exists:
-                mock_exists.return_value = True
+def test_unpin_selected_libraries(kicad_common: Path) -> None:
+    """Only the named libraries are unpinned, and a backup is kept."""
+    result = CliRunner().invoke(
+        app, ["unpin", "--symbols", "sym_a", "--footprints", "fp_b"]
+    )
 
-                with patch("builtins.open") as mock_open:
-                    mock_open.return_value.__enter__.return_value.read.return_value = '{"session": {"pinned_symbol_libs": ["lib1"], "pinned_fp_libs": []}}'
+    assert result.exit_code == 0, result.output
+    session = _session(kicad_common)
+    assert session["pinned_symbol_libs"] == ["sym_b"]
+    assert session["pinned_fp_libs"] == ["fp_a"]
+    assert session["remember_open_files"] is False
+    assert len(list(kicad_common.parent.glob("kicad_common.json.backup.*"))) == 1
 
-                    # Should not raise an error
-                    result = self.runner.invoke(main, ["unpin", "--symbols", "lib1"])
-                    # Exit code 0 means success, or 1 if no libraries found (which is expected)
-                    assert result.exit_code in [0, 1]
 
-    def test_mutual_exclusivity_footprints_only(self):
-        """Test that --footprints can be used without --all."""
-        with patch(
-            "kicad_lib_manager.services.library_service.LibraryService.find_kicad_config"
-        ) as mock_find_config:
-            mock_find_config.return_value = Path("/tmp/kicad")
+def test_unpin_all_libraries(kicad_common: Path) -> None:
+    """``--all`` empties both pinned lists."""
+    result = CliRunner().invoke(app, ["unpin", "--all"])
 
-            with patch("pathlib.Path.exists") as mock_exists:
-                mock_exists.return_value = True
+    assert result.exit_code == 0, result.output
+    assert "Unpinned 2 symbol and 2 footprint libraries" in result.output
+    session = _session(kicad_common)
+    assert session["pinned_symbol_libs"] == []
+    assert session["pinned_fp_libs"] == []
 
-                with patch("builtins.open") as mock_open:
-                    mock_open.return_value.__enter__.return_value.read.return_value = '{"session": {"pinned_symbol_libs": [], "pinned_fp_libs": ["lib1"]}}'
 
-                    # Should not raise an error
-                    result = self.runner.invoke(main, ["unpin", "--footprints", "lib1"])
-                    # Exit code 0 means success, or 1 if no libraries found (which is expected)
-                    assert result.exit_code in [0, 1]
+def test_unpin_dry_run_changes_nothing(kicad_common: Path) -> None:
+    """A dry run reports the change and leaves the file alone."""
+    before = kicad_common.read_text(encoding="utf-8")
+
+    result = CliRunner().invoke(app, ["unpin", "--symbols", "sym_a", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert "Would unpin 1 symbol and 0 footprint libraries" in result.output
+    assert kicad_common.read_text(encoding="utf-8") == before
+
+
+def test_unpin_keeps_the_file_when_writing_fails(
+    kicad_common: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed write leaves kicad_common.json as it was."""
+    before = kicad_common.read_text(encoding="utf-8")
+    fail_writes(monkeypatch)
+
+    result = CliRunner().invoke(app, ["unpin", "--symbols", "sym_a"])
+
+    assert result.exit_code == 1
+    assert "No space left on device" in result.output
+    assert kicad_common.read_text(encoding="utf-8") == before

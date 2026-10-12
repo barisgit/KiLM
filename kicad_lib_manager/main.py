@@ -1,91 +1,89 @@
-#!/usr/bin/env python3
-"""
-Main Typer CLI entry point for KiCad Library Manager
-"""
+"""The ``kilm`` command line: the Typer app and its command registry."""
 
 import importlib.metadata
+import logging
 from typing import Annotated
 
+import click
 import typer
 from rich.align import Align
-from rich.console import Console
 from rich.text import Text
-from rich.traceback import install
 from typer.core import TyperGroup
+from typing_extensions import override
 
-from .commands.add_3d import add_3d
-from .commands.add_hook import add_hook
-from .commands.config import config_app
-from .commands.import_zip import import_zip
-from .commands.init import init
-from .commands.list_libraries import list_cmd
-from .commands.pin import pin
-from .commands.setup import setup
-from .commands.status import status
-from .commands.sync import sync
-from .commands.template import template_app
-from .commands.unpin import unpin
-from .commands.update import update_app
-from .services.config_service import ConfigService
-from .services.update_service import UpdateService
-from .utils.banner import show_banner
+from kicad_lib_manager.commands.add_3d import add_3d
+from kicad_lib_manager.commands.add_hook import add_hook
+from kicad_lib_manager.commands.config import config_app
+from kicad_lib_manager.commands.import_zip import import_zip
+from kicad_lib_manager.commands.init import init
+from kicad_lib_manager.commands.list_libraries import list_cmd
+from kicad_lib_manager.commands.pin import pin
+from kicad_lib_manager.commands.setup import setup
+from kicad_lib_manager.commands.status import status
+from kicad_lib_manager.commands.sync import sync
+from kicad_lib_manager.commands.template import template_app
+from kicad_lib_manager.commands.unpin import unpin
+from kicad_lib_manager.commands.update import update_app
+from kicad_lib_manager.services.config_service import Config
+from kicad_lib_manager.services.update_service import UpdateService
+from kicad_lib_manager.utils.banner import show_banner
+from kicad_lib_manager.utils.console import get_console
 
 TAGLINE = "Professional KiCad library management"
 
-# Install rich traceback handler for better error display
-install(show_locals=True)
+logger = logging.getLogger(__name__)
 
-# Initialize Rich console
-console = Console()
+
+def _show_title() -> None:
+    """Print the centered banner and tagline."""
+    console = get_console()
+    show_banner(console, justify="center")
+    console.print()
+    console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
+    console.print()
 
 
 def _check_for_updates_if_needed() -> None:
-    """Check for updates if configured to do so, non-intrusively."""
+    """Show a notice when a newer KiLM is available, unless disabled.
+
+    Both branches answer from the day-long PyPI cache and refresh it from
+    PyPI once it has expired; a check the configured frequency calls for is
+    recorded only when it finds an update. Any failure is logged
+    at debug level and ignored, because an update check must never break the
+    command the user ran.
+    """
     try:
-        config_service = ConfigService()
-        config = config_service._config
-
-        # Skip if update checking is disabled
-        if not config.get("update_check", True):
+        config = Config()
+        enabled = config.get("update_check", True)
+        if enabled is None or not enabled:
             return
-
-        version = importlib.metadata.version("kilm")
-        update_service = UpdateService(version)
-
-        # Always show notification if update is available, regardless of frequency
-        # Only respect frequency for the actual PyPI API calls
+        update_service = UpdateService(importlib.metadata.version("kilm"))
         if config.should_check_updates():
-            # Time to make a fresh API call
             if update_service.show_update_notification(quiet=True):
                 config.mark_update_check_performed()
-        else:
-            # Use cached data to show notification if update available
-            update_info = update_service.check_for_updates(use_cache=True)
-            if update_info["has_update"]:
-                update_service.show_update_notification(quiet=True)
-
+        elif update_service.check_for_updates(use_cache=True)["has_update"]:
+            update_service.show_update_notification(quiet=True)
     except Exception:
-        # Silently fail - don't break CLI functionality
-        pass
+        logger.debug("Update check failed", exc_info=True)
 
 
 class BannerGroup(TyperGroup):
-    """Custom group that shows banner before help."""
+    """Root command group that prints the banner above its help."""
 
-    def format_help(self, ctx, formatter):
-        # Show banner before help
-        show_banner(console, justify="center")
-        console.print()
-        console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
-        console.print()
+    @override
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Print the banner and any update notice, then the regular help."""
+        _show_title()
         _check_for_updates_if_needed()
         super().format_help(ctx, formatter)
 
 
-# Create main Typer app
 app = typer.Typer(
     name="kilm",
-    help="KiCad Library Manager - Manage KiCad libraries across projects and workstations",
+    help=(
+        "KiCad Library Manager - Manage KiCad libraries across projects and "
+        "workstations"
+    ),
     context_settings={"help_option_names": ["-h", "--help"]},
     rich_markup_mode="rich",
     pretty_exceptions_enable=True,
@@ -95,19 +93,22 @@ app = typer.Typer(
 )
 
 
-def version_callback(value: bool) -> None:
-    """Print version information and exit."""
-    if value:
-        show_banner(console, justify="left")
-        console.print()
-
-        version = importlib.metadata.version("kilm")
-        console.print(f"KiCad Library Manager (KiLM) version [cyan]{version}[/cyan]")
-        raise typer.Exit()
+def version_callback(*, value: bool) -> None:
+    """Print the banner and installed version, then exit, when ``value`` is set."""
+    if not value:
+        return
+    console = get_console()
+    show_banner(console, justify="left")
+    console.print()
+    version = importlib.metadata.version("kilm")
+    console.print(f"KiCad Library Manager (KiLM) version [cyan]{version}[/cyan]")
+    raise typer.Exit
 
 
 @app.callback()
 def main(
+    ctx: typer.Context,
+    *,
     _version: Annotated[
         bool | None,
         typer.Option(
@@ -119,32 +120,18 @@ def main(
         ),
     ] = None,
 ) -> None:
+    """Show the banner when no command is given; otherwise check for updates.
+
+    The root help text comes from the ``help`` argument of ``app``, not from
+    this docstring.
     """
-    [bold blue]KiCad Library Manager[/bold blue] - Professional KiCad library management
-
-    This tool helps you configure and manage KiCad libraries across your projects
-    and workstations with a modern, type-safe CLI interface.
-
-    [bold]Common Commands:[/bold]
-    • [cyan]kilm status[/cyan]     - Show current configuration
-    • [cyan]kilm setup[/cyan]      - Configure KiCad to use libraries
-    • [cyan]kilm list[/cyan]       - List available libraries
-    • [cyan]kilm sync[/cyan]       - Update library content
-    """
-    # Show banner when no arguments are provided, centered
-    import sys
-
-    if not sys.argv[1:]:
-        show_banner(console)
-        console.print()
-        console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
-        console.print()
-        console.print(
-            "[dim]Use 'kilm --help' to see all commands.[/dim]", justify="center"
-        )
-    else:
-        # Check for updates if configured to do so only if not banner
+    if ctx.invoked_subcommand is not None:
         _check_for_updates_if_needed()
+        return
+    _show_title()
+    get_console().print(
+        "[dim]Use 'kilm --help' to see all commands.[/dim]", justify="center"
+    )
 
 
 # Leaf commands are registered as plain commands: a Typer sub-app with only a
@@ -160,7 +147,9 @@ app.command("add-3d", help="Add 3D model libraries")(add_3d)
 app.command("add-hook", help="Add project hooks")(add_hook)
 app.command(
     "import",
-    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library",
+    help=(
+        "Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library"
+    ),
 )(import_zip)
 # Groups keep their subcommands.
 app.add_typer(config_app, name="config", help="Manage configuration settings")

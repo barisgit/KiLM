@@ -1,24 +1,25 @@
-"""
-Configuration management for KiCad Library Manager.
-"""
+"""The KiLM configuration file: registered libraries and update-check settings."""
+
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"yaml"}
 
 import time
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Final, TypedDict, cast
 
 import click
 import yaml
 
-from ..utils.constants import (
-    CONFIG_DIR_NAME,
-    CONFIG_FILE_NAME,
-    DEFAULT_LIBRARIES,
-    DEFAULT_MAX_BACKUPS,
-)
+from kicad_lib_manager.services.user_paths import user_cache_dir, user_config_file
+from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS
 
 
 class LibraryDict(TypedDict):
-    """Type definition for library configuration."""
+    """A library registered in the configuration.
+
+    `type` is "github" for symbol and footprint libraries and "cloud" for 3D
+    model libraries.
+    """
 
     name: str
     path: str
@@ -26,496 +27,228 @@ class LibraryDict(TypedDict):
 
 
 ConfigValue = str | int | list[LibraryDict]
+"""A configuration value; booleans are stored as the int subtype bool."""
 
-DEFAULT_CONFIG: dict[str, ConfigValue] = {
-    "max_backups": DEFAULT_MAX_BACKUPS,
-    "libraries": DEFAULT_LIBRARIES,
-    "update_check": True,
-    "update_check_frequency": "daily",  # daily, weekly, never
-    "auto_update": False,  # Never auto-update without permission
+UPDATE_CHECK_INTERVALS: Final[dict[str, float]] = {
+    "daily": 24 * 60 * 60,
+    "weekly": 7 * 24 * 60 * 60,
 }
+"""Seconds between update checks for each `update_check_frequency`.
+
+"never" disables checks; any other value triggers one only while no
+previous check is recorded.
+"""
+
+LAST_UPDATE_CHECK_FILE: Final = "last_update_check"
+"""Cache file holding the time of the last update check."""
+
+
+def default_config() -> dict[str, ConfigValue]:
+    """Return a fresh configuration with every setting at its default."""
+    return {
+        "max_backups": DEFAULT_MAX_BACKUPS,
+        "libraries": [],
+        "update_check": True,
+        "update_check_frequency": "daily",
+        "auto_update": False,
+    }
 
 
 class Config:
-    """
-    Configuration manager for KiCad Library Manager
+    """The user's KiLM configuration, loaded at construction.
+
+    Mutating methods save the file immediately. A missing file means the
+    defaults; an unreadable one is reported on stderr and also yields the
+    defaults. Library entries without a name, path, and type are dropped
+    with a warning when the file is loaded.
     """
 
-    def __init__(self):
-        """Initialize configuration with default values"""
-        self._config = DEFAULT_CONFIG.copy()
+    def __init__(
+        self, *, config_file: Path | None = None, cache_dir: Path | None = None
+    ) -> None:
+        """Load the configuration.
+
+        Args:
+            config_file: The YAML file; defaults to the user's KiLM config.
+            cache_dir: Where update-check times are kept; defaults to the
+                user's KiLM cache.
+        """
+        self.config_file = config_file or user_config_file()
+        self._cache_dir = cache_dir or user_cache_dir()
+        self._config = default_config()
         self._load_config()
 
     def _load_config(self) -> None:
-        """Load configuration from file if it exists"""
-        config_file = self._get_config_file()
-        if config_file.exists():
-            try:
-                with config_file.open() as f:
-                    loaded_config = yaml.safe_load(f)
-                if loaded_config and isinstance(loaded_config, dict):
-                    self._config.update(loaded_config)
-                    # Ensure libraries field is always a list of dicts
-                    self._normalize_libraries_field()
-            except Exception as e:
-                # Use click.echo for warnings/errors
-                click.echo(f"Error loading config file: {e}", err=True)
-
-    def _get_config_file(self) -> Path:
-        """Get the configuration file path"""
-        config_dir = Path.home() / ".config" / CONFIG_DIR_NAME
-        config_dir.mkdir(parents=True, exist_ok=True)
-        return config_dir / CONFIG_FILE_NAME
+        """Merge the file's settings over the defaults, if the file exists."""
+        try:
+            with self.config_file.open(encoding="utf-8") as f:
+                loaded = yaml.safe_load(f)
+        except FileNotFoundError:
+            return
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
+            click.echo(f"Error loading config file: {e}", err=True)
+            return
+        if isinstance(loaded, dict):
+            self._config.update(loaded)
+            self._config["libraries"] = _normalize_libraries(
+                self._config.get("libraries")
+            )
 
     def get(self, key: str, default: ConfigValue | None = None) -> ConfigValue | None:
-        """Get a configuration value"""
+        """Return the setting `key`, or `default` when it is not set."""
         return self._config.get(key, default)
 
-    def set(self, key: str, value: ConfigValue) -> None:
-        """Set a configuration value"""
-        self._config[key] = value
-
     def save(self) -> None:
-        """Save configuration to file"""
-        config_file = self._get_config_file()
-        with config_file.open("w") as f:
+        """Write the configuration file, creating its directory if needed."""
+        self.config_file.parent.mkdir(parents=True, exist_ok=True)
+        with self.config_file.open("w", encoding="utf-8") as f:
             yaml.dump(self._config, f, default_flow_style=False)
 
+    def _libraries(self) -> list[LibraryDict]:
+        """Return the stored library list itself; callers may mutate it."""
+        libraries = self._config.get("libraries")
+        if isinstance(libraries, list):
+            return libraries
+        libraries = []
+        self._config["libraries"] = libraries
+        return libraries
+
     def add_library(self, name: str, path: str, library_type: str = "github") -> None:
-        """
-        Add a library to the configuration
+        """Register a library, or update the path of the one with this name and type.
 
         Args:
-            name: Library name
-            path: Path to the library
-            library_type: Type of library ("github" for symbols/footprints, "cloud" for 3D models)
+            name: Library name.
+            path: Path to the library.
+            library_type: "github" for symbols and footprints, "cloud" for
+                3D models.
         """
-        libraries = self._get_normalized_libraries()
-
-        # Check if library already exists
-        for lib in libraries:
-            if lib["name"] == name and lib["type"] == library_type:
-                lib["path"] = str(path)
-                self.save()
-                return
-
-        # Add new library
-        new_library = LibraryDict(name=name, path=str(path), type=library_type)
-        libraries.append(new_library)
-
-        self._config["libraries"] = libraries
+        libraries = self._libraries()
+        for library in libraries:
+            if library["name"] == name and library["type"] == library_type:
+                library["path"] = str(path)
+                break
+        else:
+            libraries.append(LibraryDict(name=name, path=str(path), type=library_type))
         self.save()
 
     def remove_library(self, name: str, library_type: str | None = None) -> bool:
-        """
-        Remove a library from the configuration
+        """Unregister the libraries called `name`, of one type or of every type.
 
-        Args:
-            name: Library name
-            library_type: Type of library ("github" or "cloud"). If None, remove all types.
+        The default library is cleared once no remaining library has its path.
 
         Returns:
-            True if library was removed, False otherwise
+            Whether any library was removed.
         """
-        libraries = self._get_normalized_libraries()
-        original_count = len(libraries)
-
-        if library_type:
-            filtered_libraries = [
-                lib
-                for lib in libraries
-                if not (lib["name"] == name and lib["type"] == library_type)
-            ]
-        else:
-            filtered_libraries = [lib for lib in libraries if lib["name"] != name]
-
-        self._config["libraries"] = filtered_libraries
-        removed = len(filtered_libraries) < original_count
-        if removed:
-            self.save()
-
-        return removed
+        libraries = self._libraries()
+        remaining = [
+            library
+            for library in libraries
+            if library["name"] != name
+            or (library_type is not None and library["type"] != library_type)
+        ]
+        if len(remaining) == len(libraries):
+            return False
+        self._config["libraries"] = remaining
+        if self.get_current_library() not in {library["path"] for library in remaining}:
+            self._config.pop("current_library", None)
+        self.save()
+        return True
 
     def get_libraries(self, library_type: str | None = None) -> list[LibraryDict]:
-        """
-        Get libraries from configuration
-
-        Args:
-            library_type: Type of library ("github" or "cloud"). If None, get all types.
-
-        Returns:
-            List of libraries
-        """
-        libraries = self._get_normalized_libraries()
-
-        if library_type:
-            return [lib for lib in libraries if lib["type"] == library_type]
-        else:
-            return libraries
-
-    def get_library_path(self, name: str, library_type: str = "github") -> str | None:
-        """
-        Get the path for a specific library
-
-        Args:
-            name: Library name
-            library_type: Type of library ("github" or "cloud")
-
-        Returns:
-            Path to the library or None if not found
-        """
-        libraries = self._get_normalized_libraries()
-
-        for lib in libraries:
-            if lib["name"] == name and lib["type"] == library_type:
-                return lib["path"]
-
-        return None
-
-    def get_current_library_paths(self) -> tuple[str | None, str | None]:
-        """
-        Get paths for the current active libraries
-
-        Returns:
-            Tuple of (github_library_path, cloud_library_path), either may be None
-        """
-        # Get all libraries by type
-        github_libraries = self.get_libraries("github")
-        cloud_libraries = self.get_libraries("cloud")
-
-        # Get the current explicitly set library path
-        current_lib_path = cast("str | None", self._config.get("current_library"))
-
-        # For GitHub libraries: first check if current library is a GitHub library,
-        # otherwise use the first available GitHub library
-        github_lib_path = None
-        if current_lib_path:
-            # Check if current library is a GitHub library
-            for lib in github_libraries:
-                if lib["path"] == current_lib_path:
-                    github_lib_path = current_lib_path
-                    break
-
-        # If no GitHub library was found or it's not the current lib,
-        # use the first available GitHub library
-        if not github_lib_path and github_libraries:
-            github_lib_path = github_libraries[0]["path"]
-
-        # For cloud libraries: first check if current library is a cloud library,
-        # otherwise use the first available cloud library
-        cloud_lib_path = None
-        if current_lib_path:
-            # Check if current library is a cloud library
-            for lib in cloud_libraries:
-                if lib["path"] == current_lib_path:
-                    cloud_lib_path = current_lib_path
-                    break
-
-        # If no cloud library was found or it's not the current lib,
-        # use the first available cloud library
-        if not cloud_lib_path and cloud_libraries:
-            cloud_lib_path = cloud_libraries[0]["path"]
-
-        return github_lib_path, cloud_lib_path
+        """Return the registered libraries, optionally only those of one type."""
+        return [
+            library
+            for library in self._libraries()
+            if library_type is None or library["type"] == library_type
+        ]
 
     def set_current_library(self, path: str) -> None:
-        """
-        Set the current active library path
-
-        Args:
-            path: Path to the library
-        """
+        """Make the library at `path` the default and save."""
         self._config["current_library"] = str(path)
         self.save()
 
     def get_current_library(self) -> str | None:
-        """
-        Get the current active library path
-
-        Returns:
-            Path to the current library or None if not set
-        """
+        """Return the path of the default library, if one is set."""
         value = self._config.get("current_library")
         return value if isinstance(value, str) else None
 
     def get_symbol_library_path(self) -> str | None:
-        """
-        Get the path for the current symbol library
-
-        Returns:
-            Path to the symbol library or None if not found
-        """
-        github_path, _ = self.get_current_library_paths()
-        return github_path
+        """Return the symbol library to use: the default or else the first one."""
+        return self._current_or_first("github")
 
     def get_3d_library_path(self) -> str | None:
-        """
-        Get the path for the current 3D models library
+        """Return the 3D model library to use: the default or else the first one."""
+        return self._current_or_first("cloud")
 
-        Returns:
-            Path to the 3D models library or None if not found
-        """
-        _, cloud_path = self.get_current_library_paths()
-        return cloud_path
-
-    def _normalize_libraries_field(self) -> None:
-        """Ensure libraries field is always a properly typed list of dictionaries."""
-        libraries = self._config.get("libraries", [])
-
-        # If libraries is not a list, reset to empty list
-        if not isinstance(libraries, list):
-            click.echo(
-                f"Warning: libraries field in config was {type(libraries).__name__}, resetting to empty list",
-                err=True,
-            )
-            self._config["libraries"] = []
-            return
-
-        # Validate and clean up each library entry
-        normalized_libraries: list[LibraryDict] = []
-        for lib in libraries:
-            validated_lib = _validate_library_entry(lib)
-            if validated_lib is not None:
-                normalized_libraries.append(validated_lib)
-            else:
-                click.echo(f"Warning: Skipping invalid library entry: {lib}", err=True)
-
-        self._config["libraries"] = normalized_libraries
-
-    def _get_normalized_libraries(self) -> list[LibraryDict]:
-        """
-        Get libraries ensuring they are properly normalized.
-
-        Returns:
-            List of properly typed library dictionaries
-        """
-        libraries_raw = self._config.get("libraries", [])
-
-        # If libraries is not a list, reset to empty list
-        if not isinstance(libraries_raw, list):
-            click.echo(
-                f"Warning: libraries field was {type(libraries_raw).__name__}, resetting to empty list",
-                err=True,
-            )
-            self._config["libraries"] = []
-            return []
-
-        # Validate and normalize each library entry
-        normalized_libraries: list[LibraryDict] = []
-        needs_save = False
-
-        for lib in libraries_raw:
-            validated_lib = _validate_library_entry(lib)
-            if validated_lib is not None:
-                normalized_libraries.append(validated_lib)
-            else:
-                click.echo(f"Warning: Skipping invalid library entry: {lib}", err=True)
-                needs_save = True
-
-        # Update config if we had to clean up invalid entries
-        if needs_save:
-            self._config["libraries"] = normalized_libraries
-            self.save()
-
-        return normalized_libraries
+    def _current_or_first(self, library_type: str) -> str | None:
+        """Return the default library if it has this type, else the first such."""
+        paths = [library["path"] for library in self.get_libraries(library_type)]
+        current = self.get_current_library()
+        if current in paths:
+            return current
+        return paths[0] if paths else None
 
     def should_check_updates(self) -> bool:
-        """
-        Determine if update check should run based on configuration.
+        """Return whether the update check frequency calls for a check now.
 
-        Returns:
-            True if update check should be performed
+        Without a readable record of the last check, a check is due unless
+        checks are disabled or the frequency is "never".
         """
-        if not self.get("update_check", True):
+        if not bool(self._config.get("update_check", True)):
             return False
-
-        frequency = self.get("update_check_frequency", "daily")
+        frequency = self._config.get("update_check_frequency", "daily")
         if frequency == "never":
             return False
-
-        # Check if we've checked recently based on frequency
-        cache_dir = Path.home() / ".cache" / "kilm"
-        last_check_file = cache_dir / "last_update_check"
-
-        if not last_check_file.exists():
-            return True
-
         try:
-            last_check = float(last_check_file.read_text().strip())
-            now = time.time()
-
-            if frequency == "daily":
-                return now - last_check > 86400  # 24 hours
-            elif frequency == "weekly":
-                return now - last_check > 604800  # 7 days
+            last_check = float(self._last_check_file().read_text().strip())
         except (ValueError, OSError):
             return True
-
-        return False
+        interval = (
+            UPDATE_CHECK_INTERVALS.get(frequency)
+            if isinstance(frequency, str)
+            else None
+        )
+        return interval is not None and time.time() - last_check > interval
 
     def mark_update_check_performed(self) -> None:
-        """Mark that an update check was performed."""
+        """Record that an update check ran now."""
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        self._last_check_file().write_text(str(time.time()))
 
-        cache_dir = Path.home() / ".cache" / "kilm"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        last_check_file = cache_dir / "last_update_check"
-        last_check_file.write_text(str(time.time()))
+    def _last_check_file(self) -> Path:
+        return self._cache_dir / LAST_UPDATE_CHECK_FILE
 
-    def get_update_preferences(self) -> dict[str, bool | str]:
-        """
-        Get update-related preferences.
 
-        Returns:
-            Dictionary containing update preferences
-        """
-        return {
-            "update_check": bool(self.get("update_check", True)),
-            "update_check_frequency": str(self.get("update_check_frequency", "daily")),
-            "auto_update": bool(self.get("auto_update", False)),
-        }
+def _normalize_libraries(value: object) -> list[LibraryDict]:
+    """Return the valid library entries of a loaded `libraries` setting.
 
-    def set_update_preference(self, key: str, value: bool | str) -> None:
-        """
-        Set an update preference with strict type validation and coercion.
-
-        Args:
-            key: Preference key ('update_check', 'update_check_frequency', 'auto_update')
-            value: Preference value (will be coerced to appropriate type)
-        """
-        valid_keys = {"update_check", "update_check_frequency", "auto_update"}
-        if key not in valid_keys:
-            raise ValueError(f"Invalid update preference key: {key}")
-
-        # Handle boolean keys with type coercion
-        if key in {"update_check", "auto_update"}:
-            coerced_value = self._coerce_to_bool(value)
-        # Handle frequency key with string validation
-        elif key == "update_check_frequency":
-            if not isinstance(value, str):
-                raise ValueError(
-                    f"update_check_frequency must be a string, got {type(value).__name__}"
-                )
-            valid_frequencies = {"daily", "weekly", "never"}
-            if value not in valid_frequencies:
-                raise ValueError(
-                    f"Invalid frequency: {value}. Must be one of: {valid_frequencies}"
-                )
-            coerced_value = value
+    Anything other than a list becomes an empty list, and entries without a
+    name, path, and type are dropped; both are reported on stderr.
+    """
+    if not isinstance(value, list):
+        click.echo(
+            f"Warning: libraries field in config was {type(value).__name__},"
+            " resetting to empty list",
+            err=True,
+        )
+        return []
+    libraries: list[LibraryDict] = []
+    for entry in cast("list[object]", value):
+        library = _library_entry(entry)
+        if library is None:
+            click.echo(f"Warning: Skipping invalid library entry: {entry}", err=True)
         else:
-            coerced_value = value
-
-        self.set(key, coerced_value)
-        self.save()
-
-    def _coerce_to_bool(self, value: bool | str) -> bool:
-        """
-        Coerce a value to boolean with strict validation.
-
-        Args:
-            value: Value to coerce (bool or string)
-
-        Returns:
-            Boolean value
-
-        Raises:
-            ValueError: If value cannot be coerced to boolean
-        """
-        if isinstance(value, bool):
-            return value
-
-        if isinstance(value, str):
-            value_lower = value.lower().strip()
-            if value_lower in {"true", "1", "yes"}:
-                return True
-            elif value_lower in {"false", "0", "no"}:
-                return False
-            else:
-                raise ValueError(
-                    f"Invalid boolean value: '{value}'. "
-                    f"Must be one of: true, false, 1, 0, yes, no (case-insensitive)"
-                )
-
-        # Should never happen
-        raise ValueError(
-            f"Cannot coerce {type(value).__name__} to boolean. "
-            f"Expected bool or string, got {type(value).__name__}"
-        )
+            libraries.append(library)
+    return libraries
 
 
-def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:
-    """Typed constructor for `LibraryDict` to satisfy type checker."""
-    return LibraryDict(name=name, path=path, type=type_)
-
-
-def _validate_library_entry(
-    lib: dict[str, str] | LibraryDict,
-) -> LibraryDict | None:
-    """Validate and normalize a library entry."""
-    if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
-        return _make_library_dict(
-            name=str(lib["name"]),
-            path=str(lib["path"]),
-            type_=str(lib["type"]),
-        )
-    return None
-
-
-class ConfigService:
-    """Service wrapper for managing KiLM configuration."""
-
-    def __init__(self):
-        """Initialize the configuration service."""
-        self._config = Config()
-
-    def get_config_file_path(self) -> Path:
-        """Get the path to the KiLM configuration file."""
-        return self._config._get_config_file()
-
-    def load_config(self) -> dict:
-        """Load the KiLM configuration."""
-        return self._config._config
-
-    def save_config(self, config: dict) -> None:
-        """Save the KiLM configuration."""
-        self._config._config = config
-        self._config.save()
-
-    def add_library(self, name: str, path: str, library_type: str) -> None:
-        """Add a library to the configuration."""
-        self._config.add_library(name, path, library_type)
-
-    def remove_library(self, name: str) -> None:
-        """Remove a library from the configuration."""
-        self._config.remove_library(name)
-
-    def get_libraries(self) -> list[LibraryDict]:
-        """Get all configured libraries."""
-        return self._config.get_libraries()
-
-    def get_library_by_name(self, name: str) -> LibraryDict | None:
-        """Get a specific library by name."""
-        libraries = self.get_libraries()
-        for lib in libraries:
-            if lib.get("name") == name:
-                return lib
+def _library_entry(entry: object) -> LibraryDict | None:
+    """Return a loaded library entry as a `LibraryDict`; None if it lacks a field."""
+    if not isinstance(entry, dict):
         return None
-
-    def get_current_library(self) -> str | None:
-        """Get the current active library path."""
-        return self._config.get_current_library()
-
-    def set_current_library(self, path: str) -> None:
-        """Set the current active library."""
-        self._config.set_current_library(path)
-
-    def get_max_backups(self) -> int:
-        """Get the maximum number of backups to keep."""
-        value = self._config.get("max_backups", DEFAULT_MAX_BACKUPS)
-        if isinstance(value, int):
-            return value
-        return DEFAULT_MAX_BACKUPS
-
-    def set_max_backups(self, count: int) -> None:
-        """Set the maximum number of backups to keep."""
-        self._config.set("max_backups", count)
-        self._config.save()
+    fields = cast("dict[object, object]", entry)
+    if not all(key in fields for key in ("name", "path", "type")):
+        return None
+    return LibraryDict(
+        name=str(fields["name"]), path=str(fields["path"]), type=str(fields["type"])
+    )

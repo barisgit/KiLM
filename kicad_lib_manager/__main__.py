@@ -1,8 +1,6 @@
-"""
-Entry point for running the package as a module
-"""
+"""Run the ``kilm`` command line with ``python -m kicad_lib_manager``."""
 
-from .main import app
+from kicad_lib_manager.main import app
 
 if __name__ == "__main__":
     app()
