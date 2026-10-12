@@ -14,6 +14,10 @@ TEMPLATE_METADATA = "metadata.yaml"
 TEMPLATE_CONTENT_DIR = "template"
 HOOKS_DIR = "hooks"
 
+# Library metadata
+# Longest environment variable name KiLM generates; some systems limit length.
+MAX_ENV_VAR_NAME_LENGTH = 50
+
 # Default configuration values
 DEFAULT_MAX_BACKUPS = 5
 DEFAULT_LIBRARIES: list = []
