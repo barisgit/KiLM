@@ -532,7 +532,7 @@ def remove(
             current_library_new = config.get_current_library()
             if current_library and current_library != current_library_new:
                 get_console().print(
-                    "Note: Default library was changed as the previous default was removed."
+                    "Note: The removed library was the default; no default is set now."
                 )
         else:
             get_console().print("No libraries were removed.")

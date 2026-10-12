@@ -147,6 +147,16 @@ def test_config_remove(mock_config_class):
     assert remaining_libraries[0]["name"] == "test-cloud-lib"
 
 
+def test_config_remove_default_library_reports_cleared_default(mock_config_class):
+    """Removing the default library says that no default is set any more."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["config", "remove", "test-github-lib", "--force"])
+
+    assert result.exit_code == 0
+    assert "no default is set now" in result.output
+    assert mock_config_class.get_current_library() is None
+
+
 def test_config_remove_with_confirmation(mock_config_class):
     """Test 'kilm config remove' with confirmation prompt."""
     runner = CliRunner()

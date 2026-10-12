@@ -137,6 +137,8 @@ class Config:
     def remove_library(self, name: str, library_type: str | None = None) -> bool:
         """Unregister the libraries called `name`, of one type or of every type.
 
+        The default library is cleared once no remaining library has its path.
+
         Returns:
             Whether any library was removed.
         """
@@ -150,6 +152,8 @@ class Config:
         if len(remaining) == len(libraries):
             return False
         self._config["libraries"] = remaining
+        if self.get_current_library() not in {library["path"] for library in remaining}:
+            self._config.pop("current_library", None)
         self.save()
         return True
 

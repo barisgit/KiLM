@@ -113,6 +113,33 @@ def test_remove_library_by_type_or_every_type(config_file: Path) -> None:
     assert saved(config_file)["libraries"] == [CLOUD]
 
 
+def test_removing_the_default_library_clears_the_default(config_file: Path) -> None:
+    """No default remains once no registered library has its path."""
+    config = make_config(
+        config_file, {"libraries": [GITHUB, CLOUD], "current_library": GITHUB["path"]}
+    )
+
+    config.remove_library(CLOUD["name"])
+    assert config.get_current_library() == GITHUB["path"]
+
+    config.remove_library(GITHUB["name"])
+
+    assert config.get_current_library() is None
+    assert "current_library" not in saved(config_file)
+
+
+def test_default_survives_while_another_entry_has_its_path(config_file: Path) -> None:
+    """Removing one of two entries sharing the default path keeps the default."""
+    twin = LibraryDict(name="twin", path=GITHUB["path"], type="cloud")
+    config = make_config(
+        config_file, {"libraries": [GITHUB, twin], "current_library": GITHUB["path"]}
+    )
+
+    config.remove_library(GITHUB["name"])
+
+    assert config.get_current_library() == GITHUB["path"]
+
+
 def test_library_paths_prefer_the_default_of_matching_type(config_file: Path) -> None:
     """The default library wins for its own type; others fall back to the first."""
     other = LibraryDict(name="other", path="/libs/other", type="github")
