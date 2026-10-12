@@ -13,11 +13,7 @@ import typer
 from rich.table import Table
 
 from kicad_lib_manager.commands.shared import MODELS_DIR_VAR, SYMBOL_DIR_VAR, given
-from kicad_lib_manager.services.config_service import (
-    Config,
-    ConfigService,
-    LibraryDict,
-)
+from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.env_vars import find_environment_variables
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
@@ -122,7 +118,7 @@ def add_config_libraries(
     console = get_console()
     config = Config()
     if verbose:
-        config_file = ConfigService().get_config_file_path()
+        config_file = config.config_file
         console.print(f"Looking for configuration in: {config_file}")
         exists = "exists" if config_file.exists() else "does not exist"
         console.print(f"Configuration file {exists}")

@@ -10,13 +10,11 @@ leaves KiCad with a truncated configuration.
 import json
 from pathlib import Path
 
+from kicad_lib_manager.utils.env_vars import JsonObject
 from kicad_lib_manager.utils.file_ops import write_atomically
 
-KICAD_COMMON_FILE = "kicad_common.json"
 PINNED_SYMBOLS_KEY = "pinned_symbol_libs"
 PINNED_FOOTPRINTS_KEY = "pinned_fp_libs"
-
-JsonObject = dict[str, object]
 
 
 def as_json_object(value: object) -> JsonObject | None:

@@ -23,4 +23,3 @@ MAX_ENV_VAR_NAME_LENGTH = 50
 
 # Default configuration values
 DEFAULT_MAX_BACKUPS = 5
-DEFAULT_LIBRARIES: list = []  # ty: ignore[missing-type-argument] -- element type lives in config_service, which imports this module; inline [] there and drop this constant

@@ -18,10 +18,8 @@ from rich.table import Table
 from rich.text import Text
 
 from kicad_lib_manager.commands.kicad_common import (
-    KICAD_COMMON_FILE,
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
-    JsonObject,
     as_json_object,
     as_list,
     load_json_object,
@@ -29,8 +27,10 @@ from kicad_lib_manager.commands.kicad_common import (
     session_of,
 )
 from kicad_lib_manager.services.kicad_service import KiCadService
+from kicad_lib_manager.services.user_paths import user_config_file
 from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.constants import CONFIG_DIR_NAME, CONFIG_FILE_NAME
+from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
+from kicad_lib_manager.utils.env_vars import JsonObject
 from kicad_lib_manager.utils.file_ops import LibraryTableEntry
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
 
@@ -72,7 +72,7 @@ def _show_kilm_configuration() -> None:
     """Show the libraries and settings in the KiLM configuration file."""
     console = get_console()
     try:
-        config_file = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+        config_file = user_config_file()
         exists = config_file.exists()
     except (OSError, RuntimeError) as e:
         console.print(f"[red]Error reading KILM configuration: {e}[/red]")

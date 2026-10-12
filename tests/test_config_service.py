@@ -10,7 +10,6 @@ import yaml
 from kicad_lib_manager.services.config_service import (
     LAST_UPDATE_CHECK_FILE,
     Config,
-    ConfigService,
     LibraryDict,
 )
 
@@ -225,14 +224,3 @@ def test_marking_a_check_postpones_the_next(config_file: Path) -> None:
     config.mark_update_check_performed()
 
     assert not config.should_check_updates()
-
-
-def test_config_service_reports_the_user_config_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The ConfigService shim exposes the file its Config reads."""
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-    assert ConfigService().get_config_file_path() == (
-        tmp_path / ".config" / "kicad-lib-manager" / "config.yaml"
-    )

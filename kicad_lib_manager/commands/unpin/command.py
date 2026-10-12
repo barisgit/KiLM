@@ -7,7 +7,6 @@ import typer
 from rich.panel import Panel
 
 from kicad_lib_manager.commands.kicad_common import (
-    KICAD_COMMON_FILE,
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
     as_list,
@@ -19,6 +18,7 @@ from kicad_lib_manager.commands.kicad_common import (
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
 
 NO_SESSION = (
     "[yellow]No session information found in KiCad configuration, "

@@ -93,10 +93,6 @@ class Config:
                 self._config.get("libraries")
             )
 
-    def _get_config_file(self) -> Path:
-        """Return `config_file`; kept for callers that predate the attribute."""
-        return self.config_file
-
     def get(self, key: str, default: ConfigValue | None = None) -> ConfigValue | None:
         """Return the setting `key`, or `default` when it is not set."""
         return self._config.get(key, default)
@@ -255,19 +251,3 @@ def _library_entry(entry: object) -> LibraryDict | None:
     return LibraryDict(
         name=str(fields["name"]), path=str(fields["path"]), type=str(fields["type"])
     )
-
-
-class ConfigService:
-    """Holder of a `Config` for callers that predate `Config`'s public API.
-
-    main.py reads `_config` and setup calls `get_config_file_path`. New code
-    uses `Config` directly; remove this once those callers do.
-    """
-
-    def __init__(self) -> None:
-        """Load the user's configuration into `_config`."""
-        self._config = Config()
-
-    def get_config_file_path(self) -> Path:
-        """Return the configuration file that `_config` reads and saves."""
-        return self._config.config_file
