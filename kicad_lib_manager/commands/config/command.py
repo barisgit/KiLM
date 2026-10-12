@@ -58,17 +58,38 @@ def list_config(
 
         if not libraries:
             get_console().print()
-            get_console().print(
-                Panel(
-                    "[yellow]No libraries configured.[/yellow]\n\n"
-                    "[cyan]Get Started:[/cyan]\n"
-                    "• Initialize GitHub library: [blue]kilm init[/blue]\n"
-                    "• Add 3D model library: [blue]kilm add-3d[/blue]\n"
-                    "• Check status: [blue]kilm status[/blue]",
-                    title="[bold yellow]⚠️ No Libraries[/bold yellow]",
-                    border_style="yellow",
+            if library_type == "github":
+                get_console().print(
+                    Panel(
+                        "[yellow]No GitHub libraries configured.[/yellow]\n\n"
+                        "[cyan]Get Started:[/cyan]\n"
+                        "• Initialize a GitHub library: [blue]kilm init[/blue]",
+                        title="[bold yellow]⚠️ No GitHub Libraries[/bold yellow]",
+                        border_style="yellow",
+                    )
                 )
-            )
+            elif library_type == "cloud":
+                get_console().print(
+                    Panel(
+                        "[yellow]No cloud libraries configured.[/yellow]\n\n"
+                        "[cyan]Get Started:[/cyan]\n"
+                        "• Add a 3D model library: [blue]kilm add-3d[/blue]",
+                        title="[bold yellow]⚠️ No Cloud Libraries[/bold yellow]",
+                        border_style="yellow",
+                    )
+                )
+            else:
+                get_console().print(
+                    Panel(
+                        "[yellow]No libraries configured.[/yellow]\n\n"
+                        "[cyan]Get Started:[/cyan]\n"
+                        "• Initialize GitHub library: [blue]kilm init[/blue]\n"
+                        "• Add 3D model library: [blue]kilm add-3d[/blue]\n"
+                        "• Check status: [blue]kilm status[/blue]",
+                        title="[bold yellow]⚠️ No Libraries[/bold yellow]",
+                        border_style="yellow",
+                    )
+                )
             return
 
         # Group libraries by type
@@ -287,28 +308,6 @@ def list_config(
                 width=35,
             )
         )
-
-        # Print helpful message if no libraries match the filter
-        if library_type == "github" and not types["github"]:
-            get_console().print(
-                Panel(
-                    "[yellow]No GitHub libraries configured.[/yellow]\n\n"
-                    "[cyan]Get Started:[/cyan]\n"
-                    "• Initialize a GitHub library: [blue]kilm init[/blue]",
-                    title="[bold yellow]⚠️ No GitHub Libraries[/bold yellow]",
-                    border_style="yellow",
-                )
-            )
-        elif library_type == "cloud" and not types["cloud"]:
-            get_console().print(
-                Panel(
-                    "[yellow]No cloud libraries configured.[/yellow]\n\n"
-                    "[cyan]Get Started:[/cyan]\n"
-                    "• Add a 3D model library: [blue]kilm add-3d[/blue]",
-                    title="[bold yellow]⚠️ No Cloud Libraries[/bold yellow]",
-                    border_style="yellow",
-                )
-            )
 
     except Exception as e:
         get_console().print(f"[red]Error listing configurations: {e}[/red]")

@@ -83,6 +83,28 @@ def test_config_list_filtered(mock_config_class):
     assert "test-cloud-lib" not in result.output
 
 
+@pytest.mark.parametrize(
+    ("library_type", "message", "hint"),
+    [
+        ("github", "No GitHub libraries configured", "kilm init"),
+        ("cloud", "No cloud libraries configured", "kilm add-3d"),
+    ],
+)
+def test_config_list_type_without_libraries(
+    mock_config_class, library_type, message, hint
+):
+    """A type filter without matches names that type and how to add one."""
+    mock_config_class.remove_library(
+        "test-github-lib" if library_type == "github" else "test-cloud-lib"
+    )
+    runner = CliRunner()
+    result = runner.invoke(main, ["config", "list", "--type", library_type])
+
+    assert result.exit_code == 0
+    assert message in result.output
+    assert hint in result.output
+
+
 def test_config_set_default(mock_config_class):
     """Test the 'kilm config set-default' command."""
     runner = CliRunner()
