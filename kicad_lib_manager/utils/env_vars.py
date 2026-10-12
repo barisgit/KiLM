@@ -135,7 +135,8 @@ def expand_user_path(path: str) -> str:
 def update_kicad_env_vars(
     kicad_config: Path,
     env_vars: Mapping[str, str | None],
-    dry_run: bool = False,  # noqa: FBT001, FBT002 -- setup and KiCadService pass it positionally; make it keyword-only once they pass it by name
+    *,
+    dry_run: bool = False,
     max_backups: int = DEFAULT_MAX_BACKUPS,
 ) -> bool:
     """Set or remove environment variables in kicad_common.json.

@@ -108,7 +108,8 @@ def write_atomically(path: Path, data: bytes) -> None:
 
 def validate_lib_table(
     table_path: Path,
-    create_if_missing: bool = True,  # noqa: FBT001, FBT002 -- LibraryService passes it positionally; make it keyword-only once it passes it by name
+    *,
+    create_if_missing: bool = True,
 ) -> None:
     """Check that table_path is a KiCad library table, creating an empty one if allowed.
 
