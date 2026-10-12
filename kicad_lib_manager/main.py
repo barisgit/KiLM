@@ -13,18 +13,18 @@ from rich.text import Text
 from rich.traceback import install
 from typer.core import TyperGroup
 
-from .commands.add_3d import add_3d_app
-from .commands.add_hook import add_hook_app
+from .commands.add_3d import add_3d
+from .commands.add_hook import add_hook
 from .commands.config import config_app
-from .commands.import_zip import import_zip_app
-from .commands.init import init_app
-from .commands.list_libraries import list_app
-from .commands.pin import pin_app
-from .commands.setup import setup_app
-from .commands.status import status_app
-from .commands.sync import sync_app
+from .commands.import_zip import import_zip
+from .commands.init import init
+from .commands.list_libraries import list_cmd
+from .commands.pin import pin
+from .commands.setup import setup
+from .commands.status import status
+from .commands.sync import sync
 from .commands.template import template_app
-from .commands.unpin import unpin_app
+from .commands.unpin import unpin
 from .commands.update import update_app
 from .services.config_service import ConfigService
 from .services.update_service import UpdateService
@@ -147,24 +147,25 @@ def main(
         _check_for_updates_if_needed()
 
 
-# Register command apps (migrated to Typer)
-app.add_typer(status_app, name="status", help="Show current library configuration")
-app.add_typer(list_app, name="list", help="List available KiCad libraries")
-app.add_typer(init_app, name="init", help="Initialize library configuration")
-app.add_typer(pin_app, name="pin", help="Pin favorite libraries")
-app.add_typer(unpin_app, name="unpin", help="Unpin favorite libraries")
-app.add_typer(setup_app, name="setup", help="Configure KiCad to use libraries")
+# Leaf commands are registered as plain commands: a Typer sub-app with only a
+# callback renders as a group, and its usage line gets a spurious COMMAND [ARGS]...
+app.command("status", help="Show current library configuration")(status)
+app.command("list", help="List available KiCad libraries")(list_cmd)
+app.command("init", help="Initialize library configuration")(init)
+app.command("pin", help="Pin favorite libraries")(pin)
+app.command("unpin", help="Unpin favorite libraries")(unpin)
+app.command("setup", help="Configure KiCad to use libraries")(setup)
+app.command("sync", help="Update/sync library content")(sync)
+app.command("add-3d", help="Add 3D model libraries")(add_3d)
+app.command("add-hook", help="Add project hooks")(add_hook)
+app.command(
+    "import",
+    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library",
+)(import_zip)
+# Groups keep their subcommands.
 app.add_typer(config_app, name="config", help="Manage configuration settings")
 app.add_typer(template_app, name="template", help="Manage project templates")
-app.add_typer(add_3d_app, name="add-3d", help="Add 3D model libraries")
-app.add_typer(sync_app, name="sync", help="Update/sync library content")
 app.add_typer(update_app, name="update", help="Update KiLM itself")
-app.add_typer(add_hook_app, name="add-hook", help="Add project hooks")
-app.add_typer(
-    import_zip_app,
-    name="import",
-    help="Import SamacSys/Mouser/UltraLibrarian/SnapMagic KiCad ZIP(s) into the library",
-)
 
 
 if __name__ == "__main__":
