@@ -10,12 +10,11 @@ from typing import Annotated
 
 import typer
 from rich.panel import Panel
-from rich.prompt import Confirm
 
 from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.kicad_common import as_json_object
+from kicad_lib_manager.utils.metadata import LIBRARY_FOLDERS
 
 LIBRARY_DESCRIPTIONS_FILE = "library_descriptions.yaml"
 LIBRARY_DESCRIPTIONS_TEMPLATE = """\
@@ -36,20 +35,13 @@ footprints:
 """
 
 
-def _sort_folders(
-    capabilities: object, present_before: set[str]
-) -> tuple[list[str], list[str]]:
+def _sort_folders(present_before: set[str]) -> tuple[list[str], list[str]]:
     """Split the library folders into those that existed and those just created.
 
-    ``capabilities`` maps folder names to whether the library has them, as
-    stored in the metadata; ``present_before`` names the directory entries
-    from before initialization.
+    ``present_before`` names the directory entries from before initialization.
     """
-    existing: list[str] = []
-    created: list[str] = []
-    for folder, present in (as_json_object(capabilities) or {}).items():
-        if present:
-            (existing if folder in present_before else created).append(folder)
+    existing = [folder for folder in LIBRARY_FOLDERS if folder in present_before]
+    created = [folder for folder in LIBRARY_FOLDERS if folder not in present_before]
     return existing, created
 
 
@@ -71,18 +63,12 @@ def _write_descriptions_template(directory: Path) -> None:
 
 
 def _report_folders(existing: list[str], created: list[str]) -> None:
-    """Print the folder status; exit when there are none and the user stops."""
+    """Print which library folders already existed and which were created."""
     console = get_console()
     if existing:
         console.print(f"[blue]Found existing folders:[/blue] {', '.join(existing)}")
     if created:
         console.print(f"[green]Created new folders:[/green] {', '.join(created)}")
-    if existing or created:
-        return
-    console.print("[yellow]Warning: No library folders were found or created.[/yellow]")
-    if not Confirm.ask("Continue anyway?", default=True):
-        console.print("[yellow]Initialization cancelled.[/yellow]")
-        raise typer.Exit(0)
 
 
 def _success_message(
@@ -149,20 +135,13 @@ def init(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         ),
     ] = False,
 ) -> None:
-    """Initialize the current directory as a KiCad library collection.
+    """Make the current directory a symbol/footprint library and register it.
 
-    This command sets up the current directory as a KiCad library containing
-    symbols, footprints, and templates. It creates the required folders if they
-    don't exist and registers the library in the local configuration.
-
-    [bold]Features:[/bold]
-    • Creates symbol, footprint, and template directories
-    • Generates metadata file with library information
-    • Assigns unique environment variable for KiCad integration
-    • Registers library in KiLM configuration
-
-    [bold]Note:[/bold] This is intended for GitHub-based libraries containing
-    symbols and footprints, not for 3D model libraries.
+    Creates the library folders, metadata, and descriptions template (see
+    the module docstring), records the directory in the KiLM configuration
+    as a GitHub library, and makes it the current library unless
+    --no-set-current is given. Exits 1 when the library cannot be written
+    or registered. 3D model libraries use ``add-3d`` instead.
     """
     current_dir = Path.cwd().resolve()
     console = get_console()
@@ -191,7 +170,7 @@ def init(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         raise typer.Exit(1) from e
 
     _write_descriptions_template(current_dir)
-    _report_folders(*_sort_folders(metadata.get("capabilities"), present_before))
+    _report_folders(*_sort_folders(present_before))
 
     library_name = str(metadata.get("name") or current_dir.name)
     try:

@@ -15,7 +15,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Final, TypedDict, cast
 
 import yaml
 
@@ -30,6 +30,7 @@ from kicad_lib_manager.utils.constants import (
 __all__ = [
     "CLOUD_METADATA_FILE",
     "GITHUB_METADATA_FILE",
+    "LIBRARY_FOLDERS",
     "CloudMetadata",
     "GitHubMetadata",
     "LibraryCapabilities",
@@ -37,11 +38,19 @@ __all__ = [
     "generate_env_var_name",
     "get_default_cloud_metadata",
     "get_default_github_metadata",
+    "library_capabilities",
     "read_cloud_metadata",
     "read_github_metadata",
     "write_cloud_metadata",
     "write_github_metadata",
 ]
+
+
+LIBRARY_FOLDERS: Final = ("symbols", "footprints", "templates")
+"""The top-level content folders of a symbol/footprint library.
+
+`LibraryCapabilities` has one flag per folder, in this order.
+"""
 
 
 class LibraryCapabilities(TypedDict, total=False):
@@ -52,8 +61,8 @@ class LibraryCapabilities(TypedDict, total=False):
     templates: bool
 
 
-class GitHubMetadata(TypedDict, total=False):
-    """kilm.yaml of a symbol/footprint library. Every field may be absent.
+class _LibraryMetadata(TypedDict, total=False):
+    """Fields shared by both metadata files. Every field may be absent.
 
     env_var names the environment variable that KiCad resolves to the
     library path; None or absent means the library has none.
@@ -64,22 +73,20 @@ class GitHubMetadata(TypedDict, total=False):
     type: str
     version: str
     env_var: str | None
-    capabilities: LibraryCapabilities
     created_with: str
     updated_with: str
 
 
-class CloudMetadata(TypedDict, total=False):
+class GitHubMetadata(_LibraryMetadata, total=False):
+    """kilm.yaml of a symbol/footprint library. Every field may be absent."""
+
+    capabilities: LibraryCapabilities
+
+
+class CloudMetadata(_LibraryMetadata, total=False):
     """.kilm_metadata of a 3D model library. Every field may be absent."""
 
-    name: str
-    description: str
-    type: str
-    version: str
-    env_var: str | None
     model_count: int
-    created_with: str
-    updated_with: str
 
 
 FieldCheck = Callable[[object], bool]
@@ -102,10 +109,7 @@ def _is_capabilities(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     flags = cast("dict[object, object]", value)
-    return all(
-        isinstance(flags.get(key, False), bool)
-        for key in LibraryCapabilities.__annotations__
-    )
+    return all(isinstance(flags.get(key, False), bool) for key in LIBRARY_FOLDERS)
 
 
 _COMMON_FIELDS: dict[str, FieldCheck] = {
@@ -232,8 +236,8 @@ def generate_env_var_name(name: str, prefix: str = "") -> str:
 def get_default_github_metadata(directory: Path) -> GitHubMetadata:
     """Metadata for a new library in directory, named after the directory.
 
-    Capabilities reflect which of the symbols, footprints, and templates
-    directories exist; env_var is KICAD_LIB_<NAME>.
+    Capabilities come from `library_capabilities`; env_var is
+    KICAD_LIB_<NAME>.
     """
     name = directory.name
     return {
@@ -242,23 +246,30 @@ def get_default_github_metadata(directory: Path) -> GitHubMetadata:
         "type": "github",
         "version": "1.0.0",
         "env_var": generate_env_var_name(name, "KICAD_LIB"),
-        "capabilities": {
-            "symbols": (directory / "symbols").exists(),
-            "footprints": (directory / "footprints").exists(),
-            "templates": (directory / "templates").exists(),
-        },
+        "capabilities": library_capabilities(directory),
         "created_with": "kilm",
         "updated_with": "kilm",
     }
 
 
-def count_model_files(directory: Path) -> int:
-    """Return the number of entries below ``directory`` named like 3D models.
+def library_capabilities(directory: Path) -> LibraryCapabilities:
+    """Return which of the `LIBRARY_FOLDERS` exist in directory."""
+    return {
+        "symbols": (directory / "symbols").exists(),
+        "footprints": (directory / "footprints").exists(),
+        "templates": (directory / "templates").exists(),
+    }
 
-    Matches MODEL_EXTENSIONS case-sensitively at any depth.
+
+def count_model_files(directory: Path) -> int:
+    """Return the number of files below ``directory`` named like 3D models.
+
+    Matches MODEL_EXTENSIONS case-sensitively at any depth, in one walk.
     """
     return sum(
-        len(list(directory.glob(f"**/*{extension}"))) for extension in MODEL_EXTENSIONS
+        1
+        for file in directory.rglob("*")
+        if file.suffix in MODEL_EXTENSIONS and file.is_file()
     )
 
 

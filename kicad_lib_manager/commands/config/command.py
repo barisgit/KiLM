@@ -16,9 +16,13 @@ from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import (
     CLOUD_METADATA_FILE,
     GITHUB_METADATA_FILE,
-    MODEL_EXTENSIONS,
 )
-from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
+from kicad_lib_manager.utils.metadata import (
+    LIBRARY_FOLDERS,
+    count_model_files,
+    read_cloud_metadata,
+    read_github_metadata,
+)
 
 
 @dataclass(frozen=True)
@@ -184,15 +188,11 @@ def _github_details(path: Path) -> list[str]:
         metadata.get("description"), metadata.get("version"), metadata.get("env_var")
     )
     capabilities = metadata.get("capabilities")
-    if isinstance(capabilities, dict):
+    if capabilities is not None:
         features = [
-            label
-            for key, label in (
-                ("symbols", "Symbols"),
-                ("footprints", "Footprints"),
-                ("templates", "Templates"),
-            )
-            if capabilities.get(key)
+            folder.capitalize()
+            for folder in LIBRARY_FOLDERS
+            if capabilities.get(folder)
         ]
         lines.append(f"[white]Features:[/white] {', '.join(features) or 'none'}")
     return lines
@@ -217,25 +217,23 @@ def _cloud_details(path: Path) -> list[str]:
     return lines
 
 
-def _common_details(description: object, version: object, env_var: object) -> list[str]:
+def _common_details(
+    description: str | None, version: str | None, env_var: str | None
+) -> list[str]:
     """Return the description, version, and environment variable lines that are set."""
     lines: list[str] = []
     if description is not None:
-        lines.append(f"[green]Description:[/green] {escape(str(description))}")
+        lines.append(f"[green]Description:[/green] {escape(description)}")
     if version is not None:
-        lines.append(f"[yellow]Version:[/yellow] {escape(str(version))}")
-    if env_var:
-        lines.append(f"[magenta]Environment Variable:[/magenta] {escape(str(env_var))}")
+        lines.append(f"[yellow]Version:[/yellow] {escape(version)}")
+    if env_var is not None and env_var:
+        lines.append(f"[magenta]Environment Variable:[/magenta] {escape(env_var)}")
     return lines
 
 
 def _counted_models(path: Path) -> str:
     """Return the model count line for a library by counting its model files."""
-    count = sum(
-        1
-        for file in path.rglob("*")
-        if file.suffix in MODEL_EXTENSIONS and file.is_file()
-    )
+    count = count_model_files(path)
     return f"[white]3D Models:[/white] {count} [dim](counted)[/dim]"
 
 

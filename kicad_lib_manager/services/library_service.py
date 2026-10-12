@@ -1,22 +1,20 @@
 """Create KiLM libraries and register their contents with KiCad."""
 
 from pathlib import Path
-from typing import Final
 
 from kicad_lib_manager.services.kicad_config import find_kicad_config
 from kicad_lib_manager.services.library_table import add_libraries
 from kicad_lib_manager.utils.constants import GITHUB_METADATA_FILE
 from kicad_lib_manager.utils.file_ops import list_libraries
 from kicad_lib_manager.utils.metadata import (
+    LIBRARY_FOLDERS,
     GitHubMetadata,
     generate_env_var_name,
     get_default_github_metadata,
+    library_capabilities,
     read_github_metadata,
     write_github_metadata,
 )
-
-LIBRARY_FOLDERS: Final = ("symbols", "footprints", "templates")
-"""The top-level folders of a KiLM library, created by `initialize_library`."""
 
 
 class LibraryService:
@@ -82,12 +80,8 @@ class LibraryService:
 
         for folder in LIBRARY_FOLDERS:
             (directory / folder).mkdir(parents=True, exist_ok=True)
-        # Every folder exists now, so the library can hold each kind.
-        metadata["capabilities"] = {
-            "symbols": True,
-            "footprints": True,
-            "templates": True,
-        }
+        # Every folder exists now, so every capability is set.
+        metadata["capabilities"] = library_capabilities(directory)
         if not write_github_metadata(directory, metadata):
             msg = f"Could not write {GITHUB_METADATA_FILE} in {directory}"
             raise OSError(msg)
