@@ -18,7 +18,7 @@ from ...utils.env_vars import (
     update_kicad_env_vars,
     update_pinned_libraries,
 )
-from ...utils.file_ops import list_libraries
+from ...utils.file_ops import list_libraries, write_atomically
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
 
 
@@ -63,11 +63,8 @@ def fix_invalid_uris(
                         create_backup(table_path, max_backups)
 
                     # Replace invalid URIs
-                    fixed_content = re.sub(pattern, r'(uri "\\1/\\2")', content)
-
-                    # Ensure UTF-8 encoding when writing
-                    with table_path.open("w", encoding="utf-8") as f:
-                        f.write(fixed_content)
+                    fixed_content = re.sub(pattern, r'(uri "\1/\2")', content)
+                    write_atomically(table_path, fixed_content.encode("utf-8"))
 
     return changes_made
 
