@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.panel import Panel
@@ -70,47 +71,61 @@ def fix_invalid_uris(
 
 
 def setup(
-    kicad_lib_dir: str | None = typer.Option(
-        None,
-        "--kicad-lib-dir",
-        envvar="KICAD_USER_LIB",
-        help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
-    ),
-    kicad_3d_dir: str | None = typer.Option(
-        None,
-        "--kicad-3d-dir",
-        envvar="KICAD_3D_LIB",
-        help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not specified)",
-    ),
-    threed_lib_dirs: str | None = typer.Option(
-        None,
-        "--threed-lib-dirs",
-        help="Names of 3D model libraries to use (comma-separated, uses all if not specified)",
-    ),
-    symbol_lib_dirs: str | None = typer.Option(
-        None,
-        "--symbol-lib-dirs",
-        help="Names of symbol libraries to use (comma-separated, uses current if not specified)",
-    ),
-    all_libraries: bool = typer.Option(
-        False,
-        "--all-libraries",
-        help="Set up all configured libraries (both symbols and 3D models)",
-    ),
-    max_backups: int = typer.Option(
-        5, "--max-backups", help="Maximum number of backups to keep"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be done without making changes"
-    ),
-    pin_libraries: bool = typer.Option(
-        True,
-        "--pin-libraries/--no-pin-libraries",
-        help="Add libraries to KiCad pinned libraries for quick access",
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show more information for debugging"
-    ),
+    kicad_lib_dir: Annotated[
+        str | None,
+        typer.Option(
+            "--kicad-lib-dir",
+            envvar="KICAD_USER_LIB",
+            help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
+        ),
+    ] = None,
+    kicad_3d_dir: Annotated[
+        str | None,
+        typer.Option(
+            "--kicad-3d-dir",
+            envvar="KICAD_3D_LIB",
+            help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not specified)",
+        ),
+    ] = None,
+    threed_lib_dirs: Annotated[
+        str | None,
+        typer.Option(
+            "--threed-lib-dirs",
+            help="Names of 3D model libraries to use (comma-separated, uses all if not specified)",
+        ),
+    ] = None,
+    symbol_lib_dirs: Annotated[
+        str | None,
+        typer.Option(
+            "--symbol-lib-dirs",
+            help="Names of symbol libraries to use (comma-separated, uses current if not specified)",
+        ),
+    ] = None,
+    all_libraries: Annotated[
+        bool,
+        typer.Option(
+            "--all-libraries",
+            help="Set up all configured libraries (both symbols and 3D models)",
+        ),
+    ] = False,
+    max_backups: Annotated[
+        int, typer.Option("--max-backups", help="Maximum number of backups to keep")
+    ] = 5,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would be done without making changes"),
+    ] = False,
+    pin_libraries: Annotated[
+        bool,
+        typer.Option(
+            "--pin-libraries/--no-pin-libraries",
+            help="Add libraries to KiCad pinned libraries for quick access",
+        ),
+    ] = True,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show more information for debugging"),
+    ] = False,
 ) -> None:
     """Configure KiCad to use libraries in the specified directory
 
