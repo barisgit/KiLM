@@ -4,19 +4,16 @@ import zipfile
 import zlib
 from pathlib import Path, PurePosixPath
 
-from .errors import ImportFailure
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
 
-
-def _lzma_errors() -> tuple[type[Exception], ...]:
-    """LZMAError, or nothing on a Python built without the lzma module.
-
-    zipfile then reports LZMA members as RuntimeError instead.
-    """
-    try:
-        from lzma import LZMAError
-    except ImportError:
-        return ()
-    return (LZMAError,)
+_LZMA_ERRORS: tuple[type[Exception], ...]
+try:
+    from lzma import LZMAError
+except ImportError:
+    # Python built without lzma: zipfile reports LZMA members as RuntimeError.
+    _LZMA_ERRORS = ()
+else:
+    _LZMA_ERRORS = (LZMAError,)
 
 
 # What zipfile raises for a corrupt archive, including the errors it lets
@@ -28,7 +25,7 @@ _CORRUPT_ARCHIVE_ERRORS: tuple[type[Exception], ...] = (
     zlib.error,
     EOFError,
     UnicodeDecodeError,
-    *_lzma_errors(),
+    *_LZMA_ERRORS,
 )
 
 MODEL_SUFFIXES = (".stp", ".step", ".stp.gz", ".step.gz")
@@ -61,7 +58,7 @@ def extract_part_files(zip_path: Path, dest: Path) -> list[Path]:
     Returns the extracted paths in member name order.
 
     Raises:
-        ImportFailure: The archive is corrupt, has a member that would land
+        ImportZipError: The archive is corrupt, has a member that would land
             outside dest, or has a part file that is encrypted or uses a
             compression method zipfile cannot read.
     """
@@ -79,15 +76,17 @@ def extract_part_files(zip_path: Path, dest: Path) -> list[Path]:
                 for i, member in enumerate(members)
             ]
     except _CORRUPT_ARCHIVE_ERRORS as exc:
-        raise ImportFailure(f"invalid or corrupt ZIP: {exc}") from exc
+        msg = f"invalid or corrupt ZIP: {exc}"
+        raise ImportZipError(msg) from exc
     except (RuntimeError, NotImplementedError) as exc:
         # What zipfile raises for members it cannot decrypt or decompress
         # (e.g. without the bz2 or lzma module) that the checks did not catch.
-        raise ImportFailure(f"unreadable archive: {exc}") from exc
+        msg = f"unreadable archive: {exc}"
+        raise ImportZipError(msg) from exc
 
 
 def _reject_unsafe_paths(zf: zipfile.ZipFile, dest: Path) -> None:
-    """Raise ImportFailure if any member would resolve outside dest (zip-slip).
+    """Raise ImportZipError if any member would resolve outside dest (zip-slip).
 
     zipfile sanitises names on extraction too; an archive built to escape is
     rejected as a whole rather than trusted for its other members.
@@ -96,7 +95,8 @@ def _reject_unsafe_paths(zf: zipfile.ZipFile, dest: Path) -> None:
     for name in zf.namelist():
         resolved = (dest / name).resolve()
         if resolved != root and not resolved.is_relative_to(root):
-            raise ImportFailure(f"unsafe ZIP entry rejected: {name!r}")
+            msg = f"unsafe ZIP entry rejected: {name!r}"
+            raise ImportZipError(msg)
 
 
 def _is_part_file(member: zipfile.ZipInfo) -> bool:
@@ -110,11 +110,13 @@ def _is_part_file(member: zipfile.ZipInfo) -> bool:
 
 def _require_readable(member: zipfile.ZipInfo) -> None:
     if member.flag_bits & _ENCRYPTED_FLAG:
-        raise ImportFailure(
+        msg = (
             f"{member.filename} is encrypted; password-protected ZIPs are not supported"
         )
+        raise ImportZipError(msg)
     if member.compress_type not in _SUPPORTED_COMPRESSION:
-        raise ImportFailure(
+        msg = (
             f"{member.filename} uses unsupported compression method "
             f"{member.compress_type}"
         )
+        raise ImportZipError(msg)

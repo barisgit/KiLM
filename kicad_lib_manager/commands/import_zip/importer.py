@@ -6,15 +6,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from kicad_lib_manager.commands.import_zip.archive import extract_part_files, is_model
+from kicad_lib_manager.commands.import_zip.errors import ImportZipError
+from kicad_lib_manager.commands.import_zip.formats import require_compatible
+from kicad_lib_manager.commands.import_zip.kicad_cli import Upgrader
+from kicad_lib_manager.commands.import_zip.symbols import SymbolMerge, merge_symbols
+from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.console import get_console
-
-from ...utils.backup import create_backup
-from ...utils.file_ops import write_atomically
-from .archive import extract_part_files, is_model
-from .errors import ImportFailure
-from .formats import require_compatible
-from .kicad_cli import Upgrader
-from .symbols import SymbolMerge, merge_symbols
+from kicad_lib_manager.utils.file_ops import write_atomically
 
 
 @dataclass(frozen=True)
@@ -26,6 +25,7 @@ class ModelRef:
 
     @property
     def path(self) -> str:
+        """The reference footprints use for this model."""
         return f"{self.prefix}/{self.name}"
 
 
@@ -71,6 +71,7 @@ class ZipResult:
     models: list[str] = field(default_factory=list)
 
     def extend(self, other: "ZipResult") -> None:
+        """Add what other added to this result."""
         self.symbols.extend(other.symbols)
         self.footprints.extend(other.footprints)
         self.models.extend(other.models)
@@ -112,7 +113,7 @@ def import_zip_file(zip_path: Path, target: ImportTarget) -> ZipResult:
     before its first change in the run.
 
     Raises:
-        ImportFailure: The ZIP is unreadable or holds files the library
+        ImportZipError: The ZIP is unreadable or holds files the library
             cannot take.
         OSError: A write failed. Files written before it stay, and later
             ZIPs and re-runs skip them.
@@ -158,9 +159,8 @@ def _read_utf8(path: Path) -> str:
     try:
         return path.read_bytes().decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise ImportFailure(
-            f"{path.name} is not valid UTF-8 ({exc.reason} at byte {exc.start})"
-        ) from exc
+        msg = f"{path.name} is not valid UTF-8 ({exc.reason} at byte {exc.start})"
+        raise ImportZipError(msg) from exc
 
 
 def _read_vendor_text(path: Path) -> str:

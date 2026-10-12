@@ -1,131 +1,98 @@
-"""Git utility functions for KiCad Library Manager.
-Handles Git hooks directory detection and safe hook management.
+"""Git hook management for KiCad Library Manager.
+
+Finds a repository's active hooks directory and merges the KiLM sync hook
+into existing hooks without losing their content.
 """
 
-import os
+import shutil
 import subprocess
-from datetime import datetime
 from pathlib import Path
+
+from kicad_lib_manager.utils.backup import unique_backup_path
+
+_BEGIN_MARKER = "# BEGIN KiLM-managed section"
+_END_MARKER = "# END KiLM-managed section"
 
 
 def get_git_hooks_directory(repo_path: Path) -> Path:
-    """Get the active Git hooks directory for a repository.
+    """Return the active Git hooks directory of repo_path, creating it if needed.
 
-    This function detects the correct hooks directory by:
-    1. Using git rev-parse --git-path hooks (handles core.hooksPath, worktrees, and common dir)
-    2. Falling back to git rev-parse --git-common-dir + hooks
-
-    Args:
-        repo_path: Path to the Git repository
-
-    Returns:
-        Path to the active hooks directory
+    Git is asked for the hooks path, which honours core.hooksPath and
+    worktrees; when that fails, the hooks directory of the common Git
+    directory is used.
 
     Raises:
-        RuntimeError: If the repository is not a valid Git repository
+        RuntimeError: repo_path does not exist, Git is not installed, or
+            repo_path is not a Git repository.
     """
     if not repo_path.exists():
-        raise RuntimeError(f"Repository path does not exist: {repo_path}")
+        msg = f"Repository path does not exist: {repo_path}"
+        raise RuntimeError(msg)
 
-    # Ask Git for the effective hooks directory. Handles core.hooksPath, worktrees, and common dir.
+    hooks_dir = _rev_parse_path(repo_path, "--git-path", "hooks")
+    if hooks_dir is None:
+        common_dir = _rev_parse_path(repo_path, "--git-common-dir")
+        if common_dir is None:
+            msg = f"Not a Git repository: {repo_path}"
+            raise RuntimeError(msg)
+        hooks_dir = (common_dir / "hooks").resolve()
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    return hooks_dir
+
+
+def _rev_parse_path(repo_path: Path, *args: str) -> Path | None:
+    """Return the path `git rev-parse` prints for args, or None if it fails.
+
+    A relative path is resolved against repo_path.
+    """
+    git = shutil.which("git")
+    if git is None:
+        msg = "Git is not installed or not on PATH"
+        raise RuntimeError(msg)
     try:
-        rp = subprocess.run(
-            ["git", "-C", str(repo_path), "rev-parse", "--git-path", "hooks"],
+        result = subprocess.run(  # noqa: S603 -- fixed git rev-parse command; repo_path is passed as one argument
+            [git, "-C", str(repo_path), "rev-parse", *args],
             capture_output=True,
             text=True,
             check=True,
         )
-        hooks_dir = Path(rp.stdout.strip())
-        if not hooks_dir.is_absolute():
-            hooks_dir = (repo_path / hooks_dir).resolve()
-        hooks_dir.mkdir(parents=True, exist_ok=True)
-        return hooks_dir
-    except subprocess.CalledProcessError as e:
-        # Fallback: resolve common dir then append hooks
-        try:
-            cd = subprocess.run(
-                ["git", "-C", str(repo_path), "rev-parse", "--git-common-dir"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            common_dir = Path(cd.stdout.strip())
-            if not common_dir.is_absolute():
-                common_dir = (repo_path / common_dir).resolve()
-            hooks_dir = common_dir / "hooks"
-            hooks_dir.mkdir(parents=True, exist_ok=True)
-            return hooks_dir.resolve()
-        except subprocess.CalledProcessError:
-            raise RuntimeError(f"Not a Git repository: {repo_path}") from e
+    except subprocess.CalledProcessError:
+        return None
+    path = Path(result.stdout.strip())
+    return path if path.is_absolute() else (repo_path / path).resolve()
 
 
 def backup_existing_hook(hook_path: Path) -> Path:
-    """Create a timestamped backup of an existing hook file.
+    """Copy hook_path to a timestamped sibling and return the copy's path.
 
-    Args:
-        hook_path: Path to the existing hook file
-
-    Returns:
-        Path to the backup file
+    The copy keeps the hook's permission bits, so an executable hook stays
+    executable, and never overwrites an earlier backup.
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = hook_path.with_suffix(f".backup.{timestamp}")
-
-    # Copy the file content
-    backup_path.write_text(hook_path.read_text(encoding="utf-8"))
-
-    # Preserve executable permissions (Unix-like systems only)
-    if (
-        os.name != "nt" and hook_path.stat().st_mode & 0o111
-    ):  # Not Windows and executable
-        backup_path.chmod(0o755)
-
+    backup_path = unique_backup_path(hook_path)
+    shutil.copy2(hook_path, backup_path)
     return backup_path
 
 
 def merge_hook_content(existing_content: str, kilm_content: str) -> str:
-    """Safely merge existing hook content with KiLM content.
+    """Return existing_content with kilm_content as its KiLM-managed section.
 
-    Args:
-        existing_content: Content of existing hook
-        kilm_content: KiLM hook content to add
-
-    Returns:
-        Merged hook content
+    A complete KiLM-managed section in existing_content is replaced in place;
+    otherwise kilm_content is appended after a blank line.
     """
-    # Check if KiLM content is already present
-    if "KiLM-managed section" in existing_content:
-        # Already has KiLM content, replace the section
-        lines = existing_content.split("\n")
-        start_marker = "# BEGIN KiLM-managed section"
-        end_marker = "# END KiLM-managed section"
+    lines = existing_content.split("\n")
+    stripped = [line.strip() for line in lines]
+    if _BEGIN_MARKER in stripped:
+        start = stripped.index(_BEGIN_MARKER)
+        if _END_MARKER in stripped[start:]:
+            end = stripped.index(_END_MARKER, start)
+            return "\n".join([*lines[:start], kilm_content, *lines[end + 1 :]])
 
-        start_idx = None
-        end_idx = None
-
-        for i, line in enumerate(lines):
-            if line.strip() == start_marker:
-                start_idx = i
-            elif line.strip() == end_marker:
-                end_idx = i
-                break
-
-        if start_idx is not None and end_idx is not None:
-            # Replace existing KiLM section
-            new_lines = lines[:start_idx] + [kilm_content] + lines[end_idx + 1 :]
-            return "\n".join(new_lines)
-
-    # Add KiLM content at the end with clear markers
     return f"{existing_content.rstrip()}\n\n{kilm_content}"
 
 
 def create_kilm_hook_content() -> str:
-    """Create the standard KiLM hook content with clear markers.
-
-    Returns:
-        Formatted hook content string
-    """
-    return """# BEGIN KiLM-managed section
+    """Return the KiLM hook section, which runs `kilm sync`, between its markers."""
+    return f"""{_BEGIN_MARKER}
 # KiCad Library Manager auto-sync hook
 # Added by kilm add-hook command
 
@@ -136,4 +103,4 @@ kilm sync
 # kilm setup
 
 echo "KiCad libraries sync complete."
-# END KiLM-managed section"""
+{_END_MARKER}"""
