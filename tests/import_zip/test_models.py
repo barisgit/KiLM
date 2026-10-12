@@ -33,6 +33,10 @@ def _footprint(library_tree: Path, name: str) -> str:
         "(model somepart.step",
         "(model somepart.stp.gz",
         "(model somepart.step.gz",
+        "(model C:/Vendor/SomePart.STP",
+        "(model C:/Vendor/SomePart.STEP",
+        "(model SomePart.STP.GZ",
+        "(model SomePart.Step.gz",
     ],
 )
 def test_fix_3d_path_points_known_models_at_the_library(raw: str) -> None:

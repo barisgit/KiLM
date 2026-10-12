@@ -136,7 +136,7 @@ _MODEL_PATH_RE = re.compile(
     # Longer/compound extensions must come before their literal prefixes
     # (e.g. "step.gz" before "step"), or the alternation matches the
     # shorter one first and leaves the rest of the extension dangling.
-    r'\(model\s+(?:"([^"]+)"|(\S+\.(?:step\.gz|stp\.gz|step|stp)))'
+    r'\(model\s+(?:"([^"]+)"|(\S+\.(?i:step\.gz|stp\.gz|step|stp)))'
 )
 
 
