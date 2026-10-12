@@ -50,7 +50,7 @@
 
           devShells.default = pkgs.mkShell {
             # Python, runtime deps, and pytest come from the package. Lint and
-            # type-check through `uv run` so ruff and pyrefly match uv.lock.
+            # type-check through `uv run` so ruff and ty match uv.lock.
             inputsFrom = [ kilm ];
             packages = [ pkgs.uv ];
             # Import the in-tree package instead of requiring an install step.

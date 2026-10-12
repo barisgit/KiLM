@@ -4,7 +4,7 @@ Adds a git post-merge hook to the current repository to automatically update KiC
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -21,7 +21,7 @@ console = Console()
 
 def add_hook(
     directory: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             help="Target git repository directory (defaults to current directory)"
         ),

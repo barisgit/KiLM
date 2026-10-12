@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from .errors import ImportFailure
 
@@ -15,19 +15,19 @@ _FORMAT_VERSION_RE = re.compile(r"\(version\s+(\d+)\)")
 _HEADER_CHARS = 1024
 
 
-def format_version(text: str) -> Optional[int]:
+def format_version(text: str) -> int | None:
     """Return the format version in a KiCad file header, None when absent."""
     m = _FORMAT_VERSION_RE.search(text[:_HEADER_CHARS])
     return int(m.group(1)) if m else None
 
 
-def file_format_version(path: Path) -> Optional[int]:
+def file_format_version(path: Path) -> int | None:
     """format_version of a file, reading only its header."""
     with path.open(encoding="utf-8", errors="replace") as fh:
         return format_version(fh.read(_HEADER_CHARS))
 
 
-def footprint_lib_version(fp_dir: Path) -> Optional[int]:
+def footprint_lib_version(fp_dir: Path) -> int | None:
     """Newest format among fp_dir's footprints; None when it has none.
 
     Legacy (module ...) footprints carry no version and count as 0.
@@ -39,7 +39,7 @@ def footprint_lib_version(fp_dir: Path) -> Optional[int]:
 def require_compatible(
     name: str,
     text: str,
-    limit: Optional[int],
+    limit: int | None,
     library: Path,
     kind: Literal["sym", "fp"],
 ) -> None:

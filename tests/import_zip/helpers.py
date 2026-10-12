@@ -2,7 +2,6 @@
 
 import zipfile
 from pathlib import Path
-from typing import Union
 from unittest.mock import patch
 
 from click.testing import Result
@@ -30,7 +29,7 @@ INCOMING_SYM = """\
 """
 
 
-def zip_with(tmp_path: Path, name: str, files: dict[str, Union[str, bytes]]) -> Path:
+def zip_with(tmp_path: Path, name: str, files: dict[str, str | bytes]) -> Path:
     """Write tmp_path/<name>.zip holding files (member name -> content)."""
     zip_path = tmp_path / f"{name}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:

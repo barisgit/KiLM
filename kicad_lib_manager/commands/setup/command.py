@@ -4,7 +4,6 @@ Setup command implementation for KiCad Library Manager (Typer version).
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -78,24 +77,24 @@ def fix_invalid_uris(
 
 
 def setup(
-    kicad_lib_dir: Optional[str] = typer.Option(
+    kicad_lib_dir: str | None = typer.Option(
         None,
         "--kicad-lib-dir",
         envvar="KICAD_USER_LIB",
         help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",
     ),
-    kicad_3d_dir: Optional[str] = typer.Option(
+    kicad_3d_dir: str | None = typer.Option(
         None,
         "--kicad-3d-dir",
         envvar="KICAD_3D_LIB",
         help="KiCad 3D models directory (uses KICAD_3D_LIB env var if not specified)",
     ),
-    threed_lib_dirs: Optional[str] = typer.Option(
+    threed_lib_dirs: str | None = typer.Option(
         None,
         "--threed-lib-dirs",
         help="Names of 3D model libraries to use (comma-separated, uses all if not specified)",
     ),
-    symbol_lib_dirs: Optional[str] = typer.Option(
+    symbol_lib_dirs: str | None = typer.Option(
         None,
         "--symbol-lib-dirs",
         help="Names of symbol libraries to use (comma-separated, uses current if not specified)",

@@ -7,7 +7,6 @@ import os
 import platform
 import re
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -35,9 +34,9 @@ class LibraryService:
     def initialize_library(
         self,
         directory: Path,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        env_var: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
+        env_var: str | None = None,
         force: bool = False,
         no_env_var: bool = False,
     ) -> dict:
@@ -92,7 +91,7 @@ class LibraryService:
 
         return metadata
 
-    def get_library_metadata(self, directory: Path) -> Optional[dict]:
+    def get_library_metadata(self, directory: Path) -> dict | None:
         """Get metadata for a library directory."""
         return read_github_metadata(directory)
 
@@ -148,8 +147,8 @@ class LibraryService:
     def add_libraries(
         kicad_lib_dir: str,
         kicad_config: Path,
-        kicad_3d_dir: Optional[str] = None,
-        additional_3d_dirs: Optional[dict[str, str]] = None,
+        kicad_3d_dir: str | None = None,
+        additional_3d_dirs: dict[str, str] | None = None,
         dry_run: bool = False,
     ) -> tuple[set[str], bool]:
         """

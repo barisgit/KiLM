@@ -4,7 +4,6 @@ import re
 from collections.abc import Mapping
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
-from typing import Optional
 
 from .errors import ImportFailure
 
@@ -20,7 +19,7 @@ def extract_symbol_blocks(text: str) -> list[str]:
     blocks: list[str] = []
     depth = 0
     in_str = False
-    block_start: Optional[int] = None
+    block_start: int | None = None
     i = 0
     n = len(text)
     while i < n:
@@ -55,7 +54,7 @@ def symbol_name(block: str) -> str:
 
 
 def fix_footprint_ref(
-    block: str, default_lib: str, fp_refs: Optional[Mapping[str, str]] = None
+    block: str, default_lib: str, fp_refs: Mapping[str, str] | None = None
 ) -> str:
     """Point the symbol's Footprint field at a footprint library.
 
@@ -89,7 +88,7 @@ def merge_symbols(
     source: str,
     library: str,
     default_fp_lib: str,
-    fp_refs: Optional[Mapping[str, str]] = None,
+    fp_refs: Mapping[str, str] | None = None,
     known: AbstractSet[str] = frozenset(),
 ) -> SymbolMerge:
     """Append the symbols of source that library lacks.

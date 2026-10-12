@@ -17,18 +17,16 @@ maintainers = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research", 
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
-    "Framework :: Pytest",
-    "Development Status :: 4 - Beta",
     "Natural Language :: English",
     "Environment :: Console",
 ]
@@ -40,27 +38,26 @@ keywords = [
     "pcb-design",
     "cli",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
     "typer>=0.17.4",
     "rich>=14.0.0",
     "packaging>=25.0",
     "pyyaml>=6.0",
-    "pathlib>=1.0.1",
     "pathspec>=0.12.1",
     "jinja2>=3.1.6",
     "questionary>=1.10.0",
     "requests>=2.32.4",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pyrefly>=0.31.0",
-    "ruff>=0.1.0",
-    "pre-commit>=3.5.0",
+    "pre-commit>=4.4.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.0",
+    "ty>=0.0.86",
 ]
 
 [project.urls]
@@ -72,26 +69,31 @@ Repository = "https://github.com/barisgit/KiLM"
 [project.scripts]
 kilm = "kicad_lib_manager.main:app"
 
+[tool.uv]
+# Oldest uv verified with this lockfile; CI pins an exact version.
+required-version = ">=0.9.8"
 
 [tool.hatch.build.targets.wheel]
 packages = ["kicad_lib_manager"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"] 
+testpaths = ["tests"]
+# Release workflow scripts are tested as top-level modules.
+pythonpath = [".github/scripts"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Coverage is opt-in (`just cov`) so the default run stays fast and writes no reports.
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=kicad_lib_manager",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
 ]
 
+[tool.ty.environment]
+# Matches pytest's pythonpath so the tests of .github/scripts resolve.
+extra-paths = [".github/scripts"]
+
 [tool.ruff]
-target-version = "py39"
 line-length = 88
 
 [tool.ruff.lint]
@@ -118,9 +120,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["ARG", "S101"]
 
-[tool.pyrefly]
-python-version = "3.9"
-
 [tool.coverage.run]
 source = ["kicad_lib_manager"]
 omit = [
@@ -129,12 +128,15 @@ omit = [
 ]
 
 [tool.coverage.report]
+# Measured 45.5% when coverage became opt-in; raise it as tests are added.
+fail_under = 45
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
     "if self.debug:",
     "if settings.DEBUG",
-    "raise AssertionError", 
+    "raise AssertionError",
     "raise NotImplementedError",
     "if 0:",
     "if __name__ == .__main__.:",

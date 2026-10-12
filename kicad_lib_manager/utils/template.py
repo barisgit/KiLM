@@ -11,7 +11,7 @@ import shutil
 import traceback
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional, TypedDict, Union, cast
+from typing import Any, NamedTuple, TypedDict, cast
 
 import click
 import jinja2
@@ -96,6 +96,14 @@ class TemplateVariable(TypedDict):
     default: str
 
 
+class _PlannedFile(NamedTuple):
+    """A template file and the project path it renders to."""
+
+    source: Path
+    target: Path
+    is_binary: bool
+
+
 class TemplateDependencies(TypedDict):
     """Template dependencies definition."""
 
@@ -117,7 +125,7 @@ class TemplateMetadata(TypedDict, total=False):
     library_path: str
 
 
-def get_gitignore_spec(directory: Path) -> Optional[pathspec.PathSpec]:
+def get_gitignore_spec(directory: Path) -> pathspec.PathSpec | None:
     """
     Get a PathSpec object representing the gitignore patterns in the given directory.
 
@@ -209,7 +217,7 @@ def list_templates_in_directory(directory: Path) -> list[TemplateMetadata]:
 
 
 def find_potential_variables(
-    directory: Path, patterns: Optional[list[str]] = None
+    directory: Path, patterns: list[str] | None = None
 ) -> dict[str, list[str]]:
     """
     Scan files in a directory for potential template variables.
@@ -276,11 +284,11 @@ def find_potential_variables(
 
 def create_template_metadata(
     name: str,
-    description: Optional[str] = None,
-    use_case: Optional[str] = None,
-    variables: Optional[dict[str, TemplateVariable]] = None,
-    extends: Optional[str] = None,
-    dependencies: Optional[list[str]] = None,
+    description: str | None = None,
+    use_case: str | None = None,
+    variables: dict[str, TemplateVariable] | None = None,
+    extends: str | None = None,
+    dependencies: list[str] | None = None,
 ) -> TemplateMetadata:
     """
     Create template metadata dictionary.
@@ -416,8 +424,8 @@ def create_template_structure(
     source_directory: Path,
     template_directory: Path,
     metadata: TemplateMetadata,
-    gitignore_spec: Optional[pathspec.PathSpec] = None,
-    additional_excludes: Optional[list[str]] = None,
+    gitignore_spec: pathspec.PathSpec | None = None,
+    additional_excludes: list[str] | None = None,
 ) -> None:
     """
     Create template structure from source directory.
@@ -477,9 +485,9 @@ def create_template_structure(
     MAX_PATH_LENGTH = 512
 
     # Track main KiCad files
-    main_project_file: Optional[str] = None
-    main_schematic_file: Optional[str] = None
-    main_pcb_file: Optional[str] = None
+    main_project_file: str | None = None
+    main_schematic_file: str | None = None
+    main_pcb_file: str | None = None
 
     # First scan to find main KiCad files
     click.echo("Scanning for main KiCad files...")
@@ -850,7 +858,7 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
 
 # Add new functions for rendering templates and creating projects from templates
 def render_template_string(
-    template_str: str, variables: Mapping[str, Union[str, int, bool]]
+    template_str: str, variables: Mapping[str, str | int | bool]
 ) -> str:
     """
     Render a template string using Jinja2 or custom Windows-compatible templating.
@@ -878,7 +886,7 @@ def render_template_string(
 
 
 def render_filename_custom(
-    filename: str, variables: Mapping[str, Union[str, int, bool]]
+    filename: str, variables: Mapping[str, str | int | bool]
 ) -> str:
     """
     Render a filename using a custom Windows-compatible templating system.
@@ -973,9 +981,7 @@ def render_filename_custom(
     return filename
 
 
-def render_filename(
-    filename: str, variables: Mapping[str, Union[str, int, bool]]
-) -> str:
+def render_filename(filename: str, variables: Mapping[str, str | int | bool]) -> str:
     """
     Render a filename using either Jinja2 or custom Windows-compatible templating.
 
@@ -1015,7 +1021,7 @@ def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
     Returns:
         Dictionary mapping template names to template metadata
     """
-    all_templates = {}
+    all_templates: dict[str, TemplateMetadata] = {}
     all_libraries = config.get_libraries()  # type: ignore[attr-defined]
 
     for library in all_libraries:
@@ -1026,7 +1032,10 @@ def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
         templates = list_templates_in_directory(Path(library_path))
         for template in templates:
             name = template.get("name")
-            if name and name not in all_templates:
+            if not name:
+                # A template without a name cannot be selected, so it is not listed.
+                continue
+            if name not in all_templates:
                 # Add the template
                 all_templates[name] = template
 
@@ -1034,15 +1043,12 @@ def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
                 all_templates[name]["source_library"] = library.get("name", "unknown")
                 all_templates[name]["library_path"] = library_path
             else:
-                # Store template
-                if name in all_templates:
-                    # Use click.echo for warnings/errors
-                    click.echo(
-                        f"Warning: Duplicate template name '{name}' found.", err=True
-                    )
-                    click.echo(f"  Existing: {all_templates[name]['path']}", err=True)
-                    click.echo(f"  New: {template['path']}", err=True)
-                all_templates[name] = template
+                # Libraries are searched in configured order, so the first one wins.
+                click.echo(
+                    f"Warning: Duplicate template name '{name}' found.", err=True
+                )
+                click.echo(f"  Using: {all_templates[name]['path']}", err=True)
+                click.echo(f"  Ignoring: {template['path']}", err=True)
 
     return all_templates
 
@@ -1050,7 +1056,7 @@ def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
 def render_template_file(
     source_file: Path,
     target_file: Path,
-    variables: Mapping[str, Union[str, int, bool]],
+    variables: Mapping[str, str | int | bool],
     is_binary: bool = False,
 ) -> bool:
     """
@@ -1132,8 +1138,8 @@ def render_template_file(
 def create_project_from_template(
     template_dir: Path,
     project_dir: Path,
-    variables: Mapping[str, Union[str, int, bool]],
-    metadata: Optional[dict[str, Any]] = None,
+    variables: Mapping[str, str | int | bool],
+    metadata: dict[str, Any] | None = None,
     dry_run: bool = False,
     skip_hooks: bool = False,
 ) -> bool:
@@ -1199,7 +1205,7 @@ def create_project_from_template(
         click.echo("Warning: Template inheritance not fully implemented yet", err=True)
 
     # Collect files to create
-    files_to_create = []
+    files_to_create: list[_PlannedFile] = []
 
     # Walk through the template directory
     for root, _dirs, files in os.walk(template_content_dir):
@@ -1250,7 +1256,9 @@ def create_project_from_template(
 
             # Add to the list of files to create
             files_to_create.append(
-                {"source": source_file, "target": target_file, "is_binary": is_binary}
+                _PlannedFile(
+                    source=source_file, target=target_file, is_binary=is_binary
+                )
             )
 
     # In dry run mode, just show what would be created
@@ -1258,20 +1266,20 @@ def create_project_from_template(
         click.echo()  # Add spacing
         click.echo("The following files would be created:")
         for file_info in files_to_create:
-            click.echo(f"  {file_info['target']}")
+            click.echo(f"  {file_info.target}")
         return True
 
     # Actually create the files
     for file_info in files_to_create:
         success = render_template_file(
-            source_file=file_info["source"],
-            target_file=file_info["target"],
+            source_file=file_info.source,
+            target_file=file_info.target,
             variables=variables,
-            is_binary=file_info["is_binary"],
+            is_binary=file_info.is_binary,
         )
 
         if not success:
-            click.echo(f"Warning: Failed to create {file_info['target']}", err=True)
+            click.echo(f"Warning: Failed to create {file_info.target}", err=True)
 
     # Run post-creation hook if present and not skipped
     if not skip_hooks:
@@ -1289,7 +1297,7 @@ def create_project_from_template(
 def run_post_create_hook(
     hook_script: Path,
     project_dir: Path,
-    variables: Mapping[str, Union[str, int, bool]],
+    variables: Mapping[str, str | int | bool],
     template_metadata: dict[str, Any],
 ) -> None:
     """

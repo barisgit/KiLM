@@ -8,7 +8,6 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 # Import Config here, but only use it when needed to avoid circular imports
 try:
@@ -31,7 +30,7 @@ except ImportError:
     CLOUD_METADATA_FILE = ".kilm_metadata"
 
 
-def find_environment_variables(var_name: str) -> Optional[str]:
+def find_environment_variables(var_name: str) -> str | None:
     """
     Find environment variables from various sources in the following order:
     1. Config file
@@ -230,8 +229,8 @@ def update_kicad_env_vars(
 
 def update_pinned_libraries(
     kicad_config: Path,
-    symbol_libs: Optional[list[str]] = None,
-    footprint_libs: Optional[list[str]] = None,
+    symbol_libs: list[str] | None = None,
+    footprint_libs: list[str] | None = None,
     dry_run: bool = False,
     max_backups: int = 5,
 ) -> bool:

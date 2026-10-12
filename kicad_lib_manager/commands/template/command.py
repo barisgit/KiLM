@@ -9,7 +9,7 @@ import shutil
 import sys
 import traceback
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import jinja2
 import pathspec
@@ -27,6 +27,7 @@ from ...utils.template import (
     TEMPLATE_CONTENT_DIR,
     TEMPLATE_METADATA,
     TEMPLATES_DIR,
+    TemplateVariable,
     create_project_from_template,
     create_template_metadata,
     create_template_structure,
@@ -51,19 +52,19 @@ def main_callback() -> None:
 
 def create(
     name: Annotated[
-        Optional[str], typer.Argument(help="Name of the project to create")
+        str | None, typer.Argument(help="Name of the project to create")
     ] = None,
     directory: Annotated[
-        Optional[str], typer.Argument(help="Directory to create project in")
+        str | None, typer.Argument(help="Directory to create project in")
     ] = None,
     template: Annotated[
-        Optional[str], typer.Option(help="Name of the template to use")
+        str | None, typer.Option(help="Name of the template to use")
     ] = None,
     library: Annotated[
-        Optional[str], typer.Option(help="Name of the library containing the template")
+        str | None, typer.Option(help="Name of the library containing the template")
     ] = None,
     set_var: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option("--set-var", help="Set template variable in key=value format"),
     ] = None,
     dry_run: Annotated[
@@ -488,33 +489,33 @@ def create(
 
 def make(
     name: Annotated[
-        Optional[str], typer.Argument(help="Name of the template to create")
+        str | None, typer.Argument(help="Name of the template to create")
     ] = None,
     source_directory: Annotated[
-        Optional[Path], typer.Argument(help="Source project directory")
+        Path | None, typer.Argument(help="Source project directory")
     ] = None,
     description: Annotated[
-        Optional[str], typer.Option(help="Template description")
+        str | None, typer.Option(help="Template description")
     ] = None,
     use_case: Annotated[
-        Optional[str], typer.Option("--use-case", help="Template use case description")
+        str | None, typer.Option("--use-case", help="Template use case description")
     ] = None,
     output_directory: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--output-directory", help="Directory where the template will be created"
         ),
     ] = None,
     exclude: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(help="Additional patterns to exclude (gitignore format)"),
     ] = None,
     variable: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(help="Define a template variable in name=value format"),
     ] = None,
     extends: Annotated[
-        Optional[str], typer.Option(help="Parent template that this template extends")
+        str | None, typer.Option(help="Parent template that this template extends")
     ] = None,
     non_interactive: Annotated[
         bool,
@@ -692,7 +693,7 @@ def make(
         console.print(f"Extends: {extends}")
 
     # Parse variables from command line
-    variable_dict = {}
+    variable_dict: dict[str, TemplateVariable] = {}
     for var in variable or []:
         if "=" in var:
             key, value = var.split("=", 1)
@@ -707,7 +708,7 @@ def make(
             console.print(f"  {key}: {value['default']} - {value['description']}")
 
     # If interactive mode is enabled, scan for potential variables
-    detected_variables = {}
+    detected_variables: dict[str, TemplateVariable] = {}
     if interactive:
         potential_vars = find_potential_variables(source_directory)
         if potential_vars:
@@ -907,7 +908,7 @@ def make(
 
 def list_templates(
     library: Annotated[
-        Optional[str], typer.Option(help="Filter templates by library name")
+        str | None, typer.Option(help="Filter templates by library name")
     ] = None,
     verbose: Annotated[
         bool,

@@ -1,143 +1,198 @@
 name: Release
 
+# Publishes the version in pyproject.toml after CI passes on a push to main:
+# plan -> build once and smoke-test -> PyPI -> tag and GitHub release.
+# Nothing happens when the version is already released. If a run fails part
+# way, use "Re-run failed jobs" on that run: finished jobs keep their results
+# and each remaining job completes its own target.
+#
+# PyPI trusted publishing is bound to this file name (release.yml); keep the
+# publishing job here.
+
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  # workflow_run always runs this file from main with repository permissions.
+  # It is safe because the plan job only proceeds for pushes to main of this
+  # repository, which already passed review and CI.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UV_VERSION: "0.13.0"
+  # The commit CI verified; every job builds and tags exactly this commit.
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
 
 jobs:
-  build-and-release:
+  plan:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      name: ${{ steps.state.outputs.name }}
+      version: ${{ steps.state.outputs.version }}
+      on-pypi: ${{ steps.state.outputs.on-pypi }}
+      has-release: ${{ steps.state.outputs.has-release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+      - name: Find what is already released
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r name version < <(python3 -c 'import tomllib; p = tomllib.load(open("pyproject.toml", "rb"))["project"]; print(p["name"], p["version"])')
+          tag="v$version"
+
+          status=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/$name/$version/json")
+          case "$status" in
+            200) on_pypi=true ;;
+            404) on_pypi=false ;;
+            *) echo "::error::PyPI lookup for $name $version returned HTTP $status"; exit 1 ;;
+          esac
+
+          # A draft is an unfinished publication, so only a published release counts.
+          if is_draft=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2> gh-error.txt); then
+            if [[ $is_draft == false ]]; then has_release=true; else has_release=false; fi
+          elif grep -q 'release not found' gh-error.txt; then
+            has_release=false
+          else
+            cat gh-error.txt >&2
+            exit 1
+          fi
+
+          if [[ $on_pypi == true && $has_release == false ]]; then
+            echo "::error::$name $version is on PyPI but has no GitHub release. Use 'Re-run failed jobs' on the Release run that published it; a new run cannot prove which commit PyPI holds."
+            exit 1
+          fi
+          # A tag can exist without a release, so check it on its own: publishing
+          # to PyPI cannot be undone if the github job then rejects the tag.
+          if [[ $on_pypi == false ]]; then
+            tag_ref=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" \
+              --jq ".[] | select(.ref == \"refs/tags/$tag\") | .ref")
+            if [[ -n $tag_ref ]]; then
+              tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag_ref" --jq .sha)
+              if [[ $tag_sha != "$RELEASE_SHA" ]]; then
+                echo "::error::Tag $tag exists at $tag_sha, not $RELEASE_SHA; bump the version."
+                exit 1
+              fi
+            fi
+          fi
+
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "on-pypi=$on_pypi"
+            echo "has-release=$has_release"
+          } >> "$GITHUB_OUTPUT"
+          echo "$name $version: on PyPI=$on_pypi, GitHub release=$has_release" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.on-pypi == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+      - name: Build the sdist and wheel
+        run: uv build --no-sources
+      - name: Check the package metadata
+        run: uvx twine@7.0.0 check --strict dist/*
+      - name: Smoke-test the wheel
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          wheels=(dist/*.whl)
+          if [[ ${#wheels[@]} -ne 1 ]]; then
+            echo "::error::Expected one wheel, found: ${wheels[*]}"
+            exit 1
+          fi
+          output=$(uvx --isolated --from "${wheels[0]}" kilm --version)
+          echo "$output"
+          grep -qF "version $VERSION" <<< "$output"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  pypi:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          # A re-run after a partial upload publishes only the missing files.
+          skip-existing: true
+          print-hash: true
+
+  github:
+    # Runs only after this run published to PyPI, so the tag marks the commit
+    # whose artifacts PyPI holds. The script re-reads GitHub instead of the
+    # plan's snapshot, so a re-run finishes or accepts an earlier attempt.
+    needs: [plan, pypi]
+    if: needs.plan.outputs.has-release == 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
-    
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-
-    - name: Get version from pyproject.toml
-      id: get_version
-      run: |
-        VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
-
-    - name: Check if release exists
-      id: check_release
-      run: |
-        if curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ steps.get_version.outputs.version }}" | grep -q '"id"'; then
-          echo "release_exists=true" >> $GITHUB_OUTPUT
-          echo "Release v${{ steps.get_version.outputs.version }} already exists"
-        else
-          echo "release_exists=false" >> $GITHUB_OUTPUT
-          echo "Release v${{ steps.get_version.outputs.version }} does not exist"
-        fi
-        
-    - name: Build package
-      if: steps.check_release.outputs.release_exists == 'false'
-      run: |
-        python -m build
-        
-    - name: Generate release notes
-      if: steps.check_release.outputs.release_exists == 'false'
-      id: release_notes
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Get the previous release tag
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-
-        if [ -z "$PREVIOUS_TAG" ]; then
-          # First release, get all commits
-          COMMITS=$(git log --oneline --no-merges)
-        else
-          # Get commits since last release
-          COMMITS=$(git log --oneline --no-merges ${PREVIOUS_TAG}..HEAD)
-        fi
-
-        # Get PR information
-        PRS=$(gh pr list --state merged --search "merged:>${PREVIOUS_TAG:-1970-01-01}" --json number,title,url --jq '.[] | "- #\(.number): \(.title) (\(.url))"' 2>/dev/null || echo "")
-
-        # Generate release notes
-        cat > release_notes.md << EOF
-        ## What's Changed in v${{ steps.get_version.outputs.version }}
-
-        ### Commits
-        $(echo "$COMMITS" | sed 's/^/- /')
-
-        EOF
-
-        if [ ! -z "$PRS" ]; then
-          cat >> release_notes.md << EOF
-
-        ### Pull Requests
-        $(echo "$PRS")
-
-        EOF
-        fi
-
-        cat >> release_notes.md << 'EOF'
-
-        ### Installation
-
-        **Using pipx (recommended for CLI tools):**
-        ```bash
-        pipx install kilm
-        ```
-
-        **Using pip:**
-        ```bash
-        pip install kilm
-        ```
-
-        **From release assets:**
-        1. Download the wheel file from this release
-        2. Install with pipx or pip:
-        ```bash
-        pipx install kilm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
-        # or
-        pip install kilm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
-        ```
-
-        ### Updating
-        Run `kilm update` to upgrade an existing installation.
-        EOF
-
-        # Store release notes for next step
-        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-        cat release_notes.md >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        
-    - name: Create Release
-      if: steps.check_release.outputs.release_exists == 'false'
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ steps.get_version.outputs.version }}
-        name: Release v${{ steps.get_version.outputs.version }}
-        body: ${{ steps.release_notes.outputs.release_notes }}
-        files: |
-          dist/*.whl
-          dist/*.tar.gz
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Publish to PyPI
-      if: steps.check_release.outputs.release_exists == 'false'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        print-hash: true
-        verbose: true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - name: Verify PyPI serves the built files
+        env:
+          NAME: ${{ needs.plan.outputs.name }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          built=$(cd dist && sha256sum -- * | sort -k2)
+          # PyPI's JSON API can lag behind an upload by a few minutes.
+          for _ in $(seq 30); do
+            published=$(curl -fsS "https://pypi.org/pypi/$NAME/$VERSION/json" \
+              | jq -r '.urls[] | "\(.digests.sha256)  \(.filename)"' | sort -k2) || published=""
+            [[ $published == "$built" ]] && exit 0
+            sleep 10
+          done
+          echo "::error::PyPI files for $NAME $VERSION differ from the built artifact"
+          diff <(echo "$built") <(echo "$published")
+      - name: Create or finish the tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.plan.outputs.name }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: python3 .github/scripts/github_release.py dist

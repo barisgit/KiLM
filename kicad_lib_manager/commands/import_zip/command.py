@@ -7,7 +7,7 @@ write). This module holds the CLI entry point and the run summary.
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -29,7 +29,7 @@ def import_zip(
         ),
     ],
     library: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--library",
             "-l",
@@ -37,7 +37,7 @@ def import_zip(
         ),
     ] = None,
     symbol_lib: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--symbol-lib",
             "-s",
@@ -45,7 +45,7 @@ def import_zip(
         ),
     ] = None,
     footprint_lib: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--footprint-lib",
             "-f",
@@ -53,7 +53,7 @@ def import_zip(
         ),
     ] = None,
     kicad_cli_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--kicad-cli", help="Path to kicad-cli or kicad.appimage for format upgrade"
         ),
@@ -95,7 +95,7 @@ def import_zip(
         raise typer.Exit(1)
 
 
-def _resolve_kicad_cli(path: Optional[Path]) -> Optional[Path]:
+def _resolve_kicad_cli(path: Path | None) -> Path | None:
     """kicad-cli to upgrade with: path when given (it must exist), else a detected one."""
     if path is not None and not path.exists():
         console.print(f"[red]kicad-cli not found at: {path}[/red]")
@@ -108,7 +108,7 @@ def _resolve_kicad_cli(path: Optional[Path]) -> Optional[Path]:
     return kicad_cli
 
 
-def _import_one(zip_path: Path, target: ImportTarget) -> Optional[ZipResult]:
+def _import_one(zip_path: Path, target: ImportTarget) -> ZipResult | None:
     """Import one ZIP and return what it added, or None after reporting a failure.
 
     A failed ZIP does not stop the run; the caller imports the rest.

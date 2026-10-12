@@ -4,7 +4,7 @@ KiCad service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class KiCadServiceProtocol(Protocol):
@@ -43,8 +43,8 @@ class KiCadServiceProtocol(Protocol):
     def add_libraries_to_kicad(
         self,
         config_dir: Path,
-        symbol_libs: Optional[list[dict]] = None,
-        footprint_libs: Optional[list[dict]] = None,
+        symbol_libs: list[dict] | None = None,
+        footprint_libs: list[dict] | None = None,
         backup: bool = True,
         max_backups: int = 5,
     ) -> bool:

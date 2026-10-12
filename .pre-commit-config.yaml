@@ -1,40 +1,25 @@
+# Hooks run the tool versions locked in uv.lock through `uv run`, so they match
+# `just check` and CI on every OS. `just setup` points git at .githooks/, whose
+# script runs the committing checkout's locked pre-commit, so each worktree uses
+# its own uv.lock. Tests stay out of the hook to keep commits fast; `just check`
+# runs them.
+minimum_pre_commit_version: "4.4.0"
 repos:
-  # Ruff formatter
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.6
+  - repo: local
     hooks:
       - id: ruff-format
         name: ruff format
-        description: Format Python code with ruff
-
-  # Ruff linter
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.6
-    hooks:
-      - id: ruff
+        entry: uv run --locked ruff format
+        language: unsupported
+        types_or: [python, pyi]
+      - id: ruff-check
         name: ruff check --fix
-        description: Lint Python code with ruff and auto-fix issues
-        args: [--fix]
-
-  # Pyrefly type checker
-  - repo: local
-    hooks:
-      - id: pyrefly
-        name: pyrefly check
-        description: Type check Python code with pyrefly
-        entry: .venv/bin/pyrefly
-        args: [check]
-        language: system
-        types: [python]
-
-  # Pytest tests
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest
-        description: Run tests with pytest
-        entry: .venv/bin/pytest
-        language: system
-        types: [python]
+        entry: uv run --locked ruff check --fix
+        language: unsupported
+        types_or: [python, pyi]
+      - id: ty
+        name: ty check
+        entry: uv run --locked ty check
+        language: unsupported
+        types_or: [python, pyi]
         pass_filenames: false
-        always_run: true

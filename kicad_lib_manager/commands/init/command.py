@@ -4,7 +4,7 @@ Initializes the current directory as a KiCad library directory (symbols, footpri
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -19,7 +19,7 @@ console = Console()
 
 def init(
     name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--name",
             help="Name for this library collection (automatic if not provided)",
@@ -33,14 +33,14 @@ def init(
         ),
     ] = True,
     description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--description",
             help="Description for this library collection",
         ),
     ] = None,
     env_var: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--env-var",
             help="Custom environment variable name for this library",
