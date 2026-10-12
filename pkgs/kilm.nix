@@ -16,11 +16,7 @@ let
   requirementName =
     requirement: lib.toLower (builtins.head (builtins.match "([A-Za-z0-9._-]+).*" requirement));
 
-  # `pathlib` is declared in pyproject but is stdlib on Python 3; the PyPI
-  # backport is a no-op and absent from nixpkgs.
-  stdlibBackports = [ "pathlib" ];
-
-  runtimeDependencies = lib.subtractLists stdlibBackports (map requirementName project.dependencies);
+  runtimeDependencies = map requirementName project.dependencies;
 in
 python3Packages.buildPythonPackage {
   pname = project.name;
@@ -30,8 +26,6 @@ python3Packages.buildPythonPackage {
   inherit src;
 
   build-system = [ python3Packages.hatchling ];
-
-  pythonRemoveDeps = stdlibBackports;
 
   dependencies = map (name: python3Packages.${name}) runtimeDependencies;
 
@@ -45,14 +39,10 @@ python3Packages.buildPythonPackage {
     (lib.makeBinPath [ git ])
   ];
 
-  # pytest-cov is required because pyproject's pytest addopts pass --cov.
   nativeCheckInputs = [
     git
-  ]
-  ++ (with python3Packages; [
-    pytest-cov
-    pytestCheckHook
-  ]);
+    python3Packages.pytestCheckHook
+  ];
 
   # Tests shell out to `git` and write into HOME; give them a writable one.
   preCheck = ''
