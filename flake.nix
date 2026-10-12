@@ -38,6 +38,16 @@
           # `nix flake check` builds the package, which runs the test suite.
           checks.kilm = kilm;
 
+          # The wrapped CLI must find git without any host PATH: install the
+          # post-merge hook into a fresh repository with only coreutils on PATH.
+          checks.git-runtime = pkgs.runCommand "kilm-git-runtime" { nativeBuildInputs = [ pkgs.git ]; } ''
+            export HOME=$TMPDIR
+            git init -q repo
+            env PATH=${pkgs.coreutils}/bin ${pkgs.lib.getExe kilm} add-hook --directory repo
+            test -x repo/.git/hooks/post-merge
+            touch $out
+          '';
+
           devShells.default = pkgs.mkShell {
             # Python, runtime deps, and pytest come from the package. Lint and
             # type-check through `uv run` so ruff and pyrefly match uv.lock.

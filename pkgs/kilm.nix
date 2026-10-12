@@ -35,6 +35,16 @@ python3Packages.buildPythonPackage {
 
   dependencies = map (name: python3Packages.${name}) runtimeDependencies;
 
+  # `kilm sync` and `kilm add-hook` shell out to git. Append it to the wrapper's
+  # PATH so it is always available, while a git already on the user's PATH (and
+  # its credential helpers) keeps precedence.
+  makeWrapperArgs = [
+    "--suffix"
+    "PATH"
+    ":"
+    (lib.makeBinPath [ git ])
+  ];
+
   # pytest-cov is required because pyproject's pytest addopts pass --cov.
   nativeCheckInputs = [
     git
