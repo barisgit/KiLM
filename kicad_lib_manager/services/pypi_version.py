@@ -117,7 +117,8 @@ class PyPIVersionChecker:
             return CachedVersion(cached.version, cached.etag, time.time())
         if response.status_code != HTTPStatus.OK:
             return None
-        info = response.json().get("info")
+        body = response.json()
+        info = body.get("info") if isinstance(body, dict) else None
         version = info.get("version") if isinstance(info, dict) else None
         if not isinstance(version, str):
             return None

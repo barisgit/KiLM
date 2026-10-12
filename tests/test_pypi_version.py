@@ -66,6 +66,9 @@ def test_unexpected_response_is_unknown(
     pypi_get.return_value.status_code = 200
     pypi_get.return_value.json.return_value = {"info": None}
     assert checker.check_latest_version() is None
+    for body in ([], None):
+        pypi_get.return_value.json.return_value = body
+        assert checker.check_latest_version() is None
 
 
 def test_fresh_cache_answers_without_network(
