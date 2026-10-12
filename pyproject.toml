@@ -167,8 +167,8 @@ omit = [
 ]
 
 [tool.coverage.report]
-# Measured 45.5% when coverage became opt-in; raise it as tests are added.
-fail_under = 45
+# Measured 76.7% after the max-strictness refactor; raise it as tests are added.
+fail_under = 76
 show_missing = true
 exclude_lines = [
     "pragma: no cover",

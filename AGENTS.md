@@ -38,12 +38,15 @@ files; tests run in `just check`.
 - `kicad_lib_manager/commands/<name>/`: one package per command, with
   `command.py` and a collocated `docs.mdx`. `docs/scripts/sync-embedded-docs.ts`
   copies each `docs.mdx` into the site's CLI reference, so update it in the same
-  change as the command.
+  change as the command. Larger commands split into further modules beside
+  `command.py` (for example `setup/`, `template/`, `update/`, `import_zip/`).
+- `kicad_lib_manager/commands/shared.py` and `kicad_common.py`: option helpers
+  and typed `kicad_common.json` access shared by several commands.
 - `kicad_lib_manager/services/`: configuration, KiCad, library, and
   self-update services.
-- `kicad_lib_manager/utils/`: file operations, backups, metadata, templates,
-  environment variables, git helpers.
-- `tests/`: pytest suite.
+- `kicad_lib_manager/utils/`: file operations, backups, metadata, the
+  `template/` package, environment variables, git helpers, and `console.py`.
+- `tests/`: pytest suite; `tests/fault_injection.py` simulates failed writes.
 - `docs/`: Astro Starlight site; guides in `docs/src/content/docs/`.
 - `flake.nix`, `pkgs/kilm.nix`: Nix package, built and tested by CI. It reads
   name, version, and dependencies from `pyproject.toml`, so a new runtime
@@ -70,6 +73,11 @@ files; tests run in `just check`.
   yaml, ...) is used only inside functions lists it in `__lazy_modules__`
   before its imports, so Python 3.15+ loads it on first use (PEP 810). Keep
   imports at module top level; the `lazy import` syntax needs Python 3.15.
+- Print through `utils.console.get_console()`, which builds a console per call;
+  a Rich console created at import time fixes the terminal mode too early.
+- Declare Typer options with `Annotated[..., typer.Option(...)]`. Typer reads
+  command annotations at runtime, so keep their imports out of
+  `TYPE_CHECKING` blocks.
 - Use `pathlib.Path` for paths and keep behavior identical on Windows, macOS,
   and Linux.
 - No emojis in code, comments, or CLI output. Put fixed values in
