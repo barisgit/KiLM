@@ -9,6 +9,7 @@ import typer
 
 from kicad_lib_manager.utils.console import get_console
 
+from ...utils.file_ops import write_atomically
 from ...utils.git_utils import (
     backup_existing_hook,
     create_kilm_hook_content,
@@ -100,9 +101,8 @@ def add_hook(
             new_content = create_kilm_hook_content()
 
         try:
-            # Write the hook content
-            with post_merge_hook.open("w") as f:
-                f.write(new_content)
+            # Binary write: text mode would give the shell script CRLF endings on Windows
+            write_atomically(post_merge_hook, new_content.encode("utf-8"))
 
             # Make the hook executable
             post_merge_hook.chmod(0o755)
@@ -133,6 +133,8 @@ def add_hook(
             get_console().print(f"[red]Error creating hook: {e!s}[/red]")
             raise typer.Exit(1) from e
 
+    except typer.Exit:
+        raise
     except Exception as e:
         get_console().print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
