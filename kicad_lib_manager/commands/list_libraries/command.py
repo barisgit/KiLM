@@ -6,13 +6,12 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 from rich.table import Table
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.library_service import LibraryService
 from ...utils.env_vars import expand_user_path, find_environment_variables
-
-console = Console()
 
 
 def list_cmd(
@@ -35,7 +34,9 @@ def list_cmd(
     if not kicad_lib_dir:
         kicad_lib_dir = find_environment_variables("KICAD_USER_LIB")
         if not kicad_lib_dir:
-            console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
+            get_console().print(
+                "[red]Error: KICAD_USER_LIB not set and not provided[/red]"
+            )
             raise typer.Exit(1)
 
     # Expand user home directory if needed
@@ -45,7 +46,9 @@ def list_cmd(
         library_service = LibraryService()
         symbols, footprints = library_service.list_libraries(Path(kicad_lib_dir))
 
-        console.print(f"[blue]Scanning library directory:[/blue] {kicad_lib_dir}\n")
+        get_console().print(
+            f"[blue]Scanning library directory:[/blue] {kicad_lib_dir}\n"
+        )
 
         # Display symbol libraries in a table
         if symbols:
@@ -60,11 +63,11 @@ def list_cmd(
             for symbol in sorted(symbols):
                 symbol_table.add_row(symbol, ".kicad_sym")
 
-            console.print(symbol_table)
+            get_console().print(symbol_table)
         else:
-            console.print("[yellow]No symbol libraries found[/yellow]")
+            get_console().print("[yellow]No symbol libraries found[/yellow]")
 
-        console.print()  # Empty line for spacing
+        get_console().print()  # Empty line for spacing
 
         # Display footprint libraries in a table
         if footprints:
@@ -79,23 +82,23 @@ def list_cmd(
             for footprint in sorted(footprints):
                 footprint_table.add_row(footprint, ".pretty")
 
-            console.print(footprint_table)
+            get_console().print(footprint_table)
         else:
-            console.print("[yellow]No footprint libraries found[/yellow]")
+            get_console().print("[yellow]No footprint libraries found[/yellow]")
 
         # Summary information
         total_libs = len(symbols) + len(footprints)
         if total_libs > 0:
-            console.print(
+            get_console().print(
                 f"\n[green]Found {total_libs} libraries total[/green] "
                 f"([cyan]{len(symbols)} symbol[/cyan], "
                 f"[magenta]{len(footprints)} footprint[/magenta])"
             )
         else:
-            console.print(
+            get_console().print(
                 "[yellow]No libraries found in the specified directory[/yellow]"
             )
 
     except Exception as e:
-        console.print(f"[red]Error listing libraries: {e}[/red]")
+        get_console().print(f"[red]Error listing libraries: {e}[/red]")
         raise typer.Exit(1) from e

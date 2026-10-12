@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...utils.git_utils import (
     backup_existing_hook,
@@ -15,8 +16,6 @@ from ...utils.git_utils import (
     get_git_hooks_directory,
     merge_hook_content,
 )
-
-console = Console()
 
 
 def add_hook(
@@ -43,15 +42,15 @@ def add_hook(
         # Determine target directory
         target_dir = directory if directory else Path.cwd()
 
-        console.print(f"[cyan]Adding Git hook to repository: {target_dir}[/cyan]")
+        get_console().print(f"[cyan]Adding Git hook to repository: {target_dir}[/cyan]")
 
         try:
             # Get the active hooks directory (handles custom paths, worktrees, etc.)
             hooks_dir = get_git_hooks_directory(target_dir)
-            console.print(f"[blue]Using hooks directory: {hooks_dir}[/blue]")
+            get_console().print(f"[blue]Using hooks directory: {hooks_dir}[/blue]")
 
         except RuntimeError as e:
-            console.print(f"[red]Error: {e}[/red]")
+            get_console().print(f"[red]Error: {e}[/red]")
             raise typer.Exit(1) from e
 
         # Check if post-merge hook already exists
@@ -59,17 +58,17 @@ def add_hook(
 
         if post_merge_hook.exists():
             if not force:
-                console.print(
+                get_console().print(
                     f"[yellow]Post-merge hook already exists at {post_merge_hook}[/yellow]"
                 )
                 overwrite = typer.confirm("Overwrite existing hook?", default=False)
                 if not overwrite:
-                    console.print("[yellow]Hook installation cancelled.[/yellow]")
+                    get_console().print("[yellow]Hook installation cancelled.[/yellow]")
                     return
 
             # Create backup of existing hook
             backup_path = backup_existing_hook(post_merge_hook)
-            console.print(
+            get_console().print(
                 f"[green]Created backup of existing hook: {backup_path}[/green]"
             )
 
@@ -79,13 +78,13 @@ def add_hook(
 
                 if force:
                     # Force overwrite - don't merge, just replace
-                    console.print(
+                    get_console().print(
                         "[yellow]Force overwrite requested, replacing existing hook...[/yellow]"
                     )
                     new_content = create_kilm_hook_content()
                 else:
                     # Merge with existing content to preserve user logic
-                    console.print(
+                    get_console().print(
                         "[cyan]Merging KiLM content with existing hook...[/cyan]"
                     )
                     new_content = merge_hook_content(
@@ -93,7 +92,7 @@ def add_hook(
                     )
 
             except (OSError, UnicodeDecodeError):
-                console.print(
+                get_console().print(
                     "[yellow]Warning: Could not read existing hook content, overwriting...[/yellow]"
                 )
                 new_content = create_kilm_hook_content()
@@ -109,30 +108,32 @@ def add_hook(
             # Make the hook executable
             post_merge_hook.chmod(0o755)
 
-            console.print(
+            get_console().print(
                 f"[green]Successfully installed post-merge hook at {post_merge_hook}[/green]"
             )
-            console.print(
+            get_console().print(
                 "[blue]The hook will run 'kilm sync' after every 'git pull' or 'git merge' operation.[/blue]"
             )
 
             if post_merge_hook.exists() and "KiLM-managed section" in new_content:
-                console.print(
+                get_console().print(
                     "\n[cyan]Note: The hook contains clear markers for KiLM-managed sections,[/cyan]"
                 )
-                console.print("[cyan]making future updates safe and idempotent.[/cyan]")
+                get_console().print(
+                    "[cyan]making future updates safe and idempotent.[/cyan]"
+                )
 
-            console.print(
+            get_console().print(
                 "\n[blue]Note: You may need to modify the hook script if you want to customize[/blue]"
             )
-            console.print(
+            get_console().print(
                 "[blue]the update behavior or automatically set up libraries.[/blue]"
             )
 
         except Exception as e:
-            console.print(f"[red]Error creating hook: {str(e)}[/red]")
+            get_console().print(f"[red]Error creating hook: {str(e)}[/red]")
             raise typer.Exit(1) from e
 
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        get_console().print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e

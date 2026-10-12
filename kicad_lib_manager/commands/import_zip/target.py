@@ -3,15 +3,14 @@
 from pathlib import Path
 
 import typer
-from rich.console import Console
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config, LibraryDict
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
 from .formats import file_format_version, footprint_lib_version
 from .importer import ImportTarget, ModelRef
 from .kicad_cli import Upgrader
-
-console = Console()
 
 
 def build_target(
@@ -34,13 +33,13 @@ def build_target(
         d for d in (lib_path / "footprints").glob("*.pretty") if d.is_dir()
     )
     if not sym_candidates:
-        console.print(
+        get_console().print(
             f"[red]No .kicad_sym file in {lib_path / 'symbols'}. Create a symbol "
             "library there first (KiCad Symbol Editor: File > New Library).[/red]"
         )
         raise typer.Exit(1)
     if not fp_candidates:
-        console.print(
+        get_console().print(
             f"[red]No .pretty directory in {lib_path / 'footprints'}. Create a "
             "footprint library there first (KiCad Footprint Editor: File > New "
             "Library).[/red]"
@@ -65,12 +64,14 @@ def build_target(
     if not all(
         p.startswith("${") for p in [model_prefix, *(m.prefix for m in models.values())]
     ):
-        console.print(
+        get_console().print(
             "[yellow]3D model paths will be absolute to this machine. Set env_var "
             "in kilm.yaml (kilm init) or register a 3D library (kilm add-3d) to "
             "share the library.[/yellow]"
         )
-    console.print(f"[dim]Target: {sym_lib.stem} / {fp_dir.stem} / {model_prefix}[/dim]")
+    get_console().print(
+        f"[dim]Target: {sym_lib.stem} / {fp_dir.stem} / {model_prefix}[/dim]"
+    )
 
     return ImportTarget(
         sym_lib=sym_lib,
@@ -92,7 +93,9 @@ def _library_path(config: Config, library: str | None) -> Path:
     """Path of the named github library, else of the current one."""
     github_libs = config.get_libraries(library_type="github")
     if not github_libs:
-        console.print("[red]No github library configured. Run 'kilm init' first.[/red]")
+        get_console().print(
+            "[red]No github library configured. Run 'kilm init' first.[/red]"
+        )
         raise typer.Exit(1)
 
     if library is None:
@@ -107,12 +110,12 @@ def _library_path(config: Config, library: str | None) -> Path:
             (lib for lib in github_libs if lib.get("name") == library), None
         )
     if target_lib is None:
-        console.print(f"[red]Library '{library}' not found in config.[/red]")
+        get_console().print(f"[red]Library '{library}' not found in config.[/red]")
         raise typer.Exit(1)
 
     lib_path = Path(target_lib["path"])
     if not lib_path.exists():
-        console.print(f"[red]Library path does not exist: {lib_path}[/red]")
+        get_console().print(f"[red]Library path does not exist: {lib_path}[/red]")
         raise typer.Exit(1)
     return lib_path
 
@@ -124,11 +127,13 @@ def _pick_lib(candidates: list[Path], name: str | None, kind: str, option: str) 
         for c in candidates:
             if c.stem == name:
                 return c
-        console.print(f"[red]No {kind} library '{name}'. Available: {available}[/red]")
+        get_console().print(
+            f"[red]No {kind} library '{name}'. Available: {available}[/red]"
+        )
         raise typer.Exit(1)
     if len(candidates) == 1:
         return candidates[0]
-    console.print(
+    get_console().print(
         f"[red]Several {kind} libraries found, choose one with {option}: {available}[/red]"
     )
     raise typer.Exit(1)
@@ -173,7 +178,7 @@ def _resolve_models(
         models_dir = existing[0]
     elif existing:
         models_dir = existing[0]
-        console.print(
+        get_console().print(
             f"[yellow]Several *.3dshapes dirs in {lib_path}; new models go to "
             f"{models_dir.name} (register the right one with 'kilm add-3d')[/yellow]"
         )

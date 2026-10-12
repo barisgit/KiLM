@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config
 from ...utils.metadata import (
@@ -19,8 +20,6 @@ from ...utils.metadata import (
     read_cloud_metadata,
     read_github_metadata,
 )
-
-console = Console()
 
 
 def list_config(
@@ -59,8 +58,8 @@ def list_config(
         current_library = config.get_current_library()
 
         if not libraries:
-            console.print()
-            console.print(
+            get_console().print()
+            get_console().print(
                 Panel(
                     "[yellow]No libraries configured.[/yellow]\n\n"
                     "[cyan]Get Started:[/cyan]\n"
@@ -80,14 +79,14 @@ def list_config(
             if lib_type in types:
                 types[lib_type].append(lib)
 
-        console.print()
+        get_console().print()
 
         # Display GitHub Libraries
         if library_type in ["all", "github"] and types["github"]:
-            console.print(
+            get_console().print(
                 "\n[bold cyan]GitHub Libraries[/bold cyan] [dim](symbols, footprints, templates)[/dim]"
             )
-            console.print()
+            get_console().print()
 
             if verbose:
                 # Verbose mode: Individual panels for each library
@@ -144,14 +143,14 @@ def list_config(
                     )
                     title = f"[bold cyan]{name}[/bold cyan] [{status}]"
 
-                    console.print(
+                    get_console().print(
                         Panel(
                             content,
                             title=title,
                             border_style="cyan" if path == current_library else "dim",
                         )
                     )
-                    console.print()
+                    get_console().print()
             else:
                 # Compact mode: Simple table
                 table = Table(
@@ -174,15 +173,15 @@ def list_config(
 
                     table.add_row(f"[bold]{name}[/bold]", status, path)
 
-                console.print(table)
-                console.print()
+                get_console().print(table)
+                get_console().print()
 
         # Display Cloud Libraries
         if library_type in ["all", "cloud"] and types["cloud"]:
-            console.print(
+            get_console().print(
                 "\n[bold cyan]Cloud Libraries[/bold cyan] [dim](3D models)[/dim]"
             )
-            console.print()
+            get_console().print()
 
             if verbose:
                 # Verbose mode: Individual panels for each library
@@ -238,14 +237,14 @@ def list_config(
                     )
                     title = f"[bold cyan]{name}[/bold cyan] [{status}]"
 
-                    console.print(
+                    get_console().print(
                         Panel(
                             content,
                             title=title,
                             border_style="cyan" if path == current_library else "dim",
                         )
                     )
-                    console.print()
+                    get_console().print()
             else:
                 # Compact mode: Simple table
                 table = Table(
@@ -268,8 +267,8 @@ def list_config(
 
                     table.add_row(f"[bold]{name}[/bold]", status, path)
 
-                console.print(table)
-                console.print()
+                get_console().print(table)
+                get_console().print()
 
         # Add summary panel
         total_libs = len(libraries)
@@ -281,7 +280,7 @@ def list_config(
             f"[cyan]GitHub:[/cyan] {github_count}  [blue]Cloud:[/blue] {cloud_count}"
         )
 
-        console.print(
+        get_console().print(
             Panel(
                 summary_content,
                 title="[bold cyan]Summary[/bold cyan]",
@@ -292,7 +291,7 @@ def list_config(
 
         # Print helpful message if no libraries match the filter
         if library_type == "github" and not types["github"]:
-            console.print(
+            get_console().print(
                 Panel(
                     "[yellow]No GitHub libraries configured.[/yellow]\n\n"
                     "[cyan]Get Started:[/cyan]\n"
@@ -302,7 +301,7 @@ def list_config(
                 )
             )
         elif library_type == "cloud" and not types["cloud"]:
-            console.print(
+            get_console().print(
                 Panel(
                     "[yellow]No cloud libraries configured.[/yellow]\n\n"
                     "[cyan]Get Started:[/cyan]\n"
@@ -313,7 +312,7 @@ def list_config(
             )
 
     except Exception as e:
-        console.print(f"[red]Error listing configurations: {e}[/red]")
+        get_console().print(f"[red]Error listing configurations: {e}[/red]")
         sys.exit(1)
 
 
@@ -362,11 +361,11 @@ def set_default(
         libraries = config.get_libraries(library_type)
 
         if not libraries:
-            console.print(f"No {library_type} libraries configured.")
+            get_console().print(f"No {library_type} libraries configured.")
             if library_type == "github":
-                console.print("Use 'kilm init' to initialize a GitHub library.")
+                get_console().print("Use 'kilm init' to initialize a GitHub library.")
             else:
-                console.print(
+                get_console().print(
                     "Use 'kilm add-3d' to add a cloud-based 3D model library."
                 )
             sys.exit(1)
@@ -376,7 +375,7 @@ def set_default(
 
         # If library name not provided, prompt for selection
         if not library_name:
-            console.print(f"\nAvailable {library_type} libraries:")
+            get_console().print(f"\nAvailable {library_type} libraries:")
 
             # Show numbered list of libraries
             for i, lib in enumerate(libraries):
@@ -388,7 +387,7 @@ def set_default(
                 if path == current_library:
                     current_marker = " (current)"
 
-                console.print(f"{i + 1}. {name}{current_marker}")
+                get_console().print(f"{i + 1}. {name}{current_marker}")
 
             # Get selection
             while True:
@@ -402,11 +401,11 @@ def set_default(
                         library_path = selected_lib.get("path")
                         break
                     else:
-                        console.print(
+                        get_console().print(
                             f"Please enter a number between 1 and {len(libraries)}"
                         )
                 except ValueError:
-                    console.print("Please enter a valid number")
+                    get_console().print("Please enter a valid number")
         else:
             # Find the library by name
             library_path = None
@@ -416,24 +415,26 @@ def set_default(
                     break
 
             if not library_path:
-                console.print(
+                get_console().print(
                     f"No {library_type} library named '{library_name}' found."
                 )
-                console.print("Use 'kilm config list' to see available libraries.")
+                get_console().print(
+                    "Use 'kilm config list' to see available libraries."
+                )
                 sys.exit(1)
 
         # Set as current library
         if library_path is None:
-            console.print(
+            get_console().print(
                 f"[red]Error: Could not find path for library '{library_name}'[/red]"
             )
             sys.exit(1)
         config.set_current_library(library_path)
-        console.print(f"Set {library_type} library '{library_name}' as default.")
-        console.print(f"Path: {library_path}")
+        get_console().print(f"Set {library_type} library '{library_name}' as default.")
+        get_console().print(f"Path: {library_path}")
 
     except Exception as e:
-        console.print(f"[red]Error setting default library: {e}[/red]")
+        get_console().print(f"[red]Error setting default library: {e}[/red]")
         sys.exit(1)
 
 
@@ -488,12 +489,12 @@ def remove(
 
         if not matching_libraries:
             if library_type == "all":
-                console.print(f"No library named '{library_name}' found.")
+                get_console().print(f"No library named '{library_name}' found.")
             else:
-                console.print(
+                get_console().print(
                     f"No {library_type} library named '{library_name}' found."
                 )
-            console.print("Use 'kilm config list' to see available libraries.")
+            get_console().print("Use 'kilm config list' to see available libraries.")
             sys.exit(1)
 
         # Confirm removal
@@ -501,16 +502,16 @@ def remove(
             for lib in matching_libraries:
                 lib_type = lib.get("type", "unknown")
                 lib_path = lib.get("path", "unknown")
-                console.print(
+                get_console().print(
                     f"Will remove {lib_type} library '{library_name}' from configuration."
                 )
-                console.print(f"Path: {lib_path}")
+                get_console().print(f"Path: {lib_path}")
 
                 if lib_path == current_library:
-                    console.print("Warning: This is the current default library.")
+                    get_console().print("Warning: This is the current default library.")
 
             if not typer.confirm("Continue?"):
-                console.print("Operation cancelled.")
+                get_console().print("Operation cancelled.")
                 return
 
         # Remove libraries
@@ -523,21 +524,23 @@ def remove(
 
         if removed_count > 0:
             if removed_count == 1:
-                console.print(f"Removed library '{library_name}' from configuration.")
+                get_console().print(
+                    f"Removed library '{library_name}' from configuration."
+                )
             else:
-                console.print(
+                get_console().print(
                     f"Removed {removed_count} instances of library '{library_name}' from configuration."
                 )
 
             # Check if we removed the current library
             current_library_new = config.get_current_library()
             if current_library and current_library != current_library_new:
-                console.print(
+                get_console().print(
                     "Note: Default library was changed as the previous default was removed."
                 )
         else:
-            console.print("No libraries were removed.")
+            get_console().print("No libraries were removed.")
 
     except Exception as e:
-        console.print(f"[red]Error removing library: {e}[/red]")
+        get_console().print(f"[red]Error removing library: {e}[/red]")
         sys.exit(1)

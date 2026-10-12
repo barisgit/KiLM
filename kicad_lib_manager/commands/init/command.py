@@ -7,14 +7,13 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
 
+from kicad_lib_manager.utils.console import get_console
+
 from ...services.config_service import Config
 from ...services.library_service import LibraryService
-
-console = Console()
 
 
 def init(
@@ -79,7 +78,7 @@ def init(
     """
     current_dir = Path.cwd().resolve()
 
-    console.print(
+    get_console().print(
         Panel(
             f"[bold blue]Initializing KiCad library[/bold blue]\n"
             f"[cyan]Location:[/cyan] {current_dir}",
@@ -117,7 +116,7 @@ def init(
                     created_folders.append(folder_type)
 
     except Exception as e:
-        console.print(f"[red]Error initializing library: {e}[/red]")
+        get_console().print(f"[red]Error initializing library: {e}[/red]")
         raise typer.Exit(1) from e
 
     # Create empty library_descriptions.yaml if it doesn't exist
@@ -142,11 +141,11 @@ footprints:
 """
             with library_descriptions_file.open("w", encoding="utf-8") as f:
                 f.write(template_content)
-            console.print(
+            get_console().print(
                 "[green]Created library_descriptions.yaml template file.[/green]"
             )
         except Exception as e:
-            console.print(
+            get_console().print(
                 f"[yellow]Warning: Could not create library_descriptions.yaml file: {e}[/yellow]"
             )
 
@@ -154,21 +153,21 @@ footprints:
 
     # Report on folder status
     if existing_folders:
-        console.print(
+        get_console().print(
             f"[blue]Found existing folders:[/blue] {', '.join(existing_folders)}"
         )
     if created_folders:
-        console.print(
+        get_console().print(
             f"[green]Created new folders:[/green] {', '.join(created_folders)}"
         )
 
     # Verify if this looks like a KiCad library
     if not created_folders and not existing_folders:
-        console.print(
+        get_console().print(
             "[yellow]Warning: No library folders were found or created.[/yellow]"
         )
         if not Confirm.ask("Continue anyway?", default=True):
-            console.print("[yellow]Initialization cancelled.[/yellow]")
+            get_console().print("[yellow]Initialization cancelled.[/yellow]")
             raise typer.Exit(0)
 
     # Update the configuration
@@ -199,7 +198,7 @@ footprints:
                 "[dim]KiLM will use this library for all commands by default.[/dim]"
             )
 
-        console.print(
+        get_console().print(
             Panel(
                 success_content,
                 title="✅ Initialization Complete",
@@ -208,14 +207,14 @@ footprints:
         )
 
         # Add a hint for adding 3D models
-        console.print("\n[bold]Next Steps:[/bold]")
-        console.print(
+        get_console().print("\n[bold]Next Steps:[/bold]")
+        get_console().print(
             "To add a 3D models directory (typically stored in the cloud), use:"
         )
-        console.print(
+        get_console().print(
             "[dim]  kilm add-3d --name my-3d-models --directory /path/to/3d/models[/dim]"
         )
 
     except Exception as e:
-        console.print(f"[red]Error initializing library: {e}[/red]")
+        get_console().print(f"[red]Error initializing library: {e}[/red]")
         raise typer.Exit(1) from e

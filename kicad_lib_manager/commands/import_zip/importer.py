@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rich.console import Console
+from kicad_lib_manager.utils.console import get_console
 
 from ...utils.backup import create_backup
 from ...utils.file_ops import write_atomically
@@ -15,8 +15,6 @@ from .errors import ImportFailure
 from .formats import require_compatible
 from .kicad_cli import Upgrader
 from .symbols import SymbolMerge, merge_symbols
-
-console = Console()
 
 
 @dataclass(frozen=True)
@@ -126,7 +124,7 @@ def import_zip_file(zip_path: Path, target: ImportTarget) -> ZipResult:
         _plan_footprints(files, target, plan)
         _plan_symbols(files, target, plan)
         for line in plan.lines:
-            console.print(line, markup=False, highlight=False)
+            get_console().print(line, markup=False, highlight=False)
         _apply(plan, target)
     return plan.result()
 
@@ -247,6 +245,8 @@ def _apply(plan: _Plan, target: ImportTarget) -> None:
         if not target.dry_run:
             if target.backup is None:
                 target.backup = create_backup(target.sym_lib)
-                console.print(f"  Backup: {target.backup}", style="dim", markup=False)
+                get_console().print(
+                    f"  Backup: {target.backup}", style="dim", markup=False
+                )
             write_atomically(target.sym_lib, plan.symbols.text.encode("utf-8"))
         target.symbols.update(plan.symbols.added)

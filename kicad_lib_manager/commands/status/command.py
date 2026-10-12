@@ -8,16 +8,15 @@ from typing import Annotated
 
 import typer
 import yaml
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from kicad_lib_manager.utils.console import get_console
+
 from ...services.kicad_service import KiCadService
 from ...utils.constants import CONFIG_DIR_NAME, CONFIG_FILE_NAME
 from ...utils.metadata import read_cloud_metadata, read_github_metadata
-
-console = Console()
 
 
 def status(
@@ -38,10 +37,12 @@ def status(
         # Show KILM configuration first
         _show_kilm_configuration()
 
-        console.print("\n[bold cyan]KiCad Configuration[/bold cyan]")
+        get_console().print("\n[bold cyan]KiCad Configuration[/bold cyan]")
 
         kicad_config = kicad_service.find_kicad_config_dir()
-        console.print(f"KiCad configuration directory: [blue]{kicad_config}[/blue]")
+        get_console().print(
+            f"KiCad configuration directory: [blue]{kicad_config}[/blue]"
+        )
 
         # Check environment variables in KiCad common
         _show_kicad_environment_variables(kicad_config)
@@ -54,7 +55,7 @@ def status(
             _show_configured_libraries(kicad_config, kicad_service)
 
     except Exception as e:
-        console.print(f"[red]Error getting KiCad configuration: {e}[/red]")
+        get_console().print(f"[red]Error getting KiCad configuration: {e}[/red]")
         raise typer.Exit(1) from e
 
 
@@ -63,7 +64,7 @@ def _show_kilm_configuration() -> None:
     try:
         config_file = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
         if config_file.exists():
-            console.print("[bold cyan]KILM Configuration[/bold cyan]")
+            get_console().print("[bold cyan]KILM Configuration[/bold cyan]")
             try:
                 with config_file.open() as f:
                     config_data = yaml.safe_load(f)
@@ -72,24 +73,24 @@ def _show_kilm_configuration() -> None:
                     _show_configured_libraries_table(config_data)
                     _show_kilm_settings(config_data)
                 else:
-                    console.print(
+                    get_console().print(
                         "[yellow]Configuration file is empty or invalid[/yellow]"
                     )
 
             except Exception as e:
-                console.print(f"[red]Error reading configuration: {e}[/red]")
+                get_console().print(f"[red]Error reading configuration: {e}[/red]")
         else:
-            console.print(
+            get_console().print(
                 "[yellow]No KILM configuration file found. Run 'kilm init' to create one.[/yellow]"
             )
     except Exception as e:
-        console.print(f"[red]Error reading KILM configuration: {e}[/red]")
+        get_console().print(f"[red]Error reading KILM configuration: {e}[/red]")
 
 
 def _show_configured_libraries_table(config_data: dict) -> None:
     """Show configured libraries in a table format"""
     if not config_data or not config_data.get("libraries"):
-        console.print("[yellow]  No libraries configured[/yellow]")
+        get_console().print("[yellow]  No libraries configured[/yellow]")
         return
 
     # Create tables for different library types
@@ -120,7 +121,7 @@ def _show_configured_libraries_table(config_data: dict) -> None:
 
             table.add_row(name, path, is_current, has_metadata)
 
-        console.print(table)
+        get_console().print(table)
 
     if cloud_libs:
         table = Table(title="Cloud Libraries (3D models)", show_header=True)
@@ -142,7 +143,7 @@ def _show_configured_libraries_table(config_data: dict) -> None:
 
             table.add_row(name, path, is_current, has_metadata)
 
-        console.print(table)
+        get_console().print(table)
 
 
 def _show_kilm_settings(config_data: dict) -> None:
@@ -165,21 +166,21 @@ def _show_kilm_settings(config_data: dict) -> None:
         settings_text.append(f"Max Backups: {max_backups}", style="blue")
 
     if settings_text.plain:
-        console.print(Panel(settings_text, title="Settings", border_style="blue"))
+        get_console().print(Panel(settings_text, title="Settings", border_style="blue"))
 
 
 def _show_kicad_environment_variables(kicad_config: Path) -> None:
     """Show KiCad environment variables"""
     kicad_common = kicad_config / "kicad_common.json"
     if not kicad_common.exists():
-        console.print("[yellow]No kicad_common.json found[/yellow]")
+        get_console().print("[yellow]No kicad_common.json found[/yellow]")
         return
 
     try:
         with kicad_common.open() as f:
             common_config = json.load(f)
 
-        console.print("\n[bold]Environment Variables in KiCad:[/bold]")
+        get_console().print("\n[bold]Environment Variables in KiCad:[/bold]")
 
         if "environment" in common_config and "vars" in common_config["environment"]:
             env_vars = common_config["environment"]["vars"]
@@ -191,13 +192,13 @@ def _show_kicad_environment_variables(kicad_config: Path) -> None:
                 for key, value in env_vars.items():
                     table.add_row(key, str(value))
 
-                console.print(table)
+                get_console().print(table)
             else:
-                console.print("[yellow]  No environment variables set[/yellow]")
+                get_console().print("[yellow]  No environment variables set[/yellow]")
         else:
-            console.print("[yellow]  No environment variables found[/yellow]")
+            get_console().print("[yellow]  No environment variables found[/yellow]")
     except Exception as e:
-        console.print(f"[red]Error reading KiCad common configuration: {e}[/red]")
+        get_console().print(f"[red]Error reading KiCad common configuration: {e}[/red]")
 
 
 def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> None:
@@ -210,7 +211,7 @@ def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> 
                 common_config = json.load(f)
 
             found_pinned = False
-            console.print("\n[bold]Pinned Libraries in KiCad:[/bold]")
+            get_console().print("\n[bold]Pinned Libraries in KiCad:[/bold]")
 
             # Check for pinned symbol libraries
             if (
@@ -220,9 +221,9 @@ def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> 
                 sym_libs = common_config["session"]["pinned_symbol_libs"]
                 if sym_libs:
                     found_pinned = True
-                    console.print("[cyan]Symbol Libraries:[/cyan]")
+                    get_console().print("[cyan]Symbol Libraries:[/cyan]")
                     for lib in sym_libs:
-                        console.print(f"  • {lib}")
+                        get_console().print(f"  • {lib}")
 
             # Check for pinned footprint libraries
             if (
@@ -232,18 +233,18 @@ def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> 
                 fp_libs = common_config["session"]["pinned_fp_libs"]
                 if fp_libs:
                     found_pinned = True
-                    console.print("[cyan]Footprint Libraries:[/cyan]")
+                    get_console().print("[cyan]Footprint Libraries:[/cyan]")
                     for lib in fp_libs:
-                        console.print(f"  • {lib}")
+                        get_console().print(f"  • {lib}")
 
             if not found_pinned:
-                console.print(
+                get_console().print(
                     "[yellow]  No pinned libraries found in kicad_common.json[/yellow]"
                 )
 
             return
         except Exception as e:
-            console.print(
+            get_console().print(
                 f"[red]Error reading pinned libraries from kicad_common.json: {e}[/red]"
             )
 
@@ -254,31 +255,33 @@ def _check_pinned_libraries(kicad_config: Path, kicad_service: KiCadService) -> 
             with pinned_libs.open() as f:
                 pinned_config = json.load(f)
 
-            console.print("\n[bold]Pinned Libraries in KiCad (legacy format):[/bold]")
+            get_console().print(
+                "\n[bold]Pinned Libraries in KiCad (legacy format):[/bold]"
+            )
             found_pinned = False
 
             if "pinned_symbol_libs" in pinned_config:
                 sym_libs = pinned_config["pinned_symbol_libs"]
                 if sym_libs:
                     found_pinned = True
-                    console.print("[cyan]Symbol Libraries:[/cyan]")
+                    get_console().print("[cyan]Symbol Libraries:[/cyan]")
                     for lib in sym_libs:
-                        console.print(f"  • {lib}")
+                        get_console().print(f"  • {lib}")
 
             if "pinned_footprint_libs" in pinned_config:
                 fp_libs = pinned_config["pinned_footprint_libs"]
                 if fp_libs:
                     found_pinned = True
-                    console.print("[cyan]Footprint Libraries:[/cyan]")
+                    get_console().print("[cyan]Footprint Libraries:[/cyan]")
                     for lib in fp_libs:
-                        console.print(f"  • {lib}")
+                        get_console().print(f"  • {lib}")
 
             if not found_pinned:
-                console.print("[yellow]  No pinned libraries found[/yellow]")
+                get_console().print("[yellow]  No pinned libraries found[/yellow]")
         except Exception as e:
-            console.print(f"[red]Error reading pinned libraries: {e}[/red]")
+            get_console().print(f"[red]Error reading pinned libraries: {e}[/red]")
     else:
-        console.print("\n[yellow]No pinned libraries file found[/yellow]")
+        get_console().print("\n[yellow]No pinned libraries file found[/yellow]")
 
 
 def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) -> None:
@@ -286,7 +289,7 @@ def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) 
     try:
         sym_libs, fp_libs = kicad_service.get_configured_libraries(kicad_config)
 
-        console.print("\n[bold]Configured Symbol Libraries:[/bold]")
+        get_console().print("\n[bold]Configured Symbol Libraries:[/bold]")
         if sym_libs:
             table = Table(show_header=True)
             table.add_column("Library Name", style="cyan", no_wrap=True)
@@ -295,11 +298,11 @@ def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) 
             for lib in sym_libs:
                 table.add_row(lib.get("name", ""), lib.get("uri", ""))
 
-            console.print(table)
+            get_console().print(table)
         else:
-            console.print("[yellow]  No symbol libraries configured[/yellow]")
+            get_console().print("[yellow]  No symbol libraries configured[/yellow]")
 
-        console.print("\n[bold]Configured Footprint Libraries:[/bold]")
+        get_console().print("\n[bold]Configured Footprint Libraries:[/bold]")
         if fp_libs:
             table = Table(show_header=True)
             table.add_column("Library Name", style="cyan", no_wrap=True)
@@ -308,8 +311,8 @@ def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) 
             for lib in fp_libs:
                 table.add_row(lib.get("name", ""), lib.get("uri", ""))
 
-            console.print(table)
+            get_console().print(table)
         else:
-            console.print("[yellow]  No footprint libraries configured[/yellow]")
+            get_console().print("[yellow]  No footprint libraries configured[/yellow]")
     except Exception as e:
-        console.print(f"[red]Error listing configured libraries: {e}[/red]")
+        get_console().print(f"[red]Error listing configured libraries: {e}[/red]")

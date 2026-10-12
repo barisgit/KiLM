@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config
 from ...utils.metadata import (
@@ -16,8 +17,6 @@ from ...utils.metadata import (
     read_cloud_metadata,
     write_cloud_metadata,
 )
-
-console = Console()
 
 
 def add_3d(
@@ -74,7 +73,7 @@ def add_3d(
     # Use current directory if not specified
     directory = Path.cwd().resolve() if directory is None else directory.resolve()
 
-    console.print(
+    get_console().print(
         f"[bold cyan]Adding cloud-based 3D models directory:[/bold cyan] {directory}"
     )
 
@@ -82,39 +81,41 @@ def add_3d(
     metadata = read_cloud_metadata(directory)
 
     if metadata and not force:
-        console.print(
+        get_console().print(
             f"[green]Found existing metadata file[/green] ({CLOUD_METADATA_FILE})"
         )
         library_name = metadata.get("name")
         library_description = metadata.get("description")
         library_env_var = metadata.get("env_var")
-        console.print(f"Using existing name: [blue]{library_name}[/blue]")
+        get_console().print(f"Using existing name: [blue]{library_name}[/blue]")
 
         # Show environment variable if present
         if library_env_var and not no_env_var:
-            console.print(
+            get_console().print(
                 f"Using existing environment variable: [yellow]{library_env_var}[/yellow]"
             )
 
         # Override with command line parameters if provided
         if name:
             library_name = name
-            console.print(f"Overriding with provided name: [blue]{library_name}[/blue]")
+            get_console().print(
+                f"Overriding with provided name: [blue]{library_name}[/blue]"
+            )
 
         if description:
             library_description = description
-            console.print(
+            get_console().print(
                 f"Overriding with provided description: [blue]{library_description}[/blue]"
             )
 
         if env_var:
             library_env_var = env_var
-            console.print(
+            get_console().print(
                 f"Overriding with provided environment variable: [yellow]{library_env_var}[/yellow]"
             )
         elif no_env_var:
             library_env_var = None
-            console.print(
+            get_console().print(
                 "[yellow]Disabling environment variable as requested[/yellow]"
             )
 
@@ -128,15 +129,17 @@ def add_3d(
                 metadata["env_var"] = None
             metadata["updated_with"] = "kilm"
             write_cloud_metadata(directory, metadata)
-            console.print("[green]Updated metadata file with new information[/green]")
+            get_console().print(
+                "[green]Updated metadata file with new information[/green]"
+            )
     else:
         # Create a new metadata file
         if metadata and force:
-            console.print(
+            get_console().print(
                 f"[yellow]Overwriting existing metadata file[/yellow] ({CLOUD_METADATA_FILE})"
             )
         else:
-            console.print(
+            get_console().print(
                 f"[green]Creating new metadata file[/green] ({CLOUD_METADATA_FILE})"
             )
 
@@ -160,7 +163,7 @@ def add_3d(
 
         # Write metadata file
         write_cloud_metadata(directory, metadata)
-        console.print("[green]Metadata file created[/green]")
+        get_console().print("[green]Metadata file created[/green]")
 
         library_name = metadata["name"]
         library_env_var = metadata.get("env_var")
@@ -176,11 +179,11 @@ def add_3d(
             break
 
     if not found_models:
-        console.print(
+        get_console().print(
             "[yellow]Warning: No 3D model files found in this directory[/yellow]"
         )
         if not typer.confirm("Continue anyway?", default=True):
-            console.print("[red]Operation cancelled[/red]")
+            get_console().print("[red]Operation cancelled[/red]")
             raise typer.Exit(0)
 
     # Update metadata with actual model count
@@ -204,28 +207,30 @@ def add_3d(
         )
         config.add_library(final_library_name, str(directory), "cloud")
 
-        console.print(
+        get_console().print(
             f"[bold green]3D models directory '{final_library_name}' added successfully![/bold green]"
         )
-        console.print(f"[blue]Path:[/blue] {directory}")
+        get_console().print(f"[blue]Path:[/blue] {directory}")
         if model_count > 0:
-            console.print(f"[green]Found {model_count} 3D model files[/green]")
+            get_console().print(f"[green]Found {model_count} 3D model files[/green]")
 
         if library_env_var:
-            console.print(
+            get_console().print(
                 f"[yellow]Assigned environment variable:[/yellow] {library_env_var}"
             )
-            console.print("\n[bold]You can use this directory with:[/bold]")
-            console.print(
+            get_console().print("\n[bold]You can use this directory with:[/bold]")
+            get_console().print(
                 f"  [cyan]kilm setup --threed-lib-dirs '{library_name}'[/cyan]"
             )
-            console.print("  [dim]# or by setting the environment variable[/dim]")
-            console.print(f"  [cyan]export {library_env_var}='{directory}'[/cyan]")
+            get_console().print("  [dim]# or by setting the environment variable[/dim]")
+            get_console().print(
+                f"  [cyan]export {library_env_var}='{directory}'[/cyan]"
+            )
 
         # Show current cloud libraries
         libraries = config.get_libraries("cloud")
         if len(libraries) > 1:
-            console.print(
+            get_console().print(
                 "\n[bold]All registered cloud-based 3D model directories:[/bold]"
             )
             for lib in libraries:
@@ -242,11 +247,11 @@ def add_3d(
                     pass
 
                 if lib_env_var:
-                    console.print(
+                    get_console().print(
                         f"  - [cyan]{lib_name}[/cyan]: {lib_path} [yellow](ENV: {lib_env_var})[/yellow]"
                     )
                 else:
-                    console.print(f"  - [cyan]{lib_name}[/cyan]: {lib_path}")
+                    get_console().print(f"  - [cyan]{lib_name}[/cyan]: {lib_path}")
     except Exception as e:
-        console.print(f"[red]Error adding 3D models directory: {e}[/red]")
+        get_console().print(f"[red]Error adding 3D models directory: {e}[/red]")
         raise typer.Exit(1) from e

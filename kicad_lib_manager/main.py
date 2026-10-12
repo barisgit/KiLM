@@ -8,10 +8,10 @@ from typing import Annotated
 
 import typer
 from rich.align import Align
-from rich.console import Console
 from rich.text import Text
-from rich.traceback import install
 from typer.core import TyperGroup
+
+from kicad_lib_manager.utils.console import get_console
 
 from .commands.add_3d import add_3d
 from .commands.add_hook import add_hook
@@ -31,12 +31,6 @@ from .services.update_service import UpdateService
 from .utils.banner import show_banner
 
 TAGLINE = "Professional KiCad library management"
-
-# Install rich traceback handler for better error display
-install(show_locals=True)
-
-# Initialize Rich console
-console = Console()
 
 
 def _check_for_updates_if_needed() -> None:
@@ -74,6 +68,7 @@ class BannerGroup(TyperGroup):
 
     def format_help(self, ctx, formatter):
         # Show banner before help
+        console = get_console()
         show_banner(console, justify="center")
         console.print()
         console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
@@ -98,6 +93,7 @@ app = typer.Typer(
 def version_callback(value: bool) -> None:
     """Print version information and exit."""
     if value:
+        console = get_console()
         show_banner(console, justify="left")
         console.print()
 
@@ -135,6 +131,7 @@ def main(
     import sys
 
     if not sys.argv[1:]:
+        console = get_console()
         show_banner(console)
         console.print()
         console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))

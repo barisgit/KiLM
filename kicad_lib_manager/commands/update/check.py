@@ -4,11 +4,10 @@ import importlib.metadata
 from typing import Annotated
 
 import typer
-from rich.console import Console
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.update_service import UpdateService
-
-console = Console()
 
 
 def check_update_command(
@@ -34,22 +33,24 @@ def check_update_command(
         method = update_info["method"]
         can_auto_update = update_info["supports_auto_update"]
 
-        console.print("[yellow]Update available![/yellow]")
-        console.print(f"Current version: [blue]{current}[/blue]")
-        console.print(f"Latest version: [green]{latest}[/green]")
-        console.print(f"Installation method: [cyan]{method}[/cyan]")
+        get_console().print("[yellow]Update available![/yellow]")
+        get_console().print(f"Current version: [blue]{current}[/blue]")
+        get_console().print(f"Latest version: [green]{latest}[/green]")
+        get_console().print(f"Installation method: [cyan]{method}[/cyan]")
 
         if can_auto_update:
-            console.print("\nRun [bold cyan]kilm update perform[/bold cyan] to update")
+            get_console().print(
+                "\nRun [bold cyan]kilm update perform[/bold cyan] to update"
+            )
         else:
             update_cmd = update_service.get_update_instructions()
-            console.print(f"\nManual update required: [cyan]{update_cmd}[/cyan]")
+            get_console().print(f"\nManual update required: [cyan]{update_cmd}[/cyan]")
 
         # Exit with code 1 to indicate update available
         raise typer.Exit(1)
     else:
         if not quiet:
-            console.print(
+            get_console().print(
                 f"[green]✓[/green] You are using the latest version ([bold cyan]v{update_info['current_version']}[/bold cyan])"
             )
         # Exit with code 0 for no update needed

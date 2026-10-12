@@ -16,9 +16,10 @@ import pathspec
 import questionary
 import typer
 import yaml
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config
 from ...utils.template import (
@@ -36,9 +37,6 @@ from ...utils.template import (
     get_gitignore_spec,
     render_template_string,
 )
-
-console = Console()
-err_console = Console(stderr=True)
 
 
 def main_callback() -> None:
@@ -115,8 +113,8 @@ def create(
     all_templates = find_all_templates(config)
 
     if not all_templates:
-        console.print("No templates found in any configured libraries.")
-        console.print("Use 'kilm template make' to create a template first.")
+        get_console().print("No templates found in any configured libraries.")
+        get_console().print("Use 'kilm template make' to create a template first.")
         return
 
     # Parse name and directory
@@ -154,12 +152,12 @@ def create(
                     break
 
             if not selected_template:
-                console.print(f"Template '{template}' not found.")
-                console.print("Available templates:")
+                get_console().print(f"Template '{template}' not found.")
+                get_console().print("Available templates:")
                 for t_name, t_data in all_templates.items():
                     library = t_data.get("source_library", "unknown")
                     description = t_data.get("description", "")
-                    console.print(f"  {t_name} ({library}): {description}")
+                    get_console().print(f"  {t_name} ({library}): {description}")
                 return
     else:
         # Interactive template selection using questionary
@@ -176,20 +174,20 @@ def create(
         ).ask()
 
         if selected_template_name is None:  # Handle cancellation
-            console.print("Template selection cancelled.")
+            get_console().print("Template selection cancelled.")
             return
 
         selected_template = all_templates.get(selected_template_name)
 
     # Ensure selected_template is not None before proceeding
     if not selected_template:
-        console.print("[red]Error: No template selected.[/red]")
+        get_console().print("[red]Error: No template selected.[/red]")
         return
 
     # Get template directory
     template_path_str = selected_template.get("path")
     if not template_path_str:
-        err_console.print(
+        get_console(stderr=True).print(
             f"Error: Template metadata for '{selected_template.get('name')}' is missing the 'path'."
         )
         return
@@ -201,12 +199,14 @@ def create(
         with metadata_file.open() as f:
             metadata = yaml.safe_load(f)
         if not metadata:  # Handle empty metadata file
-            err_console.print(
+            get_console(stderr=True).print(
                 f"Warning: Template metadata file is empty: {metadata_file}"
             )
             metadata = {}  # Use empty dict to avoid downstream errors
     except Exception as e:
-        err_console.print(f"Error reading template metadata {metadata_file}: {e}")
+        get_console(stderr=True).print(
+            f"Error reading template metadata {metadata_file}: {e}"
+        )
         return
 
     # Get template variables from metadata
@@ -238,14 +238,14 @@ def create(
             variables["project_name"] = name
 
     # Show template info
-    console.print()
-    console.print(f"Using Template: {metadata.get('name', 'Unknown')}")
-    console.print(f"Description: {metadata.get('description', 'N/A')}")
+    get_console().print()
+    get_console().print(f"Using Template: {metadata.get('name', 'Unknown')}")
+    get_console().print(f"Description: {metadata.get('description', 'N/A')}")
     if metadata.get("use_case"):
-        console.print(f"Use case: {metadata.get('use_case')}")
+        get_console().print(f"Use case: {metadata.get('use_case')}")
 
-    console.print()
-    console.print("Template Variables:")
+    get_console().print()
+    get_console().print("Template Variables:")
 
     # Combine initial variables from args and --set-var
     variables.update(command_line_vars)
@@ -263,7 +263,7 @@ def create(
                 else "--set-var"
             )
             if var_name in command_line_vars or (var_name == "project_name" and name):
-                console.print(
+                get_console().print(
                     f"  {var_name}: {variables[var_name]} (from {source}) - {description}"
                 )
             continue  # Skip prompting
@@ -281,14 +281,14 @@ def create(
             except jinja2.exceptions.UndefinedError as e:
                 # If a variable needed for the default hasn't been entered yet,
                 # keep the original template string or empty if undefined errors occur early
-                err_console.print(
+                get_console(stderr=True).print(
                     f"Debug: Undefined variable for default of {var_name}: {e}. Default might be incomplete."
                 )
                 rendered_default = (
                     ""  # Or keep 'default'? Better to show empty than half-rendered?
                 )
             except Exception as e:
-                err_console.print(
+                get_console(stderr=True).print(
                     f"Warning: Could not render default for {var_name}: {e}"
                 )
                 rendered_default = default  # Use original default on other errors
@@ -301,7 +301,7 @@ def create(
         ).ask()
 
         if answer is None:  # Handle Ctrl+C or cancellation
-            console.print("Variable input cancelled.")
+            get_console().print("Variable input cancelled.")
             return  # Exit the command gracefully
 
         # Store the answer for use in subsequent default renderings
@@ -339,7 +339,7 @@ def create(
                     original_default_template, variables
                 )
             except Exception as e:
-                err_console.print(
+                get_console(stderr=True).print(
                     f"Warning: Could not re-render default for {var_name}: {e}"
                 )
                 correct_default = variables[var_name]  # Keep existing value on error
@@ -350,14 +350,14 @@ def create(
                 variables[var_name] == shown_default
                 and variables[var_name] != correct_default
             ):
-                console.print(
+                get_console().print(
                     f"Updating default for '{var_name}': '{shown_default}' -> '{correct_default}'"
                 )
                 variables[var_name] = correct_default
     # --- End Post-processing ---
 
-    console.print()
-    console.print(
+    get_console().print()
+    get_console().print(
         f"Final variables: {json.dumps(variables, indent=2)}"
     )  # Changed message for clarity
 
@@ -379,7 +379,7 @@ def create(
             )
             final_project_dir = project_dir / dir_name_rendered
         except Exception as e:
-            err_console.print(
+            get_console(stderr=True).print(
                 f"Warning: Could not render default directory_name '{directory_name_template}': {e}"
             )
             # Fallback below
@@ -388,22 +388,24 @@ def create(
     if not final_project_dir and "project_name" in variables:
         project_name_sanitized = variables["project_name"].lower().replace(" ", "-")
         final_project_dir = project_dir / project_name_sanitized
-        console.print(f"Using project_name to determine directory: {final_project_dir}")
+        get_console().print(
+            f"Using project_name to determine directory: {final_project_dir}"
+        )
 
     # Final check if we have a directory
     if not final_project_dir:
-        err_console.print(
+        get_console(stderr=True).print(
             "Error: Cannot determine project directory. Ensure 'project_name' or 'directory_name' variable is properly handled."
         )
         return
     # --- End Directory Determination ---
 
-    console.print()
-    console.print(f"Project will be created in: {final_project_dir}")
+    get_console().print()
+    get_console().print(f"Project will be created in: {final_project_dir}")
 
     # --- Execution ---
     if dry_run:
-        console.print("Dry run enabled. No changes will be made.")
+        get_console().print("Dry run enabled. No changes will be made.")
         # Optionally, list files that *would* be created here
     else:
         # Check if target directory exists and handle overwrite
@@ -411,21 +413,23 @@ def create(
             if not typer.confirm(
                 f"Directory '{final_project_dir}' already exists. Overwrite?"
             ):
-                console.print("Aborted.")
+                get_console().print("Aborted.")
                 return
             else:
-                console.print(f"Removing existing directory: {final_project_dir}")
+                get_console().print(f"Removing existing directory: {final_project_dir}")
                 try:
                     shutil.rmtree(final_project_dir)
                 except Exception as e:
-                    err_console.print(f"Error removing existing directory: {e}")
+                    get_console(stderr=True).print(
+                        f"Error removing existing directory: {e}"
+                    )
                     return
 
         # Create parent directories if they don't exist
         try:
             final_project_dir.parent.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            err_console.print(
+            get_console(stderr=True).print(
                 f"Error creating parent directories for {final_project_dir}: {e}"
             )
             return
@@ -443,25 +447,33 @@ def create(
                             old_syntax_files.append(file)
 
                 if old_syntax_files:
-                    console.print()
-                    err_console.print("WARNING: Windows Compatibility Notice:")
-                    err_console.print(
+                    get_console().print()
+                    get_console(stderr=True).print(
+                        "WARNING: Windows Compatibility Notice:"
+                    )
+                    get_console(stderr=True).print(
                         "This template uses the old {{variable}} syntax in filenames, which may not work on Windows."
                     )
-                    err_console.print(
+                    get_console(stderr=True).print(
                         "Consider updating the template to use the new Windows-compatible %{variable} syntax."
                     )
-                    err_console.print("Files with old syntax:")
+                    get_console(stderr=True).print("Files with old syntax:")
                     for file in old_syntax_files[:3]:  # Show first 3 files
-                        err_console.print(f"  - {file}")
+                        get_console(stderr=True).print(f"  - {file}")
                     if len(old_syntax_files) > 3:
-                        err_console.print(f"  ... and {len(old_syntax_files) - 3} more")
-                    console.print()
-                    err_console.print("New syntax examples:")
-                    err_console.print("  - %{project_name}.kicad_pro")
-                    err_console.print("  - %{project_name.lower}.kicad_sch")
-                    err_console.print("  - %{project_name.replace(' ', '-')}.kicad_pcb")
-                    console.print()
+                        get_console(stderr=True).print(
+                            f"  ... and {len(old_syntax_files) - 3} more"
+                        )
+                    get_console().print()
+                    get_console(stderr=True).print("New syntax examples:")
+                    get_console(stderr=True).print("  - %{project_name}.kicad_pro")
+                    get_console(stderr=True).print(
+                        "  - %{project_name.lower}.kicad_sch"
+                    )
+                    get_console(stderr=True).print(
+                        "  - %{project_name.replace(' ', '-')}.kicad_pcb"
+                    )
+                    get_console().print()
 
         success = create_project_from_template(
             template_dir=template_dir,
@@ -472,19 +484,19 @@ def create(
             metadata=metadata,  # Pass metadata for post-hook if needed
         )
     except Exception as e:
-        err_console.print(f"Error during project creation: {e}")
+        get_console(stderr=True).print(f"Error during project creation: {e}")
         traceback.print_exc()  # Print traceback for debugging
         success = False
 
     if success:
         if not dry_run:
-            console.print()
-            console.print(
+            get_console().print()
+            get_console().print(
                 f"Project '{variables.get('project_name', name)}' created successfully in '{final_project_dir}'"
             )
     else:
-        console.print()
-        err_console.print("Project creation failed.")
+        get_console().print()
+        get_console(stderr=True).print("Project creation failed.")
 
 
 def make(
@@ -580,7 +592,7 @@ def make(
     library_paths = {lib["name"]: lib["path"] for lib in all_libraries}
 
     if not library_names:
-        console.print(
+        get_console().print(
             "No GitHub libraries configured. Use 'kilm init' to create one first."
         )
         sys.exit(1)
@@ -618,9 +630,9 @@ def make(
         # Ask for output directory if not specified
         if not output_directory:
             # Show numbered list of libraries
-            console.print("\nChoose a library to store the template:")
+            get_console().print("\nChoose a library to store the template:")
             for i, lib_name in enumerate(library_names):
-                console.print(f"{i + 1}. {lib_name} ({library_paths[lib_name]})")
+                get_console().print(f"{i + 1}. {lib_name} ({library_paths[lib_name]})")
 
             # Get selection
             while True:
@@ -633,14 +645,14 @@ def make(
                         library_path = library_paths[selected_lib]
                         break
                     else:
-                        console.print(
+                        get_console().print(
                             f"Please enter a number between 1 and {len(library_names)}"
                         )
                 except ValueError:
-                    console.print("Please enter a valid number")
+                    get_console().print("Please enter a valid number")
 
             output_directory = Path(library_path) / TEMPLATES_DIR / name
-            console.print(f"Template will be created in: {output_directory}")
+            get_console().print(f"Template will be created in: {output_directory}")
     else:
         # Non-interactive mode - use current directory if not specified
         if not source_directory:
@@ -655,7 +667,7 @@ def make(
             # Find the library to add the template to
             library_path = config.get_symbol_library_path()
             if not library_path:
-                console.print(
+                get_console().print(
                     "No library configured. Use 'kilm init' to create one first."
                 )
                 return
@@ -670,27 +682,27 @@ def make(
 
     # Check if template already exists
     if output_directory and output_directory.exists() and not force:
-        console.print(f"Template '{name}' already exists at {output_directory}")
-        console.print("Use --force to overwrite.")
+        get_console().print(f"Template '{name}' already exists at {output_directory}")
+        get_console().print("Use --force to overwrite.")
         return
 
     # Get gitignore spec
     gitignore_spec = get_gitignore_spec(source_directory)
 
     # Show what we're going to do
-    console.print(f"Creating template '{name}' from {source_directory}")
-    console.print(f"Output directory: {output_directory}")
+    get_console().print(f"Creating template '{name}' from {source_directory}")
+    get_console().print(f"Output directory: {output_directory}")
 
     if description:
-        console.print(f"Description: {description}")
+        get_console().print(f"Description: {description}")
     if use_case:
-        console.print(f"Use case: {use_case}")
+        get_console().print(f"Use case: {use_case}")
     if exclude:
-        console.print("Additional exclusions:")
+        get_console().print("Additional exclusions:")
         for pattern in exclude:
-            console.print(f"  {pattern}")
+            get_console().print(f"  {pattern}")
     if extends:
-        console.print(f"Extends: {extends}")
+        get_console().print(f"Extends: {extends}")
 
     # Parse variables from command line
     variable_dict: dict[str, TemplateVariable] = {}
@@ -703,19 +715,19 @@ def make(
             }
 
     if variable_dict:
-        console.print("\nTemplate variables:")
+        get_console().print("\nTemplate variables:")
         for key, value in variable_dict.items():
-            console.print(f"  {key}: {value['default']} - {value['description']}")
+            get_console().print(f"  {key}: {value['default']} - {value['description']}")
 
     # If interactive mode is enabled, scan for potential variables
     detected_variables: dict[str, TemplateVariable] = {}
     if interactive:
         potential_vars = find_potential_variables(source_directory)
         if potential_vars:
-            console.print("\nFound potential template variables:")
+            get_console().print("\nFound potential template variables:")
             for var_name, values in potential_vars.items():
                 value_str = ", ".join(values)
-                console.print(f"  {var_name}: {value_str}")
+                get_console().print(f"  {var_name}: {value_str}")
 
                 # Ask if the user wants to use this variable
                 if typer.confirm(
@@ -816,16 +828,18 @@ def make(
         included_files.sort()
         excluded_files.sort()
 
-        console.print("\nFiles that will be included in the template:")
+        get_console().print("\nFiles that will be included in the template:")
         for file in included_files:
-            console.print(f"  + {file}")
+            get_console().print(f"  + {file}")
 
         # Show which Markdown files will be templated
         md_files = [f for f in included_files if f.lower().endswith(".md")]
         if md_files:
-            console.print("\nMarkdown files that will be converted to Jinja templates:")
+            get_console().print(
+                "\nMarkdown files that will be converted to Jinja templates:"
+            )
             for file in md_files:
-                console.print(f"  * {file}")
+                get_console().print(f"  * {file}")
 
         # Show which KiCad project files will be templated
         kicad_files = [
@@ -834,7 +848,7 @@ def make(
             if f.lower().endswith((".kicad_pro", ".kicad_sch", ".kicad_pcb"))
         ]
         if kicad_files:
-            console.print("\nKiCad project files that will be templated:")
+            get_console().print("\nKiCad project files that will be templated:")
             for file in kicad_files:
                 # Show the templated filename that will be used
                 if file.lower().endswith(".kicad_pro"):
@@ -846,15 +860,15 @@ def make(
                 else:
                     templated_name = file
 
-                console.print(f"  * {file} → {templated_name}")
+                get_console().print(f"  * {file} → {templated_name}")
 
-        console.print("\nFiles that will be excluded from the template:")
+        get_console().print("\nFiles that will be excluded from the template:")
         for file in excluded_files:
-            console.print(f"  - {file}")
+            get_console().print(f"  - {file}")
 
     # If this is a dry run, stop here
     if dry_run:
-        console.print("\nDry run complete. No changes were made.")
+        get_console().print("\nDry run complete. No changes were made.")
         return
 
     # Create the template
@@ -872,36 +886,40 @@ def make(
             additional_excludes=exclude or None,
         )
 
-        console.print(f"\nTemplate '{name}' created successfully at {output_directory}")
+        get_console().print(
+            f"\nTemplate '{name}' created successfully at {output_directory}"
+        )
 
         # Add hints for next steps
-        console.print("\nNext steps:")
-        console.print(
+        get_console().print("\nNext steps:")
+        get_console().print(
             f"1. Edit {output_directory / TEMPLATE_METADATA if output_directory else 'N/A'} to customize template metadata"
         )
-        console.print(
+        get_console().print(
             f"2. Customize template files in {output_directory / TEMPLATE_CONTENT_DIR if output_directory else 'N/A'}"
         )
-        console.print(
+        get_console().print(
             f"3. Edit post-creation hook in {output_directory / HOOKS_DIR / POST_CREATE_HOOK if output_directory else 'N/A'} if needed"
         )
-        console.print(
+        get_console().print(
             f"4. Use your template with: kilm template create MyProject --template {name}"
         )
 
         # Add information about filename templating syntax
-        console.print("\nFilename Templating:")
-        console.print("For Windows compatibility, use %{variable} syntax in filenames:")
-        console.print("  - %{project_name}.kicad_pro")
-        console.print("  - %{project_name.lower}.kicad_sch")
-        console.print("  - %{project_name.replace(' ', '-')}.kicad_pcb")
-        console.print("  - %{project_name.upper.replace(' ', '_')}.md")
-        console.print(
+        get_console().print("\nFilename Templating:")
+        get_console().print(
+            "For Windows compatibility, use %{variable} syntax in filenames:"
+        )
+        get_console().print("  - %{project_name}.kicad_pro")
+        get_console().print("  - %{project_name.lower}.kicad_sch")
+        get_console().print("  - %{project_name.replace(' ', '-')}.kicad_pcb")
+        get_console().print("  - %{project_name.upper.replace(' ', '_')}.md")
+        get_console().print(
             "(Old {{variable}} syntax still works but may cause issues on Windows)"
         )
 
     except Exception as e:
-        err_console.print(f"Error creating template: {str(e)}")
+        get_console(stderr=True).print(f"Error creating template: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
 
@@ -949,8 +967,8 @@ def list_templates(
     all_templates = find_all_templates(config)
 
     if not all_templates:
-        console.print()
-        console.print(
+        get_console().print()
+        get_console().print(
             Panel(
                 "[yellow]No templates found in any configured libraries.[/yellow]\n\n"
                 "[cyan]💡 Get Started:[/cyan]\n"
@@ -971,8 +989,8 @@ def list_templates(
         }
 
         if not all_templates:
-            console.print()
-            console.print(
+            get_console().print()
+            get_console().print(
                 Panel(
                     f"[yellow]No templates found in library '[cyan]{library}[/cyan]'.[/yellow]\n\n"
                     "[cyan]💡 Try:[/cyan]\n"
@@ -989,7 +1007,7 @@ def list_templates(
     if json_output:
         import json as json_lib
 
-        console.print(json_lib.dumps(all_templates, indent=2))
+        get_console().print(json_lib.dumps(all_templates, indent=2))
         return
 
     # Group templates by library for display
@@ -1001,7 +1019,7 @@ def list_templates(
         templates_by_library[lib_name].append((name, data))
 
     # Display templates in Rich tables organized by library
-    console.print()
+    get_console().print()
 
     for lib_name, templates in templates_by_library.items():
         # Create a table for each library
@@ -1045,8 +1063,8 @@ def list_templates(
 
             table.add_row(*row_data)
 
-        console.print(table)
-        console.print()
+        get_console().print(table)
+        get_console().print()
 
     # Add usage hint panel
     hint_content = (
@@ -1055,7 +1073,7 @@ def list_templates(
     hint_content += "[cyan]Verbose:[/cyan] kilm template list --verbose\n"
     hint_content += "[cyan]Filter:[/cyan] kilm template list --library <library_name>"
 
-    console.print(
+    get_console().print(
         Panel(
             hint_content,
             title="[bold blue]💡 Quick Tips[/bold blue]",
@@ -1069,7 +1087,7 @@ def list_templates(
     summary_content = f"[green]Libraries:[/green] {library_count}\n"
     summary_content += f"[green]Templates:[/green] {template_count}"
 
-    console.print(
+    get_console().print(
         Panel(
             summary_content,
             title="[bold cyan]📊 Summary[/bold cyan]",

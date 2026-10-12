@@ -9,11 +9,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from rich.console import Console
+from kicad_lib_manager.utils.console import get_console
 
 from .formats import format_version
-
-console = Console()
 
 _KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
     Path.home() / "AppImages" / "kicad.appimage",
@@ -119,12 +117,12 @@ def _run(kicad_cli: Path, label: str, *args: str) -> bool:
             cmd, capture_output=True, text=True, check=True, timeout=_TIMEOUT_SECONDS
         )
     except subprocess.TimeoutExpired:
-        console.print(
+        get_console().print(
             f"[yellow]  warn: kicad-cli {args[0]} upgrade timed out for {label}, skipping[/yellow]"
         )
         return False
     except subprocess.CalledProcessError as exc:
-        console.print(
+        get_console().print(
             f"[yellow]  warn: kicad-cli {args[0]} upgrade failed for {label}: {exc.stderr.strip()}[/yellow]"
         )
         return False
@@ -136,7 +134,7 @@ def _within_limit(text: str, limit: int | None, suffix: str) -> bool:
     version = format_version(text)
     if limit is None or version is None or version <= limit:
         return True
-    console.print(
+    get_console().print(
         f"[dim]  kicad-cli writes format {version}, newer than {limit} in the "
         f"target library; keeping vendor {suffix} formats[/dim]"
     )

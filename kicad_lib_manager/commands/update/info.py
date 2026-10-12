@@ -4,12 +4,11 @@ import importlib.metadata
 from typing import Annotated
 
 import typer
-from rich.console import Console
 from rich.panel import Panel
 
-from ...services.update_service import UpdateService
+from kicad_lib_manager.utils.console import get_console
 
-console = Console()
+from ...services.update_service import UpdateService
 
 
 def info_command(
@@ -45,7 +44,7 @@ def info_command(
     ]
 
     # Display information
-    console.print(
+    get_console().print(
         Panel(
             f"""[bold]Version Information[/bold]
 Current version: {version_status}

@@ -8,11 +8,10 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
+
+from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config
-
-console = Console()
 
 
 def sync(
@@ -44,12 +43,12 @@ def sync(
         libraries = config.get_libraries(library_type="github")
 
         if not libraries:
-            console.print(
+            get_console().print(
                 "[yellow]No GitHub libraries configured. Use 'kilm init' to add a library.[/yellow]"
             )
             return
 
-        console.print(
+        get_console().print(
             f"[cyan]Syncing {len(libraries)} KiCad GitHub libraries...[/cyan]"
         )
 
@@ -66,7 +65,7 @@ def sync(
             lib_path = lib.get("path")
 
             if not lib_path:
-                console.print(
+                get_console().print(
                     f"  [yellow]Skipping {lib_name}: No path defined[/yellow]"
                 )
                 skipped_count += 1
@@ -74,7 +73,7 @@ def sync(
 
             lib_path = Path(lib_path)
             if not lib_path.exists():
-                console.print(
+                get_console().print(
                     f"  [yellow]Skipping {lib_name}: Path does not exist: {lib_path}[/yellow]"
                 )
                 skipped_count += 1
@@ -82,17 +81,17 @@ def sync(
 
             git_dir = lib_path / ".git"
             if not git_dir.exists() or not git_dir.is_dir():
-                console.print(
+                get_console().print(
                     f"  [yellow]Skipping {lib_name}: Not a git repository: {lib_path}[/yellow]"
                 )
                 skipped_count += 1
                 continue
 
             # Prepare to run git pull
-            console.print(f"  [cyan]Syncing {lib_name} at {lib_path}...[/cyan]")
+            get_console().print(f"  [cyan]Syncing {lib_name} at {lib_path}...[/cyan]")
 
             if dry_run:
-                console.print(
+                get_console().print(
                     f"    [blue]Dry run: would execute 'git pull' in {lib_path}[/blue]"
                 )
                 updated_count += 1
@@ -113,17 +112,17 @@ def sync(
                     is_updated = "Already up to date" not in output
 
                     if verbose:
-                        console.print(f"    [green]Success: {output}[/green]")
+                        get_console().print(f"    [green]Success: {output}[/green]")
                         # Also show the short status for consistency
                         if is_updated:
-                            console.print("    [green]Updated[/green]")
+                            get_console().print("    [green]Updated[/green]")
                         else:
-                            console.print("    [blue]Up to date[/blue]")
+                            get_console().print("    [blue]Up to date[/blue]")
                     else:
                         if is_updated:
-                            console.print("    [green]Updated[/green]")
+                            get_console().print("    [green]Updated[/green]")
                         else:
-                            console.print("    [blue]Up to date[/blue]")
+                            get_console().print("    [blue]Up to date[/blue]")
 
                     # Update counters regardless of verbose flag
                     if is_updated:
@@ -139,32 +138,36 @@ def sync(
                                 (lib_name, lib_path, changes_require_setup)
                             )
                             if verbose:
-                                console.print(
+                                get_console().print(
                                     f"    [yellow]Detected new library content: {', '.join(changes_require_setup)}[/yellow]"
                                 )
                 else:
-                    console.print(f"    [red]Failed: {result.stderr.strip()}[/red]")
+                    get_console().print(
+                        f"    [red]Failed: {result.stderr.strip()}[/red]"
+                    )
                     failed_count += 1
 
             except Exception as e:
-                console.print(f"    [red]Error: {str(e)}[/red]")
+                get_console().print(f"    [red]Error: {str(e)}[/red]")
                 failed_count += 1
 
         # Summary
-        console.print("\n[bold cyan]Sync Summary:[/bold cyan]")
-        console.print(f"  [green]{updated_count}[/green] libraries synced")
-        console.print(f"  [blue]{up_to_date_count}[/blue] libraries up to date")
-        console.print(f"  [yellow]{skipped_count}[/yellow] libraries skipped")
-        console.print(f"  [red]{failed_count}[/red] libraries failed")
+        get_console().print("\n[bold cyan]Sync Summary:[/bold cyan]")
+        get_console().print(f"  [green]{updated_count}[/green] libraries synced")
+        get_console().print(f"  [blue]{up_to_date_count}[/blue] libraries up to date")
+        get_console().print(f"  [yellow]{skipped_count}[/yellow] libraries skipped")
+        get_console().print(f"  [red]{failed_count}[/red] libraries failed")
 
         # If libraries with changes were detected, suggest running setup
         if libraries_with_changes:
-            console.print("\n[yellow]New library content detected in:[/yellow]")
+            get_console().print("\n[yellow]New library content detected in:[/yellow]")
             for lib_name, _lib_path, changes in libraries_with_changes:
-                console.print(f"  - [cyan]{lib_name}[/cyan]: {', '.join(changes)}")
+                get_console().print(
+                    f"  - [cyan]{lib_name}[/cyan]: {', '.join(changes)}"
+                )
 
             if auto_setup:
-                console.print(
+                get_console().print(
                     "\n[green]Running 'kilm setup' to configure new libraries...[/green]"
                 )
                 # Import at runtime to avoid circular imports
@@ -173,26 +176,26 @@ def sync(
 
                     setup_cmd()
                 except ImportError:
-                    console.print(
+                    get_console().print(
                         "[red]Error: Could not import setup command. Please run 'kilm setup' manually.[/red]"
                     )
             else:
-                console.print(
+                get_console().print(
                     "\n[yellow]You should run 'kilm setup' to configure the new libraries in KiCad.[/yellow]"
                 )
-                console.print(
+                get_console().print(
                     "[blue]Run 'kilm sync --auto-setup' next time to automatically run setup after sync.[/blue]"
                 )
         else:
-            console.print(
+            get_console().print(
                 "\n[blue]No new libraries detected that would require running 'kilm setup'.[/blue]"
             )
-            console.print(
+            get_console().print(
                 "[blue]Use 'kilm status' to check your current configuration.[/blue]"
             )
 
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        get_console().print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
 
 
