@@ -258,11 +258,16 @@ def _library_entry(entry: object) -> LibraryDict | None:
 
 
 class ConfigService:
-    """Holder of a `Config`, kept only because main.py still constructs it.
+    """Holder of a `Config` for callers that predate `Config`'s public API.
 
-    New code uses `Config` directly; remove this once main.py does.
+    main.py reads `_config` and setup calls `get_config_file_path`. New code
+    uses `Config` directly; remove this once those callers do.
     """
 
     def __init__(self) -> None:
         """Load the user's configuration into `_config`."""
         self._config = Config()
+
+    def get_config_file_path(self) -> Path:
+        """Return the configuration file that `_config` reads and saves."""
+        return self._config.config_file
