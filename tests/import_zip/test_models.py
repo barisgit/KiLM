@@ -256,6 +256,27 @@ def test_file_names_differing_only_in_case_are_one_file(
     assert [p.name for p in fp_dir.iterdir()] == ["Foo.kicad_mod"]
 
 
+def test_members_differing_only_in_case_import_the_first_everywhere(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    # On a case-insensitive filesystem the second member used to overwrite the
+    # first during extraction, so platforms imported different geometry.
+    zip_path = zip_with(
+        tmp_path,
+        "case",
+        {
+            "P/KiCad/Foo.kicad_mod": '(footprint "Foo" (descr "first"))\n',
+            "P/KiCad/foo.kicad_mod": '(footprint "foo" (descr "second"))\n',
+        },
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert "FP   skip (exists as Foo.kicad_mod): foo.kicad_mod" in result.output
+    assert '(descr "first")' in _footprint(library_tree, "Foo.kicad_mod")
+
+
 @pytest.mark.parametrize("kept_from", ["library", "earlier ZIP"])
 def test_symbols_reference_the_kept_spelling_of_a_skipped_footprint(
     tmp_path: Path, library_tree: Path, mock_config: MagicMock, kept_from: str

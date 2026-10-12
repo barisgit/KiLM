@@ -37,7 +37,7 @@ For each ZIP, the command:
 
 Every file of a ZIP is read, upgraded, and checked before anything is written, so a dry run reports the same additions and failures as a real run, and a ZIP that fails these checks changes nothing. Each file is written to a temporary sibling and then renamed over the target, so an interrupted import never leaves a truncated library. Before its first change in a run, the symbol library is copied to `<name>.kicad_sym.backup.<timestamp>` next to it; the five newest backups are kept.
 
-Re-running an import is safe: existing symbols, footprints, and models are reported as skipped and left untouched. File names that differ only in case count as the same file, so a library stays usable on case-insensitive filesystems (macOS, Windows); symbols reference the footprint under the name the library already holds. A dry run reports exactly what a real run would add, including parts repeated across several ZIPs.
+Re-running an import is safe: existing symbols, footprints, and models are reported as skipped and left untouched. File names that differ only in case count as the same file (within one ZIP, the first by archive path is kept), so a library stays usable on case-insensitive filesystems (macOS, Windows); symbols reference the footprint under the name the library already holds. A dry run reports exactly what a real run would add, including parts repeated across several ZIPs.
 
 ### 3D model paths
 

@@ -53,8 +53,10 @@ def extract_part_files(zip_path: Path, dest: Path) -> list[Path]:
     puts the files at the root), so members are chosen by extension, not by
     directory. Other members, hidden files, and macOS metadata
     ("__MACOSX/._<name>" resource forks that share the real files'
-    extensions) are not extracted. Returns the extracted paths in member name
-    order.
+    extensions) are not extracted. Each member goes into its own numbered
+    subdirectory of dest, so members whose names differ only in case (or
+    repeat) keep their own contents on case-insensitive filesystems too.
+    Returns the extracted paths in member name order.
 
     Raises:
         ImportFailure: The archive is corrupt, has a member that would land
@@ -70,7 +72,10 @@ def extract_part_files(zip_path: Path, dest: Path) -> list[Path]:
             )
             for member in members:
                 _require_readable(member)
-            return [Path(zf.extract(member, dest)) for member in members]
+            return [
+                Path(zf.extract(member, dest / str(i)))
+                for i, member in enumerate(members)
+            ]
     except _CORRUPT_ARCHIVE_ERRORS as exc:
         raise ImportFailure(f"invalid or corrupt ZIP: {exc}") from exc
     except (RuntimeError, NotImplementedError) as exc:
