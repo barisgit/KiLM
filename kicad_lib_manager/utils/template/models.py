@@ -5,11 +5,13 @@ __lazy_modules__ = {"yaml"}
 
 from collections.abc import Collection, Mapping
 from pathlib import Path
-from typing import TypeAlias, TypedDict, cast
+from typing import TypeAlias, TypedDict, TypeVar, cast
 
 import yaml
 
 from kicad_lib_manager.utils.constants import TEMPLATE_METADATA
+
+_Validated = TypeVar("_Validated", bound=Mapping[str, object])
 
 # Values a template is rendered with, keyed by variable name.
 RenderVariables: TypeAlias = Mapping[str, str | int | bool]
@@ -63,6 +65,23 @@ _DEPENDENCY_KEYS = (
 )
 
 
+def discovered_template(
+    metadata: TemplateMetadata, template_dir: Path, library_dir: Path
+) -> DiscoveredTemplate:
+    """Return ``metadata`` with where it was found: ``template_dir`` in ``library_dir``.
+
+    The library's directory name is recorded as the source library. Builds a
+    new mapping instead of unpacking ``metadata`` as keyword arguments,
+    because its custom keys need not be strings.
+    """
+    # TypedDicts allow extra keys; the declared ones are set below.
+    template = cast("DiscoveredTemplate", dict(metadata))
+    template["path"] = str(template_dir)
+    template["source_library"] = library_dir.name
+    template["library_path"] = str(library_dir)
+    return template
+
+
 class MetadataError(Exception):
     """A ``metadata.yaml`` file could not be read or parsed."""
 
@@ -88,14 +107,16 @@ def read_template_metadata(template_dir: Path) -> TemplateMetadata | None:
 def parse_template_metadata(raw: object) -> TemplateMetadata | None:
     """Validate loaded YAML as template metadata.
 
-    Known keys are kept with their declared types: scalars become strings, a
-    variable without a description or default gets the ones ``template create``
-    shows, and malformed values are dropped. Other keys, also inside a
-    variable or ``dependencies``, are kept as loaded for hooks and ``template
-    list --json``; the keys that discovery adds (``path`` and the library) are
-    not taken from the file. Returns None unless ``raw`` is a non-empty mapping.
+    Known keys are kept with their declared types: scalars become strings,
+    variable names become text (templates and ``--set`` refer to them by
+    name), a variable without a description or default gets the ones
+    ``template create`` shows, and malformed values are dropped. Other keys,
+    also inside a variable or ``dependencies``, are kept as loaded, keys
+    included (``7`` and ``"7"`` stay distinct), for hooks and ``template list
+    --json``; the keys that discovery adds (``path`` and the library) are not
+    taken from the file. Returns None unless ``raw`` is a non-empty mapping.
     """
-    fields = _string_keyed(raw)
+    fields = _mapping(raw)
     if fields is None or not fields:
         return None
     metadata = TemplateMetadata()
@@ -109,15 +130,11 @@ def parse_template_metadata(raw: object) -> TemplateMetadata | None:
         metadata["version"] = version
     if (extends := _text(fields.get("extends"))) is not None:
         metadata["extends"] = extends
-    if (variables := _string_keyed(fields.get("variables"))) is not None:
+    if (variables := _mapping(fields.get("variables"))) is not None:
         metadata["variables"] = _variables(variables)
-    if (dependencies := _string_keyed(fields.get("dependencies"))) is not None:
+    if (dependencies := _mapping(fields.get("dependencies"))) is not None:
         metadata["dependencies"] = _dependencies(dependencies)
-    # TypedDicts allow extra keys; the declared ones were checked above.
-    return cast(
-        "TemplateMetadata",
-        _with_custom_keys(dict(metadata), fields, _TEMPLATE_KEYS),
-    )
+    return _with_custom_keys(metadata, fields, _TEMPLATE_KEYS)
 
 
 def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None:
@@ -136,11 +153,11 @@ def default_description(name: str) -> str:
     return f"Value for {name}"
 
 
-def _string_keyed(value: object) -> dict[str, object] | None:
-    """Return a YAML mapping with its keys as text, or None for other values."""
+def _mapping(value: object) -> dict[object, object] | None:
+    """Return a YAML mapping as loaded, or None for other values."""
     if not isinstance(value, Mapping):
         return None
-    return {str(key): item for key, item in value.items()}
+    return dict(cast("Mapping[object, object]", value))
 
 
 def _text(value: object) -> str | None:
@@ -151,21 +168,31 @@ def _text(value: object) -> str | None:
 
 
 def _with_custom_keys(
-    validated: dict[str, object],
-    fields: Mapping[str, object],
+    validated: _Validated,
+    fields: Mapping[object, object],
     declared: Collection[str],
-) -> dict[str, object]:
-    """Return ``validated`` followed by the ``fields`` that are not ``declared``."""
-    return {
+) -> _Validated:
+    """Return ``validated`` followed by the ``fields`` that are not ``declared``.
+
+    The result keeps the type of ``validated``, whose declared keys were
+    checked. The custom keys are kept as loaded, so they need not be strings.
+    """
+    merged = {
         **validated,
         **{key: value for key, value in fields.items() if key not in declared},
     }
+    # A TypedDict cannot declare non-string keys, so the type checker calls
+    # this cast impossible; at runtime a TypedDict is a dict and takes any key.
+    return cast(  # ty: ignore[disjoint-cast] -- custom keys need not be strings
+        "_Validated", merged
+    )
 
 
-def _variables(raw: dict[str, object]) -> dict[str, TemplateVariable]:
+def _variables(raw: dict[object, object]) -> dict[str, TemplateVariable]:
     variables: dict[str, TemplateVariable] = {}
-    for name, value in raw.items():
-        fields = _string_keyed(value) or {}
+    for key, value in raw.items():
+        name = str(key)
+        fields = _mapping(value) or {}
         description = _text(fields.get("description"))
         default = _text(fields.get("default"))
         variable = TemplateVariable(
@@ -174,22 +201,14 @@ def _variables(raw: dict[str, object]) -> dict[str, TemplateVariable]:
             else description,
             default="" if default is None else default,
         )
-        # TypedDicts allow extra keys; the declared ones were set above.
-        variables[name] = cast(
-            "TemplateVariable",
-            _with_custom_keys(dict(variable), fields, _VARIABLE_KEYS),
-        )
+        variables[name] = _with_custom_keys(variable, fields, _VARIABLE_KEYS)
     return variables
 
 
-def _dependencies(raw: dict[str, object]) -> TemplateDependencies:
+def _dependencies(raw: dict[object, object]) -> TemplateDependencies:
     recommended = raw.get("recommended")
     names = recommended if isinstance(recommended, list) else []
     dependencies = TemplateDependencies(
         recommended=[text for item in names if (text := _text(item)) is not None]
     )
-    # TypedDicts allow extra keys; the declared one was set above.
-    return cast(
-        "TemplateDependencies",
-        _with_custom_keys(dict(dependencies), raw, _DEPENDENCY_KEYS),
-    )
+    return _with_custom_keys(dependencies, raw, _DEPENDENCY_KEYS)

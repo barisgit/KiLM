@@ -20,6 +20,7 @@ from kicad_lib_manager.utils.template.constants import POST_CREATE_HOOK
 from kicad_lib_manager.utils.template.discovery import (
     ConfiguredLibrary,
     find_all_templates,
+    list_templates_in_directory,
 )
 from kicad_lib_manager.utils.template.hooks import (
     create_hook_script,
@@ -28,6 +29,7 @@ from kicad_lib_manager.utils.template.hooks import (
 from kicad_lib_manager.utils.template.models import (
     DiscoveredTemplate,
     TemplateMetadata,
+    discovered_template,
     read_template_metadata,
     write_template_metadata,
 )
@@ -138,12 +140,7 @@ def test_rendered_files_keep_markup_characters(tmp_path: Path) -> None:
 
 
 def _discovered(template_dir: Path, metadata: TemplateMetadata) -> DiscoveredTemplate:
-    return DiscoveredTemplate(
-        **metadata,
-        path=str(template_dir),
-        source_library="library",
-        library_path=str(template_dir.parent),
-    )
+    return discovered_template(metadata, template_dir, template_dir.parent)
 
 
 @pytest.fixture
@@ -217,6 +214,36 @@ def test_hook_reads_custom_metadata(tmp_path: Path) -> None:
     )
 
     assert (project_dir / "hook.txt").read_text(encoding="utf-8") == "Hi A,B"
+
+
+def test_hook_sees_custom_keys_as_loaded(tmp_path: Path) -> None:
+    """Integer and text keys stay distinct, also inside variables and dependencies."""
+    template_dir = tmp_path / TEMPLATES_DIR / "tpl"
+    (template_dir / TEMPLATE_CONTENT_DIR).mkdir(parents=True)
+    (template_dir / TEMPLATE_CONTENT_DIR / "README.md").write_text("", encoding="utf-8")
+    (template_dir / HOOKS_DIR).mkdir()
+    (template_dir / TEMPLATE_METADATA).write_text(
+        "name: tpl\n7: first\n'7': second\n"
+        "variables:\n  board:\n    default: A\n    7: int\n    '7': text\n"
+        "dependencies:\n  recommended: []\n  7: dep\n",
+        encoding="utf-8",
+    )
+    (template_dir / HOOKS_DIR / POST_CREATE_HOOK).write_text(
+        "from pathlib import Path\n\n\ndef post_create(context):\n"
+        "    t = context['template']\n"
+        "    board = t['variables']['board']\n"
+        "    values = [t[7], t['7'], board[7], board['7'], t['dependencies'][7]]\n"
+        "    Path(context['project_dir'], 'hook.txt').write_text(' '.join(values))\n",
+        encoding="utf-8",
+    )
+    templates = list_templates_in_directory(tmp_path)
+    assert [template["name"] for template in templates] == ["tpl"]
+    project_dir = tmp_path / "project"
+
+    assert create_project_from_template(templates[0], project_dir, PROJECT)
+
+    hook_output = (project_dir / "hook.txt").read_text(encoding="utf-8")
+    assert hook_output == "first second int text dep"
 
 
 def test_create_project_dry_run_writes_nothing(

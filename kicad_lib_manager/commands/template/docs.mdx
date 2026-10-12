@@ -108,7 +108,7 @@ kilm template create [project_name_or_path] [output_path] [OPTIONS]
 5.  **Processes Templates:**
     - Renders filenames using Windows-compatible `%{variable}` syntax (with fallback support for legacy `{{variable}}` syntax)
     - Renders file content using Jinja2 `{{variable}}` syntax for `.jinja2` files
-6.  **(Optional) Runs Hooks:** Executes the `hooks/post_create.py` script if it exists and `--skip-hooks` was not used. Its `post_create(context)` receives `project_dir`, `variables`, and `template`: the template's metadata, including any keys of your own in `metadata.yaml`.
+6.  **(Optional) Runs Hooks:** Executes the `hooks/post_create.py` script if it exists and `--skip-hooks` was not used. Its `post_create(context)` receives `project_dir`, `variables`, and `template`: the template's metadata, including any keys of your own in `metadata.yaml`, with each key as YAML loads it (`7` and `'7'` stay distinct).
 
 #### Examples
 

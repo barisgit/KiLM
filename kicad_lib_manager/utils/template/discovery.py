@@ -10,6 +10,7 @@ from kicad_lib_manager.utils.constants import TEMPLATE_METADATA, TEMPLATES_DIR
 from kicad_lib_manager.utils.template.models import (
     DiscoveredTemplate,
     MetadataError,
+    discovered_template,
     read_template_metadata,
 )
 
@@ -49,14 +50,7 @@ def list_templates_in_directory(directory: Path) -> list[DiscoveredTemplate]:
             click.echo(str(error), err=True)
             continue
         if metadata is not None:
-            templates.append(
-                DiscoveredTemplate(
-                    **metadata,
-                    path=str(template_dir),
-                    source_library=directory.name,
-                    library_path=str(directory),
-                )
-            )
+            templates.append(discovered_template(metadata, template_dir, directory))
     return templates
 
 

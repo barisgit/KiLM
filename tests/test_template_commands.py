@@ -76,6 +76,18 @@ def test_list_json_keeps_custom_metadata(home: Path) -> None:
     assert templates["board"]["released"] == "2026-01-02"
 
 
+def test_list_json_prints_keys_json_cannot_hold_as_text(home: Path) -> None:
+    """Custom keys such as YAML dates print as text instead of failing."""
+    template_dir = add_template(add_library(home, "lib"), "board", {})
+    with (template_dir / TEMPLATE_METADATA).open("a", encoding="utf-8") as f:
+        f.write("2026-01-02: released\nhook_options:\n  2026-01-03: tagged\n")
+
+    templates = json.loads(invoke("list", "--json"))
+
+    assert templates["board"]["2026-01-02"] == "released"
+    assert templates["board"]["hook_options"] == {"2026-01-03": "tagged"}
+
+
 def test_create_uses_template_from_requested_library(
     home: Path, tmp_path: Path
 ) -> None:

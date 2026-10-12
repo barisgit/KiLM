@@ -1,7 +1,8 @@
 """The ``template list`` command."""
 
 import json
-from typing import Annotated
+from collections.abc import Mapping
+from typing import Annotated, cast
 
 import typer
 from rich.panel import Panel
@@ -42,7 +43,7 @@ def list_templates(
     if json_output:
         # Plain echo: a Rich console would wrap long values and break the JSON.
         # Custom keys may hold YAML dates and such, which print as text.
-        typer.echo(json.dumps(templates, indent=2, default=str))
+        typer.echo(json.dumps(_json_keys(templates), indent=2, default=str))
         return
 
     by_library: dict[str, list[tuple[str, DiscoveredTemplate]]] = {}
@@ -141,3 +142,22 @@ def _variables_summary(template: DiscoveredTemplate) -> str:
     if len(names) > MAX_LISTED_VARIABLES:
         summary += f", +{len(names) - MAX_LISTED_VARIABLES} more"
     return summary
+
+
+def _json_keys(value: object) -> object:
+    """Return ``value`` with the mapping keys JSON cannot hold turned into text.
+
+    JSON object keys are text; json.dumps also accepts numbers, booleans, and
+    None but fails on other keys, such as the dates YAML loads.
+    """
+    if isinstance(value, Mapping):
+        items = cast("Mapping[object, object]", value).items()
+        return {
+            key if isinstance(key, (str, int, float)) or key is None else str(key): (
+                _json_keys(item)
+            )
+            for key, item in items
+        }
+    if isinstance(value, list):
+        return [_json_keys(item) for item in cast("list[object]", value)]
+    return value
