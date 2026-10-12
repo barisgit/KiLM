@@ -25,6 +25,7 @@ from kicad_lib_manager.utils.console import get_console
 
 from ...services.config_service import Config
 from ...utils.template import (
+    FILENAME_VAR_PATTERN,
     HOOKS_DIR,
     POST_CREATE_HOOK,
     TEMPLATE_CONTENT_DIR,
@@ -275,7 +276,10 @@ def create(
 
         # Render the default value using already known variables
         rendered_default = default
-        if default and "{{" in default and "}}" in default:
+        if default and (
+            ("{{" in default and "}}" in default)
+            or FILENAME_VAR_PATTERN.search(default)
+        ):
             try:
                 # Use the 'variables' dict which now contains previously entered answers
                 rendered_default = render_template_string(default, variables)

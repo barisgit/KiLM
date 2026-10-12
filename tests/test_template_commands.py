@@ -108,3 +108,38 @@ def test_list_filters_library_before_resolving_name_clashes(home: Path) -> None:
     templates = json.loads(invoke("list", "--library", "second", "--json"))
 
     assert templates["board"]["description"] == "second"
+
+
+def test_create_renders_percent_syntax_defaults(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Defaults written in the %{...} syntax are rendered before they are offered."""
+    offered: dict[str, str] = {}
+
+    class AcceptDefault:
+        def __init__(self, message: str, default: str) -> None:
+            self.answer = default
+            offered[message.split()[0]] = default
+
+        def ask(self) -> str:
+            return self.answer
+
+    monkeypatch.setattr(questionary, "text", AcceptDefault)
+    add_template(
+        add_library(home, "lib"),
+        "board",
+        {"%{project_filename}.txt.jinja2": "{{ directory_name }}"},
+        variables={
+            "project_name": {"description": "Name", "default": ""},
+            "directory_name": {
+                "description": "Directory",
+                "default": "%{project_name.lower.replace(' ', '-')}",
+            },
+            "project_filename": {"description": "File", "default": "%{project_name}"},
+        },
+    )
+
+    invoke("create", "My Board", str(tmp_path), "--template", "board")
+
+    assert offered == {"directory_name": "my-board", "project_filename": "My Board"}
+    assert (tmp_path / "my-board" / "My Board.txt").read_text() == "my-board"
