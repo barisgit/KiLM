@@ -52,3 +52,19 @@ jobs:
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
+  # Builds the flake package (which runs the test suite) so Nix packaging
+  # breaks visibly when pyproject.toml gains a dependency nixpkgs lacks.
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v31
+
+    - name: Check flake
+      run: nix flake check -L
+
+    - name: Smoke-test the packaged CLI
+      run: nix run . -- --version
