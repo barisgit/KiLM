@@ -1,7 +1,7 @@
 """Tests for KiCad environment variables and pinned libraries."""
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -12,6 +12,7 @@ from kicad_lib_manager.utils.env_vars import (
     update_kicad_env_vars,
     update_pinned_libraries,
 )
+from tests.fault_injection import fail_writes
 
 
 def test_update_kicad_env_vars(tmp_path: Path) -> None:
@@ -107,16 +108,6 @@ def test_update_kicad_env_vars(tmp_path: Path) -> None:
         update_kicad_env_vars(kicad_config, env_vars)
 
 
-class _DiskFullError(OSError):
-    """Stands in for a disk error in the middle of writing JSON."""
-
-
-def _failing_iterencode(*_args: object, **_kwargs: object) -> Iterator[str]:
-    """Yield the start of a JSON document, then fail like a full disk."""
-    yield '{"environment": '
-    raise _DiskFullError
-
-
 @pytest.mark.parametrize(
     "update",
     [
@@ -134,12 +125,32 @@ def test_failed_write_keeps_kicad_common(
     kicad_common = tmp_path / "kicad_common.json"
     original = json.dumps({"environment": {"vars": {}}, "session": {}})
     kicad_common.write_text(original, encoding="utf-8")
-    monkeypatch.setattr(json.JSONEncoder, "iterencode", _failing_iterencode)
+    fail_writes(monkeypatch)
 
-    with pytest.raises(_DiskFullError):
+    with pytest.raises(OSError, match="No space left on device"):
         update(tmp_path)
 
     assert kicad_common.read_text(encoding="utf-8") == original
+
+
+def test_pinning_adds_new_libraries_once(tmp_path: Path) -> None:
+    """Pins are appended to those already there; repeats and dry runs write nothing."""
+    kicad_common = tmp_path / "kicad_common.json"
+    session = {"pinned_symbol_libs": ["Old"], "pinned_fp_libs": []}
+    kicad_common.write_text(json.dumps({"session": session}), encoding="utf-8")
+
+    assert not update_pinned_libraries(tmp_path, symbol_libs=["Old"])
+    assert update_pinned_libraries(tmp_path, footprint_libs=["Fp"], dry_run=True)
+    assert json.loads(kicad_common.read_text(encoding="utf-8"))["session"] == session
+
+    assert update_pinned_libraries(
+        tmp_path, symbol_libs=["New", "Old", "New"], footprint_libs=["Fp"]
+    )
+    assert json.loads(kicad_common.read_text(encoding="utf-8"))["session"] == {
+        "pinned_symbol_libs": ["Old", "New"],
+        "pinned_fp_libs": ["Fp"],
+    }
+    assert not update_pinned_libraries(tmp_path, symbol_libs=["New"])
 
 
 class _FakeConfig:

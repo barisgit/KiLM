@@ -1,31 +1,34 @@
-"""Typed access to KiCad's ``kicad_common.json``.
+"""KiCad's ``kicad_common.json``: typed reads and backed-up atomic writes.
 
 KiCad keeps environment variables under ``environment.vars`` and the pinned
 libraries under ``session.pinned_symbol_libs`` and ``session.pinned_fp_libs``.
-The helpers here read the JSON into plain objects, narrow the parts the
-commands use, and write the file back atomically, so a failed write never
-leaves KiCad with a truncated configuration.
+The helpers here narrow the parsed JSON to the parts KiLM uses and replace
+the file atomically after backing it up, so a failed write never leaves
+KiCad with a truncated configuration.
 """
 
 import json
 from pathlib import Path
 
-from kicad_lib_manager.utils.env_vars import JsonObject
+from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.file_ops import write_atomically
+
+JsonObject = dict[str, object]
+"""A parsed JSON object."""
 
 PINNED_SYMBOLS_KEY = "pinned_symbol_libs"
 PINNED_FOOTPRINTS_KEY = "pinned_fp_libs"
 
 
 def as_json_object(value: object) -> JsonObject | None:
-    """Return ``value`` as a JSON object, or None when it is not one."""
+    """Return a copy of ``value`` with text keys, or None when it is not a dict."""
     if not isinstance(value, dict):
         return None
     return {str(key): item for key, item in value.items()}
 
 
 def as_list(value: object) -> list[object]:
-    """Return ``value`` when it is a JSON array, otherwise an empty list."""
+    """Return a copy of ``value`` when it is a list, otherwise an empty list."""
     if not isinstance(value, list):
         return []
     return [*value]
@@ -55,6 +58,10 @@ def load_json_object(path: Path) -> JsonObject:
     return data
 
 
-def save_json_object(path: Path, data: JsonObject) -> None:
-    """Replace ``path`` atomically with ``data`` as indented JSON."""
+def replace_json_object(path: Path, data: JsonObject, *, max_backups: int) -> None:
+    """Back up ``path``, then replace it atomically with ``data`` as indented JSON.
+
+    ``max_backups`` is the number of backups of ``path`` to keep.
+    """
+    create_backup(path, max_backups)
     write_atomically(path, json.dumps(data, indent=2).encode("utf-8"))

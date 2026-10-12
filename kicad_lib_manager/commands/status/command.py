@@ -17,21 +17,21 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from kicad_lib_manager.commands.kicad_common import (
+from kicad_lib_manager.services.kicad_service import KiCadService
+from kicad_lib_manager.services.user_paths import user_config_file
+from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
+from kicad_lib_manager.utils.file_ops import LibraryTableEntry
+from kicad_lib_manager.utils.kicad_common import (
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
+    JsonObject,
     as_json_object,
     as_list,
     load_json_object,
     pinned_names,
     session_of,
 )
-from kicad_lib_manager.services.kicad_service import KiCadService
-from kicad_lib_manager.services.user_paths import user_config_file
-from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
-from kicad_lib_manager.utils.env_vars import JsonObject
-from kicad_lib_manager.utils.file_ops import LibraryTableEntry
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
 
 LEGACY_PINNED_FILE = "pinned"

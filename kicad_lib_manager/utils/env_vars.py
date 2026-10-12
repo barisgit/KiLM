@@ -16,16 +16,18 @@ from pathlib import Path
 from typing import cast
 
 from kicad_lib_manager.services.config_service import Config
-from kicad_lib_manager.utils.backup import create_backup
 from kicad_lib_manager.utils.constants import (
     CLOUD_METADATA_FILE,
     DEFAULT_MAX_BACKUPS,
     GITHUB_METADATA_FILE,
     KICAD_COMMON_FILE,
 )
-from kicad_lib_manager.utils.file_ops import write_atomically
-
-JsonObject = dict[str, object]
+from kicad_lib_manager.utils.kicad_common import (
+    PINNED_FOOTPRINTS_KEY,
+    PINNED_SYMBOLS_KEY,
+    JsonObject,
+    replace_json_object,
+)
 
 
 class KiCadConfigError(ValueError):
@@ -176,7 +178,7 @@ def update_kicad_env_vars(
         return False
     if not dry_run:
         environment["vars"] = updated
-        _save_kicad_common(kicad_common, config, max_backups)
+        replace_json_object(kicad_common, config, max_backups=max_backups)
     return True
 
 
@@ -208,8 +210,8 @@ def update_pinned_libraries(
         KiCadConfigError: kicad_common.json is not valid JSON of the expected shape.
     """
     requested = {
-        "pinned_symbol_libs": () if symbol_libs is None else symbol_libs,
-        "pinned_fp_libs": () if footprint_libs is None else footprint_libs,
+        PINNED_SYMBOLS_KEY: () if symbol_libs is None else symbol_libs,
+        PINNED_FOOTPRINTS_KEY: () if footprint_libs is None else footprint_libs,
     }
     if not any(requested.values()):
         return False
@@ -217,8 +219,8 @@ def update_pinned_libraries(
     kicad_common, config = _load_kicad_common(kicad_config)
     if config.get("session") is None:
         config["session"] = {
-            "pinned_symbol_libs": [],
-            "pinned_fp_libs": [],
+            PINNED_SYMBOLS_KEY: [],
+            PINNED_FOOTPRINTS_KEY: [],
             "remember_open_files": False,
         }
     session = _object_entry(config, "session", kicad_common)
@@ -231,7 +233,7 @@ def update_pinned_libraries(
             pinned.extend(new)
 
     if changed and not dry_run:
-        _save_kicad_common(kicad_common, config, max_backups)
+        replace_json_object(kicad_common, config, max_backups=max_backups)
     return changed
 
 
@@ -250,13 +252,6 @@ def _load_kicad_common(kicad_config: Path) -> tuple[Path, JsonObject]:
         msg = f"Invalid KiCad configuration in {kicad_common}: expected an object"
         raise KiCadConfigError(msg)
     return kicad_common, cast("JsonObject", document)
-
-
-def _save_kicad_common(
-    kicad_common: Path, config: JsonObject, max_backups: int
-) -> None:
-    create_backup(kicad_common, max_backups)
-    write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
 
 
 def _object_entry(parent: JsonObject, key: str, kicad_common: Path) -> JsonObject:

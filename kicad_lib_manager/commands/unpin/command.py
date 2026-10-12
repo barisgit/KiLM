@@ -6,19 +6,18 @@ from typing import Annotated
 import typer
 from rich.panel import Panel
 
-from kicad_lib_manager.commands.kicad_common import (
+from kicad_lib_manager.services.library_service import LibraryService
+from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
+from kicad_lib_manager.utils.kicad_common import (
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
     as_list,
     load_json_object,
     pinned_names,
-    save_json_object,
+    replace_json_object,
     session_of,
 )
-from kicad_lib_manager.services.library_service import LibraryService
-from kicad_lib_manager.utils.backup import create_backup
-from kicad_lib_manager.utils.console import get_console
-from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
 
 NO_SESSION = (
     "[yellow]No session information found in KiCad configuration, "
@@ -97,8 +96,7 @@ def _remove_pins(
             session[key] = kept
     if changed and not dry_run:
         config["session"] = session
-        create_backup(kicad_common, max_backups)
-        save_json_object(kicad_common, config)
+        replace_json_object(kicad_common, config, max_backups=max_backups)
     return changed
 
 

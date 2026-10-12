@@ -12,10 +12,10 @@ import typer
 from rich.panel import Panel
 from rich.prompt import Confirm
 
-from kicad_lib_manager.commands.kicad_common import as_json_object
 from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
+from kicad_lib_manager.utils.kicad_common import as_json_object
 
 LIBRARY_DESCRIPTIONS_FILE = "library_descriptions.yaml"
 LIBRARY_DESCRIPTIONS_TEMPLATE = """\

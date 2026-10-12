@@ -6,10 +6,13 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from kicad_lib_manager.commands.kicad_common import load_json_object, session_of
 from kicad_lib_manager.main import app
 from kicad_lib_manager.services.library_service import LibraryService
-from kicad_lib_manager.utils.env_vars import JsonObject
+from kicad_lib_manager.utils.kicad_common import (
+    JsonObject,
+    load_json_object,
+    session_of,
+)
 from tests.fault_injection import fail_writes
 
 CONFLICT = "'--all' cannot be used with '--symbols' or '--footprints'"
