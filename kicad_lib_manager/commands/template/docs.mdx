@@ -19,10 +19,10 @@ Creates a new project template from an existing KiCad project directory.
 #### Usage
 
 ```bash
-kilm template make <template_name> [project_path] [OPTIONS]
+kilm template make [template_name] [project_path] [OPTIONS]
 ```
 
-- `<template_name>`: **Required.** The name for the new template.
+- `[template_name]`: The name for the new template. Defaults to the name of the source directory (offered as the default when prompting).
 - `[project_path]`: The path to the KiCad project directory to use as the source. Defaults to the current directory.
 
 #### Options
@@ -33,8 +33,8 @@ kilm template make <template_name> [project_path] [OPTIONS]
 - `--extends TEXT`: Name of a parent template that this template extends.
 - `--exclude TEXT`: Glob pattern (like `.gitignore`) to exclude specific files or directories from the template. Can be used multiple times.
 - `--output-directory DIRECTORY`:
-  Specifies the directory where the `templates/<template_name>` structure will be created. Defaults to the `templates` directory within the KiLM library containing the current working directory.
-  _Example:_ `kilm template make my-tmpl --output-directory /path/to/central/templates/dir`
+  The template directory to create; the template files go directly into it. Defaults to `templates/<template_name>` in the library you choose when prompted, or in the configured symbol library with `--non-interactive`.
+  _Example:_ `kilm template make my-tmpl --output-directory /path/to/central/templates/my-tmpl`
 - `--non-interactive`:
   Create the template without interactive prompts for configuration or variable detection. Default: `False` (interactive).
 - `--dry-run`:
@@ -46,12 +46,12 @@ kilm template make <template_name> [project_path] [OPTIONS]
 #### Behavior
 
 1.  **Scans Project:** Analyzes the source project directory.
-2.  **Determines Output:** Finds the target `templates/` directory (either default or via `--output-directory`).
-3.  **Creates Template Structure:** Creates `templates/<template_name>/`.
-4.  **Copies Files:** Copies project files into `templates/<template_name>/template/`, respecting `.gitignore` and `--exclude` patterns.
+2.  **Determines Output:** Uses `--output-directory`, or `templates/<template_name>` in the chosen library.
+3.  **Creates Template Structure:** Creates the template directory.
+4.  **Copies Files:** Copies project files into its `template/` directory, respecting `.gitignore` and `--exclude` patterns.
 5.  **Filename Templating:** Renames files using Windows-compatible syntax based on detected project names and provided/detected variables (e.g., `MyProject.kicad_pro` becomes `%{project_filename}.kicad_pro.jinja2`).
-6.  **Creates `metadata.yaml`:** Generates a `metadata.yaml` file containing the template name, description, use case, detected/defined variables, and exclusions.
-7.  **(Optional) Creates Hooks:** Can set up pre/post-creation hook scripts (e.g., `hooks/post_create.py`).
+6.  **Creates `metadata.yaml`:** Generates a `metadata.yaml` file containing the template name, description, use case, version, detected/defined variables, and the `--extends` parent.
+7.  **Creates a Hook:** Writes a starter `hooks/post_create.py` to edit or delete.
 
 #### Examples
 
@@ -81,11 +81,11 @@ Creates a new KiCad project based on an existing template.
 #### Usage
 
 ```bash
-kilm template create <project_name_or_path> [output_path] [OPTIONS]
+kilm template create [project_name_or_path] [output_path] [OPTIONS]
 ```
 
-- `<project_name_or_path>`: **Required.** The name for the new KiCad project. If this contains path separators (e.g., `path/to/MyNewBoard`), the last component is used as the project name, and the preceding path is used as the default `output_path`.
-- `[output_path]`: The directory where the new project will be created. If omitted, defaults to a directory named `<project_name>` in the current location, or the path derived from `<project_name_or_path>`.
+- `[project_name_or_path]`: The name for the new KiCad project; prompted for when omitted. If this contains path separators (e.g., `path/to/MyNewBoard`), the last component is used as the project name, and the preceding path is used as the default `output_path`.
+- `[output_path]`: The parent directory of the new project; defaults to the current directory or the path derived from `<project_name_or_path>`. The project directory inside it is named by the template's `directory_name` variable, or by the project name in lower case with spaces replaced by dashes.
 
 #### Options
 
@@ -147,7 +147,7 @@ kilm template list [OPTIONS]
 #### Options
 
 - `--library TEXT`: List templates only from the specified KiLM library name.
-- `-v, --verbose`: Show detailed information, including template description, use case, and variables.
+- `-v, --verbose`: Add the template variables and the parent template (`extends`) to the table.
 - `--json`: Output the list in JSON format.
 - `--help`: Show help message.
 
@@ -194,7 +194,7 @@ your-kilm-library/
             ├── %{project_filename}.kicad_pcb.jinja2
             ├── README.md.jinja2
             └── assets/
-                └── logo-%{company_name|lower}.png.jinja2
+                └── logo-%{company_name.lower}.png.jinja2
 ```
 
 - **`metadata.yaml`**: Defines template variables and descriptions.
