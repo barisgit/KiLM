@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from kicad_lib_manager.utils import git_utils
 from kicad_lib_manager.utils.git_utils import (
     backup_existing_hook,
     create_kilm_hook_content,
@@ -17,7 +18,7 @@ from kicad_lib_manager.utils.git_utils import (
 class TestGitUtils:
     """Test cases for Git utility functions."""
 
-    def test_create_kilm_hook_content(self):
+    def test_create_kilm_hook_content(self) -> None:
         """Test that KiLM hook content is created with proper markers."""
         content = create_kilm_hook_content()
 
@@ -28,7 +29,7 @@ class TestGitUtils:
         assert content.startswith("# BEGIN KiLM-managed section")
         assert content.endswith("# END KiLM-managed section")
 
-    def test_backup_existing_hook(self, tmp_path):
+    def test_backup_existing_hook(self, tmp_path: Path) -> None:
         """Test backup creation with timestamp."""
         hook_file = tmp_path / "post-merge"
         hook_content = "#!/bin/sh\necho 'test hook'"
@@ -46,7 +47,7 @@ class TestGitUtils:
         if os.name != "nt":  # Not Windows
             assert backup_path.stat().st_mode & 0o111  # Check executable bit
 
-    def test_merge_hook_content_new_content(self):
+    def test_merge_hook_content_new_content(self) -> None:
         """Test merging when no KiLM content exists."""
         existing = "#!/bin/sh\necho 'existing hook'"
         kilm_content = create_kilm_hook_content()
@@ -58,7 +59,7 @@ class TestGitUtils:
         assert "END KiLM-managed section" in result
         assert result.count("BEGIN KiLM-managed section") == 1
 
-    def test_merge_hook_content_replace_existing(self):
+    def test_merge_hook_content_replace_existing(self) -> None:
         """Test merging when KiLM content already exists."""
         existing = """#!/bin/sh
 echo 'existing hook'
@@ -79,7 +80,9 @@ echo 'after kilm'"""
         assert "kilm sync" in result
 
     @patch("subprocess.run")
-    def test_get_git_hooks_directory_standard(self, mock_run, tmp_path):
+    def test_get_git_hooks_directory_standard(
+        self, mock_run: Mock, tmp_path: Path
+    ) -> None:
         """Test standard hooks directory detection."""
         # Mock the first call to succeed with hooks path
         mock_run.return_value = Mock(returncode=0, stdout=".git/hooks")
@@ -94,7 +97,9 @@ echo 'after kilm'"""
         mock_run.assert_called_once()
 
     @patch("subprocess.run")
-    def test_get_git_hooks_directory_custom_path(self, mock_run, tmp_path):
+    def test_get_git_hooks_directory_custom_path(
+        self, mock_run: Mock, tmp_path: Path
+    ) -> None:
         """Test custom hooks directory detection."""
         custom_hooks = tmp_path / "custom" / "hooks"
         custom_hooks.mkdir(parents=True, exist_ok=True)
@@ -111,7 +116,9 @@ echo 'after kilm'"""
         mock_run.assert_called_once()
 
     @patch("subprocess.run")
-    def test_get_git_hooks_directory_relative_path(self, mock_run, tmp_path):
+    def test_get_git_hooks_directory_relative_path(
+        self, mock_run: Mock, tmp_path: Path
+    ) -> None:
         """Test relative custom hooks path handling."""
         mock_run.return_value = Mock(returncode=0, stdout="custom/hooks")
 
@@ -126,7 +133,9 @@ echo 'after kilm'"""
         mock_run.assert_called_once()
 
     @patch("subprocess.run")
-    def test_get_git_hooks_directory_worktree(self, mock_run, tmp_path):
+    def test_get_git_hooks_directory_worktree(
+        self, mock_run: Mock, tmp_path: Path
+    ) -> None:
         """Test Git worktree hooks directory detection."""
         # Mock the Git command to return the worktree hooks path
         main_git_dir = tmp_path / "main-repo" / ".git"
@@ -142,6 +151,14 @@ echo 'after kilm'"""
 
         assert hooks_dir == worktree_hooks
         mock_run.assert_called_once()
+
+    def test_get_git_hooks_directory_without_git(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A missing git executable is reported, not raised as FileNotFoundError."""
+        monkeypatch.setattr(git_utils.shutil, "which", lambda _name: None)
+        with pytest.raises(RuntimeError, match="Git is not installed"):
+            get_git_hooks_directory(tmp_path)
 
     def test_get_git_hooks_directory_not_repo(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
