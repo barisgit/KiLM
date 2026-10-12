@@ -3,7 +3,7 @@ List command implementation for KiCad Library Manager (Typer version).
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -17,7 +17,7 @@ console = Console()
 
 def list_cmd(
     kicad_lib_dir: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--kicad-lib-dir",
             help="KiCad library directory (uses KICAD_USER_LIB env var if not specified)",

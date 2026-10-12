@@ -4,7 +4,6 @@ KiCad service implementation for KiCad Library Manager.
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from ..utils.file_ops import list_configured_libraries
 from .library_service import LibraryService
@@ -58,8 +57,8 @@ class KiCadService:
     def add_libraries_to_kicad(
         self,
         config_dir: Path,
-        symbol_libs: Optional[list[dict]] = None,
-        footprint_libs: Optional[list[dict]] = None,
+        symbol_libs: list[dict] | None = None,
+        footprint_libs: list[dict] | None = None,
         backup: bool = True,
         max_backups: int = 5,
     ) -> bool:

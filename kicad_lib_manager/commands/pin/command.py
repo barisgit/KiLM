@@ -3,7 +3,7 @@ Pin command implementation for KiCad Library Manager (Typer version).
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -23,7 +23,7 @@ console = Console()
 
 def pin(
     kicad_lib_dir: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--kicad-lib-dir",
             envvar="KICAD_USER_LIB",
@@ -31,7 +31,7 @@ def pin(
         ),
     ] = None,
     symbols: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(
             "--symbols",
             "-s",
@@ -39,7 +39,7 @@ def pin(
         ),
     ] = None,
     footprints: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(
             "--footprints",
             "-f",

@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path, PurePath
-from typing import Any, Optional
+from typing import Any
 
 import requests
 from packaging.version import InvalidVersion, Version
@@ -20,8 +20,8 @@ class InstallationDetector:
 
     def __init__(
         self,
-        executable_path: Optional[PurePath] = None,
-        platform_name: Optional[str] = None,
+        executable_path: PurePath | None = None,
+        platform_name: str | None = None,
     ):
         self.executable_path = executable_path or Path(sys.executable)
         self.platform_name = platform_name or os.name
@@ -144,7 +144,7 @@ class PyPIVersionChecker:
         self.cache_file = Path.home() / ".cache" / "kilm" / "version_check.json"
         self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
 
-    def check_latest_version(self) -> Optional[str]:
+    def check_latest_version(self) -> str | None:
         """
         Check latest version from PyPI with caching and rate limiting.
         Returns None if check fails or is rate limited.
@@ -183,7 +183,7 @@ class PyPIVersionChecker:
 
         return None
 
-    def _load_cache(self) -> Optional[dict]:
+    def _load_cache(self) -> dict | None:
         """Load cached version data."""
         if self.cache_file.exists():
             try:
@@ -251,7 +251,7 @@ class UpdateManager:
         self.current_version = current_version
         self.installation_method = detect_installation_method()
 
-    def check_latest_version(self) -> Optional[str]:
+    def check_latest_version(self) -> str | None:
         """Check for latest version available on PyPI."""
         return self.version_checker.check_latest_version()
 
@@ -431,7 +431,7 @@ class UpdateService:
 
     def perform_update(
         self,
-        target_version: Optional[str] = None,
+        target_version: str | None = None,
         force: bool = False,
         dry_run: bool = False,
     ) -> tuple[bool, str]:
@@ -458,9 +458,7 @@ class UpdateService:
         # Perform the update
         return self.manager.perform_update()
 
-    def _show_dry_run_info(
-        self, target_version: Optional[str] = None
-    ) -> tuple[bool, str]:
+    def _show_dry_run_info(self, target_version: str | None = None) -> tuple[bool, str]:
         """Show what would happen during an update."""
         from rich.console import Console
         from rich.panel import Panel

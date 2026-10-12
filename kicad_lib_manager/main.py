@@ -4,7 +4,7 @@ Main Typer CLI entry point for KiCad Library Manager
 """
 
 import importlib.metadata
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.align import Align
@@ -109,7 +109,7 @@ def version_callback(value: bool) -> None:
 @app.callback()
 def main(
     _version: Annotated[
-        Optional[bool],
+        bool | None,
         typer.Option(
             "--version",
             "-V",

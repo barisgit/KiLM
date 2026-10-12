@@ -8,7 +8,6 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -41,7 +40,7 @@ def _windows_kicad_cli_candidates() -> list[Path]:
     return sorted(found, key=version_key, reverse=True)
 
 
-def detect_kicad_cli() -> Optional[Path]:
+def detect_kicad_cli() -> Path | None:
     """Return kicad-cli from PATH or a known install location, else None."""
     on_path = shutil.which("kicad-cli")
     if on_path is not None:
@@ -69,11 +68,11 @@ class Upgrader:
     skipped for the rest of the run. kicad_cli None disables upgrades.
     """
 
-    kicad_cli: Optional[Path]
+    kicad_cli: Path | None
     footprints_enabled: bool = True
     symbols_enabled: bool = True
 
-    def footprint(self, name: str, text: str, limit: Optional[int]) -> str:
+    def footprint(self, name: str, text: str, limit: int | None) -> str:
         """Return text upgraded if it is a legacy (module ...) footprint."""
         cli = self.kicad_cli
         if cli is None or not self.footprints_enabled:
@@ -95,7 +94,7 @@ class Upgrader:
             return text
         return new_text
 
-    def symbols(self, name: str, text: str, limit: Optional[int]) -> str:
+    def symbols(self, name: str, text: str, limit: int | None) -> str:
         """Return the symbol library text upgraded."""
         cli = self.kicad_cli
         if cli is None or not self.symbols_enabled:
@@ -132,7 +131,7 @@ def _run(kicad_cli: Path, label: str, *args: str) -> bool:
     return True
 
 
-def _within_limit(text: str, limit: Optional[int], suffix: str) -> bool:
+def _within_limit(text: str, limit: int | None, suffix: str) -> bool:
     """Whether upgraded text's format is at most limit; reports when not."""
     version = format_version(text)
     if limit is None or version is None or version <= limit:

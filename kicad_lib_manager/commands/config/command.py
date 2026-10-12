@@ -5,7 +5,7 @@ Provides commands for managing KiCad Library Manager configuration.
 
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -319,7 +319,7 @@ def list_config(
 
 def set_default(
     library_name: Annotated[
-        Optional[str], typer.Argument(help="Name of library to set as default")
+        str | None, typer.Argument(help="Name of library to set as default")
     ] = None,
     library_type: Annotated[
         str,

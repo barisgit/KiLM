@@ -4,7 +4,7 @@ Configuration management for KiCad Library Manager.
 
 import time
 from pathlib import Path
-from typing import Optional, TypedDict, Union, cast
+from typing import TypedDict, cast
 
 import click
 import yaml
@@ -25,7 +25,7 @@ class LibraryDict(TypedDict):
     type: str
 
 
-ConfigValue = Union[str, int, list[LibraryDict]]
+ConfigValue = str | int | list[LibraryDict]
 
 DEFAULT_CONFIG: dict[str, ConfigValue] = {
     "max_backups": DEFAULT_MAX_BACKUPS,
@@ -67,9 +67,7 @@ class Config:
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir / CONFIG_FILE_NAME
 
-    def get(
-        self, key: str, default: Optional[ConfigValue] = None
-    ) -> Optional[ConfigValue]:
+    def get(self, key: str, default: ConfigValue | None = None) -> ConfigValue | None:
         """Get a configuration value"""
         return self._config.get(key, default)
 
@@ -108,7 +106,7 @@ class Config:
         self._config["libraries"] = libraries
         self.save()
 
-    def remove_library(self, name: str, library_type: Optional[str] = None) -> bool:
+    def remove_library(self, name: str, library_type: str | None = None) -> bool:
         """
         Remove a library from the configuration
 
@@ -138,7 +136,7 @@ class Config:
 
         return removed
 
-    def get_libraries(self, library_type: Optional[str] = None) -> list[LibraryDict]:
+    def get_libraries(self, library_type: str | None = None) -> list[LibraryDict]:
         """
         Get libraries from configuration
 
@@ -155,9 +153,7 @@ class Config:
         else:
             return libraries
 
-    def get_library_path(
-        self, name: str, library_type: str = "github"
-    ) -> Optional[str]:
+    def get_library_path(self, name: str, library_type: str = "github") -> str | None:
         """
         Get the path for a specific library
 
@@ -176,7 +172,7 @@ class Config:
 
         return None
 
-    def get_current_library_paths(self) -> tuple[Optional[str], Optional[str]]:
+    def get_current_library_paths(self) -> tuple[str | None, str | None]:
         """
         Get paths for the current active libraries
 
@@ -188,7 +184,7 @@ class Config:
         cloud_libraries = self.get_libraries("cloud")
 
         # Get the current explicitly set library path
-        current_lib_path = cast("Optional[str]", self._config.get("current_library"))
+        current_lib_path = cast("str | None", self._config.get("current_library"))
 
         # For GitHub libraries: first check if current library is a GitHub library,
         # otherwise use the first available GitHub library
@@ -232,7 +228,7 @@ class Config:
         self._config["current_library"] = str(path)
         self.save()
 
-    def get_current_library(self) -> Optional[str]:
+    def get_current_library(self) -> str | None:
         """
         Get the current active library path
 
@@ -242,7 +238,7 @@ class Config:
         value = self._config.get("current_library")
         return value if isinstance(value, str) else None
 
-    def get_symbol_library_path(self) -> Optional[str]:
+    def get_symbol_library_path(self) -> str | None:
         """
         Get the path for the current symbol library
 
@@ -252,7 +248,7 @@ class Config:
         github_path, _ = self.get_current_library_paths()
         return github_path
 
-    def get_3d_library_path(self) -> Optional[str]:
+    def get_3d_library_path(self) -> str | None:
         """
         Get the path for the current 3D models library
 
@@ -365,7 +361,7 @@ class Config:
         last_check_file = cache_dir / "last_update_check"
         last_check_file.write_text(str(time.time()))
 
-    def get_update_preferences(self) -> dict[str, Union[bool, str]]:
+    def get_update_preferences(self) -> dict[str, bool | str]:
         """
         Get update-related preferences.
 
@@ -378,7 +374,7 @@ class Config:
             "auto_update": bool(self.get("auto_update", False)),
         }
 
-    def set_update_preference(self, key: str, value: Union[bool, str]) -> None:
+    def set_update_preference(self, key: str, value: bool | str) -> None:
         """
         Set an update preference with strict type validation and coercion.
 
@@ -411,7 +407,7 @@ class Config:
         self.set(key, coerced_value)
         self.save()
 
-    def _coerce_to_bool(self, value: Union[bool, str]) -> bool:
+    def _coerce_to_bool(self, value: bool | str) -> bool:
         """
         Coerce a value to boolean with strict validation.
 
@@ -452,8 +448,8 @@ def _make_library_dict(name: str, path: str, type_: str) -> LibraryDict:
 
 
 def _validate_library_entry(
-    lib: Union[dict[str, str], LibraryDict],
-) -> Optional[LibraryDict]:
+    lib: dict[str, str] | LibraryDict,
+) -> LibraryDict | None:
     """Validate and normalize a library entry."""
     if isinstance(lib, dict) and all(key in lib for key in ["name", "path", "type"]):
         return _make_library_dict(
@@ -496,7 +492,7 @@ class ConfigService:
         """Get all configured libraries."""
         return self._config.get_libraries()
 
-    def get_library_by_name(self, name: str) -> Optional[LibraryDict]:
+    def get_library_by_name(self, name: str) -> LibraryDict | None:
         """Get a specific library by name."""
         libraries = self.get_libraries()
         for lib in libraries:
@@ -504,7 +500,7 @@ class ConfigService:
                 return lib
         return None
 
-    def get_current_library(self) -> Optional[str]:
+    def get_current_library(self) -> str | None:
         """Get the current active library path."""
         return self._config.get_current_library()
 

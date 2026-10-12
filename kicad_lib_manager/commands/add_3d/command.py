@@ -3,7 +3,7 @@ Add cloud-based 3D models directory command for KiCad Library Manager (Typer ver
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -22,13 +22,13 @@ console = Console()
 
 def add_3d(
     name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             help="Name for this 3D models collection (automatic if not provided)"
         ),
     ] = None,
     directory: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             help="Directory containing 3D models (default: current directory)",
             exists=True,
@@ -38,10 +38,10 @@ def add_3d(
         ),
     ] = None,
     description: Annotated[
-        Optional[str], typer.Option(help="Description for this 3D models collection")
+        str | None, typer.Option(help="Description for this 3D models collection")
     ] = None,
     env_var: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--env-var",
             help="Custom environment variable name for this 3D model library",

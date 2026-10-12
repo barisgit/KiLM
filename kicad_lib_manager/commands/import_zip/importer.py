@@ -5,7 +5,6 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -57,12 +56,12 @@ class ImportTarget:
     model_prefix: str
     upgrader: Upgrader
     dry_run: bool
-    sym_format: Optional[int] = None
-    fp_format: Optional[int] = None
+    sym_format: int | None = None
+    fp_format: int | None = None
     models: dict[str, ModelRef] = field(default_factory=dict)
     footprints: dict[str, str] = field(default_factory=dict)
     symbols: set[str] = field(default_factory=set)
-    backup: Optional[Path] = None
+    backup: Path | None = None
 
 
 @dataclass
@@ -94,7 +93,7 @@ class _Plan:
     model_copies: list[tuple[Path, ModelRef]] = field(default_factory=list)
     footprints: dict[str, tuple[Path, str]] = field(default_factory=dict)
     fp_refs: dict[str, str] = field(default_factory=dict)
-    symbols: Optional[SymbolMerge] = None
+    symbols: SymbolMerge | None = None
     lines: list[str] = field(default_factory=list)
 
     def result(self) -> ZipResult:

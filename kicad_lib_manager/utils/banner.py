@@ -49,7 +49,9 @@ def show_banner(
     ]
 
     # Print each line with different colors for front and back characters
-    for line, front_color, back_color in zip(banner_lines, front_colors, back_colors):
+    for line, front_color, back_color in zip(
+        banner_lines, front_colors, back_colors, strict=True
+    ):
         # Split the line into front characters (KILM) and back characters (box drawing)
         # The KILM text is represented by the block characters ██╗, ██║, etc.
         # The back characters are the decorative box drawing elements

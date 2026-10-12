@@ -5,7 +5,7 @@ Metadata management utilities for KiCad Library Manager.
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import yaml
 
@@ -14,7 +14,7 @@ from .constants import CLOUD_METADATA_FILE, GITHUB_METADATA_FILE
 
 def read_github_metadata(
     directory: Path,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """
     Read metadata from a GitHub library directory.
 
@@ -63,7 +63,7 @@ def write_github_metadata(directory: Path, metadata: dict[str, Any]) -> bool:
         return False
 
 
-def read_cloud_metadata(directory: Path) -> Optional[dict[str, Union[str, int, None]]]:
+def read_cloud_metadata(directory: Path) -> dict[str, str | int | None] | None:
     """
     Read metadata from a cloud 3D model directory.
 
@@ -91,7 +91,7 @@ def read_cloud_metadata(directory: Path) -> Optional[dict[str, Union[str, int, N
 
 
 def write_cloud_metadata(
-    directory: Path, metadata: dict[str, Union[str, int, None]]
+    directory: Path, metadata: dict[str, str | int | None]
 ) -> bool:
     """
     Write metadata to a cloud 3D model directory.
@@ -182,7 +182,7 @@ def get_default_github_metadata(
     }
 
 
-def get_default_cloud_metadata(directory: Path) -> dict[str, Union[str, int, None]]:
+def get_default_cloud_metadata(directory: Path) -> dict[str, str | int | None]:
     """
     Generate default metadata for a cloud 3D model directory.
 

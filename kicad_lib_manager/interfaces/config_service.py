@@ -4,7 +4,7 @@ Configuration service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class ConfigServiceProtocol(Protocol):
@@ -35,11 +35,11 @@ class ConfigServiceProtocol(Protocol):
         """Get all configured libraries."""
 
     @abstractmethod
-    def get_library_by_name(self, name: str) -> Optional[dict]:
+    def get_library_by_name(self, name: str) -> dict | None:
         """Get a specific library by name."""
 
     @abstractmethod
-    def get_current_library(self) -> Optional[str]:
+    def get_current_library(self) -> str | None:
         """Get the current active library path."""
 
     @abstractmethod

@@ -3,7 +3,6 @@ Unpin command implementation for KiCad Library Manager (Typer version).
 """
 
 import json
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -16,13 +15,13 @@ console = Console()
 
 
 def unpin(
-    symbols: Optional[list[str]] = typer.Option(
+    symbols: list[str] | None = typer.Option(
         None,
         "--symbols",
         "-s",
         help="Symbol libraries to unpin (can be specified multiple times)",
     ),
-    footprints: Optional[list[str]] = typer.Option(
+    footprints: list[str] | None = typer.Option(
         None,
         "--footprints",
         "-f",

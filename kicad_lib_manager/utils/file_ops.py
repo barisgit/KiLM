@@ -7,12 +7,9 @@ import re
 import shutil
 import uuid
 from pathlib import Path
-from typing import Optional
 
 
-def read_file_with_encoding(
-    file_path: Path, encodings: Optional[list[str]] = None
-) -> str:
+def read_file_with_encoding(file_path: Path, encodings: list[str] | None = None) -> str:
     """
     Read a file trying multiple encodings until successful
 

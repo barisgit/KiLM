@@ -1,7 +1,7 @@
 """Update perform command implementation."""
 
 import importlib.metadata
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -14,7 +14,7 @@ console = Console()
 
 def perform_update_command(
     target_version: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--target-version",
             "-t",

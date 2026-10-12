@@ -1,7 +1,6 @@
 """Resolving the libraries an import writes to from the KiLM configuration."""
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -17,9 +16,9 @@ console = Console()
 
 def build_target(
     config: Config,
-    library: Optional[str],
-    symbol_lib: Optional[str],
-    footprint_lib: Optional[str],
+    library: str | None,
+    symbol_lib: str | None,
+    footprint_lib: str | None,
     upgrader: Upgrader,
     dry_run: bool,
 ) -> ImportTarget:
@@ -89,7 +88,7 @@ def build_target(
     )
 
 
-def _library_path(config: Config, library: Optional[str]) -> Path:
+def _library_path(config: Config, library: str | None) -> Path:
     """Path of the named github library, else of the current one."""
     github_libs = config.get_libraries(library_type="github")
     if not github_libs:
@@ -118,9 +117,7 @@ def _library_path(config: Config, library: Optional[str]) -> Path:
     return lib_path
 
 
-def _pick_lib(
-    candidates: list[Path], name: Optional[str], kind: str, option: str
-) -> Path:
+def _pick_lib(candidates: list[Path], name: str | None, kind: str, option: str) -> Path:
     """Return the library called name, or the only candidate when name is None."""
     available = ", ".join(c.stem for c in candidates)
     if name is not None:

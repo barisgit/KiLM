@@ -4,7 +4,7 @@ Library service protocol interface for KiCad Library Manager.
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional, Protocol, Union
+from typing import Protocol
 
 
 class LibraryServiceProtocol(Protocol):
@@ -24,19 +24,19 @@ class LibraryServiceProtocol(Protocol):
     def initialize_library(
         self,
         directory: Path,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        env_var: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
+        env_var: str | None = None,
         force: bool = False,
         no_env_var: bool = False,
-    ) -> dict[str, Union[str, bool, dict[str, bool]]]:
+    ) -> dict[str, str | bool | dict[str, bool]]:
         """Initialize a library in the given directory."""
         ...
 
     @abstractmethod
     def get_library_metadata(
         self, directory: Path
-    ) -> Optional[dict[str, Union[str, bool, dict[str, bool]]]]:
+    ) -> dict[str, str | bool | dict[str, bool]] | None:
         """Get metadata for a library directory."""
         ...
 
