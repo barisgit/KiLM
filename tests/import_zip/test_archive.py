@@ -1,5 +1,6 @@
 """Archive extraction: safety, vendor junk, and unreadable members."""
 
+import struct
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -34,6 +35,24 @@ def _imploded(path: Path) -> Path:
     return path
 
 
+def _corrupt_lzma(path: Path) -> Path:
+    """Recompress path with LZMA and give every member invalid LZMA properties."""
+    with zipfile.ZipFile(path) as zf:
+        members = {name: zf.read(name) for name in zf.namelist()}
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_LZMA) as zf:
+        for name, content in members.items():
+            zf.writestr(name, content)
+    data = bytearray(path.read_bytes())
+    i = data.find(b"PK\x03\x04")
+    while i != -1:
+        name_len, extra_len = struct.unpack("<HH", data[i + 26 : i + 30])
+        # Member data: 2-byte LZMA version, 2-byte properties size, properties.
+        data[i + 30 + name_len + extra_len + 4] = 0xFF
+        i = data.find(b"PK\x03\x04", i + 4)
+    path.write_bytes(bytes(data))
+    return path
+
+
 def test_zip_slip_entry_rejects_the_archive(tmp_path: Path) -> None:
     zip_path = zip_with(tmp_path, "evil", {"../../outside.kicad_mod": "x"})
     dest = tmp_path / "extract"
@@ -58,7 +77,7 @@ def test_only_part_files_are_extracted(tmp_path: Path) -> None:
     assert sorted(f.name for f in files) == ["P.kicad_mod", "P.kicad_sym", "P.stp"]
 
 
-@pytest.mark.parametrize("damage", [_encrypted, _imploded])
+@pytest.mark.parametrize("damage", [_encrypted, _imploded, _corrupt_lzma])
 def test_unreadable_members_fail_only_their_zip(
     tmp_path: Path,
     library_tree: Path,

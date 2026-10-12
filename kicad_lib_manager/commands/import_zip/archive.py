@@ -6,6 +6,29 @@ from pathlib import Path, PurePosixPath
 
 from .errors import ImportFailure
 
+
+def _lzma_errors() -> tuple[type[Exception], ...]:
+    """LZMAError, or nothing on a Python built without the lzma module.
+
+    zipfile then reports LZMA members as RuntimeError instead.
+    """
+    try:
+        from lzma import LZMAError
+    except ImportError:
+        return ()
+    return (LZMAError,)
+
+
+# What zipfile raises for a corrupt archive, including the errors it lets
+# through from decompressors fed corrupt member data.
+_CORRUPT_ARCHIVE_ERRORS: tuple[type[Exception], ...] = (
+    zipfile.BadZipFile,
+    zipfile.LargeZipFile,
+    zlib.error,
+    EOFError,
+    *_lzma_errors(),
+)
+
 MODEL_SUFFIXES = (".stp", ".step", ".stp.gz", ".step.gz")
 _PART_SUFFIXES = (".kicad_sym", ".kicad_mod", *MODEL_SUFFIXES)
 
@@ -48,7 +71,7 @@ def extract_part_files(zip_path: Path, dest: Path) -> list[Path]:
             for member in members:
                 _require_readable(member)
             return [Path(zf.extract(member, dest)) for member in members]
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, zlib.error, EOFError) as exc:
+    except _CORRUPT_ARCHIVE_ERRORS as exc:
         raise ImportFailure(f"invalid or corrupt ZIP: {exc}") from exc
     except (RuntimeError, NotImplementedError) as exc:
         # What zipfile raises for members it cannot decrypt or decompress
