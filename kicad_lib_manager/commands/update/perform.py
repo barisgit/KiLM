@@ -1,5 +1,8 @@
 """`kilm update perform`: install a new KiLM release with its own installer."""
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"packaging.version"}
+
 import importlib.metadata
 from typing import Annotated
 

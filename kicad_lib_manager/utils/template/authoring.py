@@ -1,5 +1,8 @@
 """Making a template from an existing project, for ``template make``."""
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"pathspec"}
+
 import shutil
 from collections.abc import Mapping
 from pathlib import Path, PurePath

@@ -12,9 +12,13 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path, PurePath
+from typing import TYPE_CHECKING
 
 import click
 import pathspec
+
+if TYPE_CHECKING:
+    from pathspec import PathSpec
 
 from kicad_lib_manager.utils.template.constants import (
     ALWAYS_IGNORED_PATTERNS,
@@ -184,8 +188,11 @@ class _ExclusionRules:
 
     source: Path
     template_root: Path | None
-    gitignore: pathspec.PathSpec | None
-    additional: pathspec.PathSpec | None
+    # Quoted names that exist only for type checkers: dataclass processing
+    # resolves field annotations, which would load the lazily imported
+    # pathspec when this module is imported.
+    gitignore: "PathSpec | None"
+    additional: "PathSpec | None"
 
     def directory_exclusion(self, relative: PurePath) -> Exclusion | None:
         path = f"{relative.as_posix()}/"
