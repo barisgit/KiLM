@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.13.2",
     "chokidar": "^4.0.3",
-    "concurrently": "^9.2.3",
+    "concurrently": "^9.2.5",
     "sharp": "^0.34.5",
     "tsx": "^4.22.4"
   },
