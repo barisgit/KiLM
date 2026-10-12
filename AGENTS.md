@@ -39,8 +39,8 @@ files; tests run in `just check`.
   `command.py` and a collocated `docs.mdx`. `docs/scripts/sync-embedded-docs.ts`
   copies each `docs.mdx` into the site's CLI reference, so update it in the same
   change as the command.
-- `kicad_lib_manager/services/` and `interfaces/`: configuration, KiCad,
-  library, and self-update services and their protocols.
+- `kicad_lib_manager/services/`: configuration, KiCad, library, and
+  self-update services.
 - `kicad_lib_manager/utils/`: file operations, backups, metadata, templates,
   environment variables, git helpers.
 - `tests/`: pytest suite.
