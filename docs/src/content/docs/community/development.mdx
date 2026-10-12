@@ -49,7 +49,7 @@ Run the CLI from the checkout with `uv run kilm --help`.
 | Command | Purpose |
 | --- | --- |
 | `just` | List the commands. |
-| `just check` | Formatting check, lint (ruff), type check (ty), and tests. Never modifies files. |
+| `just check` | Formatting check, lint (ruff), type check (ty), and tests, including the 600-line module limit. Never modifies files. |
 | `just test [args]` | Fast test run; arguments go to pytest, for example `just test -k sync`. |
 | `just cov` | Tests with coverage and the minimum threshold. |
 | `just fix` | Format the code and apply safe lint fixes. |

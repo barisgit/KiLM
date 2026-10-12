@@ -17,7 +17,7 @@ Windows.
 | --- | --- |
 | `just` | List the commands. |
 | `just setup` | Install the locked Python and docs dependencies and the git hooks. Safe to rerun, including in a new worktree. |
-| `just check` | Everything CI requires: `ruff format --check`, `ruff check`, `ty check`, and the tests. Never modifies files. |
+| `just check` | Everything CI requires: `ruff format --check`, `ruff check`, `ty check`, and the tests (which include the module-size and suppression gates). Never modifies files. |
 | `just test [args]` | Fast test run without coverage; arguments go to pytest. |
 | `just cov` | Tests with coverage; fails below `fail_under` in `pyproject.toml`. |
 | `just fix` | Format and apply safe lint fixes. |
@@ -54,12 +54,16 @@ files; tests run in `just check`.
 
 ## Standards
 
-- `pyproject.toml` holds the ruff rules and the ty configuration. Never weaken
-  a rule, threshold, or type to make a check pass; fix the code.
+- `pyproject.toml` holds the ruff rules (`select = ["ALL"]` with complexity
+  limits) and the ty configuration (every rule at error). Never weaken a rule,
+  threshold, or type to make a check pass; fix the code.
+- Modules stay within 600 lines; `tests/test_repository_limits.py` enforces it
+  because no lint rule does. Split a module rather than raising the limit.
 - Every suppression names the rule and states why, for example
   `# noqa: S603 -- arguments are a fixed git command` or
   `# ty: ignore[invalid-assignment] -- <reason>`. Blanket `# noqa` and
-  `# type: ignore` are not allowed.
+  `# type: ignore` are not allowed; `tests/test_repository_limits.py` rejects
+  suppressions without a rule and reason.
 - Full type hints. Do not add `Any`; use precise types, `TypedDict`, protocols,
   or generics.
 - Use `pathlib.Path` for paths and keep behavior identical on Windows, macOS,

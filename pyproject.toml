@@ -93,32 +93,69 @@ addopts = [
 # Matches pytest's pythonpath so the tests of .github/scripts resolve.
 extra-paths = [".github/scripts"]
 
+[tool.ty.rules]
+# Every rule, including those off by default, fails the check.
+all = "error"
+
+[tool.ty.analysis]
+# Only rule-specific `# ty: ignore[rule]` comments suppress diagnostics.
+respect-type-ignore-comments = false
+# Sound narrowing: no literal narrowing from `==`, no assumptions about
+# unspecialized generics in isinstance checks.
+strict-equality-semantics = true
+strict-generic-narrowing = true
+
 [tool.ruff]
 line-length = 88
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings  
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
-    "SIM", # flake8-simplify
-    "TC",  # flake8-type-checking
-    "PTH", # flake8-use-pathlib
-    "ERA", # eradicate
+select = ["ALL"]
+# Preview complexity limits, opted into one by one so other preview rules and
+# preview behavior stay off.
+preview = true
+explicit-preview-rules = true
+extend-select = [
+    "PLR0904", # too-many-public-methods
+    "PLR0914", # too-many-locals
+    "PLR0916", # too-many-boolean-expressions
+    "PLR1702", # too-many-nested-blocks
 ]
 ignore = [
-    "E501",  # line too long (handled by ruff format)
-    "B008",  # do not perform function calls in argument defaults
-    "TC003", # type checking is not required
+    # Conflicts with ruff format, which owns trailing commas.
+    "COM812",
+    # Licensing is stated once in LICENSE and pyproject.toml; a per-file
+    # copyright header would repeat it in every module.
+    "CPY001",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*" = ["ARG", "S101"]
+# pytest reports failures through plain asserts, and expected values in tests
+# are the specification, not magic numbers.
+"tests/**" = ["S101", "PLR2004"]
+# Standalone scripts that release.yml runs by path; tests import them as
+# top-level modules through pytest's pythonpath, not as a package.
+".github/scripts/*.py" = ["INP001"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+# Ruff's defaults, stated so they are visible and only ever tightened.
+max-args = 5
+max-positional-args = 5
+max-branches = 12
+max-returns = 6
+max-statements = 50
+max-locals = 15
+max-nested-blocks = 5
+max-bool-expr = 5
+max-public-methods = 20
 
 [tool.coverage.run]
 source = ["kicad_lib_manager"]
