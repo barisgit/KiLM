@@ -29,7 +29,7 @@ kilm add-3d [OPTIONS]
 
 The command performs the following main actions:
 
-1. **Creates/Updates Metadata**: Creates or modifies `.kilm_cloud_metadata` in the target directory containing:
+1. **Creates/Updates Metadata**: Creates or modifies `.kilm_metadata` in the target directory containing:
    - Library name, description, and associated environment variable
    - Count of detected model files
    - Last updated timestamp
@@ -155,5 +155,5 @@ The command automatically detects these 3D model file extensions:
 
 - **Environment Variables**: Use `kilm setup` to activate the configured environment variables in KiCad
 - **Cross-platform**: Works on Windows, macOS, and Linux with appropriate path handling
-- **Metadata Storage**: Library information is stored in `.kilm_cloud_metadata` in the target directory
+- **Metadata Storage**: Library information is stored in `.kilm_metadata` in the target directory
 - **KiCad Integration**: Requires `kilm setup` to complete the integration with KiCad
