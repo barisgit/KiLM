@@ -8,8 +8,6 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
-from kicad_lib_manager.main import app
-
 runner = CliRunner()
 
 SAMPLE_SYM_LIB = """\
@@ -102,6 +100,12 @@ def snapmagic_zip(tmp_path: Path, part: str) -> Path:
 
 def run_import(*args: str) -> Result:
     """Run 'kilm import' with args, without kicad-cli."""
+    # Imported here, not at module level: conftest.py imports this module while
+    # pytest is not capturing output, and importing the app then creates every
+    # module-level Rich Console against the real stdout. On a terminal they
+    # would pick a color system and put ANSI codes into all CliRunner output.
+    from kicad_lib_manager.main import app
+
     with patch(
         "kicad_lib_manager.commands.import_zip.command.detect_kicad_cli",
         return_value=None,
