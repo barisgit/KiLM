@@ -348,3 +348,10 @@ def test_variable_scan_skips_directories_make_does_not_copy(tmp_path: Path) -> N
     (tmp_path / "notes.txt").write_text('author = "Jane"', encoding="utf-8")
 
     assert find_potential_variables(tmp_path) == {"jane": ["Jane"]}
+
+
+def test_variable_scan_with_no_patterns_finds_nothing(tmp_path: Path) -> None:
+    """An empty pattern list means no patterns, not the default ones."""
+    (tmp_path / "notes.txt").write_text('author = "Jane"', encoding="utf-8")
+
+    assert find_potential_variables(tmp_path, patterns=[]) == {}

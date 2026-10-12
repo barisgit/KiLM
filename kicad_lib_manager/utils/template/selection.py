@@ -157,15 +157,14 @@ def find_potential_variables(
     Args:
         directory: The source project.
         patterns: Regexes whose first group, or whole match when they have no
-            group, is a candidate value; defaults to DEFAULT_VARIABLE_PATTERNS.
+            group, is a candidate value; None means DEFAULT_VARIABLE_PATTERNS.
 
     Returns:
         Distinct values in order of discovery, keyed by a variable name made
         from the lower-cased value. Files over 1 MiB or not UTF-8 are skipped.
     """
-    compiled = [
-        re.compile(pattern) for pattern in patterns or DEFAULT_VARIABLE_PATTERNS
-    ]
+    chosen = DEFAULT_VARIABLE_PATTERNS if patterns is None else patterns
+    compiled = [re.compile(pattern) for pattern in chosen]
     plan = plan_template_files(directory, gitignore_spec=get_gitignore_spec(directory))
     variables: dict[str, list[str]] = {}
     for relative in plan.files:
