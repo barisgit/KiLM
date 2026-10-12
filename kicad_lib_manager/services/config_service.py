@@ -1,5 +1,8 @@
 """Configuration management for KiCad Library Manager."""
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"yaml"}
+
 import time
 from pathlib import Path
 from typing import TypedDict, cast

@@ -2,6 +2,9 @@
 Provides functions for working with project templates.
 """
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"jinja2", "pathspec", "yaml"}
+
 import importlib.util
 import json
 import os

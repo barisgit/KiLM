@@ -66,6 +66,10 @@ files; tests run in `just check`.
   suppressions without a rule and reason.
 - Full type hints. Do not add `Any`; use precise types, `TypedDict`, protocols,
   or generics.
+- A module whose heavy third-party import (questionary, requests, jinja2,
+  yaml, ...) is used only inside functions lists it in `__lazy_modules__`
+  before its imports, so Python 3.15+ loads it on first use (PEP 810). Keep
+  imports at module top level; the `lazy import` syntax needs Python 3.15.
 - Use `pathlib.Path` for paths and keep behavior identical on Windows, macOS,
   and Linux.
 - No emojis in code, comments, or CLI output. Put fixed values in

@@ -1,5 +1,8 @@
 """Status command implementation for KiCad Library Manager (Typer version)."""
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"yaml"}
+
 import json
 from pathlib import Path
 from typing import Annotated

@@ -1,5 +1,8 @@
 """Metadata management utilities for KiCad Library Manager."""
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"yaml"}
+
 import json
 import re
 from pathlib import Path

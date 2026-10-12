@@ -2,6 +2,9 @@
 Core functionality for managing KiCad libraries.
 """
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"yaml"}
+
 import os
 import platform
 import re

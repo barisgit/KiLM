@@ -2,6 +2,9 @@
 Provides commands for creating KiCad projects from templates and creating templates from projects.
 """
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"jinja2", "pathspec", "questionary", "yaml"}
+
 import json
 import os
 import shutil

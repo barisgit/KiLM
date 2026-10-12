@@ -2,6 +2,9 @@
 Handles installation method detection, PyPI integration, and update execution.
 """
 
+# PEP 810: on Python 3.15+ these imports load on first use.
+__lazy_modules__ = {"packaging.version", "requests"}
+
 import json
 import os
 import subprocess
