@@ -41,7 +41,7 @@ This guide covers setting up a professional development environment for KiLM wit
 
    This installs:
    - KiLM in editable mode (changes reflect immediately)
-   - Development tools: pytest, black, ruff, pyrefly
+   - Development tools: pytest, ruff, pyrefly
    - Pre-commit hooks and coverage tools
 
 </Steps>
@@ -74,11 +74,11 @@ pyrefly --check kicad_lib_manager/
 
 ### Code Formatting
 ```bash
-# Format code with Black
-black .
+# Format code with Ruff
+ruff format .
 
 # Check formatting without applying changes
-black --check .
+ruff format --check .
 ```
 
 ### Linting and Analysis
@@ -125,7 +125,7 @@ pre-commit autoupdate
 ### Quality Pipeline
 ```bash
 # Run complete quality check (to be implemented)
-# This should include: pyrefly, black, ruff, pytest
+# This should include: pyrefly, ruff, pytest
 make quality  # or equivalent script
 ```
 

@@ -58,8 +58,6 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=22.0.0",
-    "flake8>=4.0.0",
     "pyrefly>=0.31.0",
     "ruff>=0.1.0",
     "pre-commit>=3.5.0",
@@ -77,10 +75,6 @@ kilm = "kicad_lib_manager.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["kicad_lib_manager"]
-
-[tool.black]
-line-length = 88
-target-version = ['py39']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"] 
@@ -116,7 +110,7 @@ select = [
     "ERA", # eradicate
 ]
 ignore = [
-    "E501",  # line too long (handled by black)
+    "E501",  # line too long (handled by ruff format)
     "B008",  # do not perform function calls in argument defaults
     "TC003", # type checking is not required
 ]

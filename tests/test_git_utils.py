@@ -3,6 +3,7 @@ Tests for Git utility functions.
 """
 
 import os
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -144,7 +145,13 @@ echo 'after kilm'"""
         assert hooks_dir == worktree_hooks
         mock_run.assert_called_once()
 
-    def test_get_git_hooks_directory_not_repo(self, tmp_path):
+    def test_get_git_hooks_directory_not_repo(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test error when directory is not a Git repository."""
+        # Clear git environment (e.g. GIT_DIR is exported to hooks during
+        # `git commit`, which would make rev-parse succeed against this repo)
+        for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE"):
+            monkeypatch.delenv(var, raising=False)
         with pytest.raises(RuntimeError, match="Not a Git repository"):
             get_git_hooks_directory(tmp_path)
