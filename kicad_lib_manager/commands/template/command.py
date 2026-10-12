@@ -30,6 +30,8 @@ from ...utils.template import (
     POST_CREATE_HOOK,
     TEMPLATE_CONTENT_DIR,
     TEMPLATE_METADATA,
+    EXCLUDED_DIRECTORIES,
+    KICAD_PRL_EXT,
     TEMPLATES_DIR,
     TemplateVariable,
     create_project_from_template,
@@ -798,8 +800,12 @@ def make(
                 if not git_path.endswith("/"):
                     git_path += "/"
 
-                if (gitignore_spec and gitignore_spec.match_file(git_path)) or (
-                    additional_spec and additional_spec.match_file(git_path)
+                if (
+                    d in EXCLUDED_DIRECTORIES
+                    or output_directory.as_posix()
+                    in str(source_directory / rel_path)
+                    or (gitignore_spec and gitignore_spec.match_file(git_path))
+                    or (additional_spec and additional_spec.match_file(git_path))
                 ):
                     dirs_to_remove.append(d)
                     excluded_files.append(f"{rel_path}/")
@@ -818,6 +824,9 @@ def make(
                     excluded_files.append(rel_path)
                     continue
                 if additional_spec and additional_spec.match_file(git_path):
+                    excluded_files.append(rel_path)
+                    continue
+                if file.lower().endswith(KICAD_PRL_EXT):
                     excluded_files.append(rel_path)
                     continue
 

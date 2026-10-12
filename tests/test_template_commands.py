@@ -171,3 +171,28 @@ def test_make_keeps_description_when_detected_variable_is_described(
     metadata = yaml.safe_load((output / TEMPLATE_METADATA).read_text())
     assert metadata["description"] == "Board template"
     assert metadata["variables"]["jane"]["description"] == "Author name"
+
+
+def test_make_dry_run_lists_only_files_that_make_copies(
+    home: Path, tmp_path: Path
+) -> None:
+    """The preview excludes what make itself excludes."""
+    add_library(home, "lib")
+    source = tmp_path / "source"
+    (source / ".git").mkdir(parents=True)
+    (source / ".git" / "HEAD").write_text("ref")
+    (source / "board.kicad_prl").write_text("{}")
+    (source / "notes.txt").write_text("notes")
+
+    output = invoke(
+        "make",
+        "board",
+        str(source),
+        "--non-interactive",
+        "--dry-run",
+        "--output-directory",
+        str(tmp_path / "out"),
+    )
+
+    included = [line.strip() for line in output.splitlines() if "+ " in line]
+    assert included == ["+ notes.txt"]
