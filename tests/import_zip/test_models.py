@@ -277,6 +277,33 @@ def test_members_differing_only_in_case_import_the_first_everywhere(
     assert '(descr "first")' in _footprint(library_tree, "Foo.kicad_mod")
 
 
+def test_footprint_extension_is_written_in_lowercase(
+    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+) -> None:
+    # KiCad lists only *.kicad_mod, so Part.KICAD_MOD would be missing from
+    # the library on case-sensitive filesystems.
+    zip_path = zip_with(
+        tmp_path,
+        "upper",
+        {
+            "U/KiCad/U.kicad_sym": (
+                '(kicad_symbol_lib\n\t(symbol "U"\n'
+                '\t\t(property "Footprint" "Part")\n\t)\n)\n'
+            ),
+            "U/KiCad/Part.KICAD_MOD": '(footprint "Part")\n',
+        },
+    )
+
+    result = run_import(str(zip_path))
+
+    assert result.exit_code == 0, result.output
+    assert "FP   add: Part.kicad_mod" in result.output
+    fp_dir = library_tree / "footprints" / "SAMPLELIB.pretty"
+    assert [p.name for p in fp_dir.iterdir()] == ["Part.kicad_mod"]
+    sym_text = (library_tree / "symbols" / "SAMPLELIB.kicad_sym").read_text()
+    assert '"Footprint" "SAMPLELIB:Part"' in sym_text
+
+
 @pytest.mark.parametrize("kept_from", ["library", "earlier ZIP"])
 def test_symbols_reference_the_kept_spelling_of_a_skipped_footprint(
     tmp_path: Path, library_tree: Path, mock_config: MagicMock, kept_from: str

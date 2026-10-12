@@ -32,7 +32,7 @@ For each ZIP, the command:
 
 1. **Extracts the archive safely**: An archive with an entry that would land outside the extraction directory is rejected. KiCad files are found by extension, so the vendor's folder layout does not matter; other files, macOS metadata (`__MACOSX/`, `._*`), and hidden files are ignored.
 2. **Copies 3D models** (`.step`, `.stp`, `.step.gz`, `.stp.gz`): A model already present in any `*.3dshapes` directory of the library is reused instead of copied again.
-3. **Copies footprints** (`.kicad_mod`): References to models the library holds are pointed at them; other references, such as those into KiCad's own 3D libraries, are kept. Footprints that already exist are skipped.
+3. **Copies footprints** (`.kicad_mod`, written with that lowercase extension, the only one KiCad lists): References to models the library holds are pointed at them; other references, such as those into KiCad's own 3D libraries, are kept. Footprints that already exist are skipped.
 4. **Merges symbols** (`.kicad_sym`): Symbols that already exist are skipped, and each new symbol's `Footprint` field is pointed at the footprint library that received its footprint. The symbol library keeps its line endings.
 
 Every file of a ZIP is read, upgraded, and checked before anything is written, so a dry run reports the same additions and failures as a real run, and a ZIP that fails these checks changes nothing. Each file is written to a temporary sibling and then renamed over the target, so an interrupted import never leaves a truncated library. Before its first change in a run, the symbol library is copied to `<name>.kicad_sym.backup.<timestamp>` next to it; the five newest backups are kept.

@@ -189,7 +189,9 @@ def _plan_models(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
 def _plan_footprints(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
     lib = target.fp_dir.stem
     for f in (f for f in files if f.suffix.lower() == ".kicad_mod"):
-        key = f.name.casefold()
+        # KiCad lists only *.kicad_mod files, so new files get that suffix.
+        name = f"{f.stem}.kicad_mod"
+        key = name.casefold()
         kept = plan.fp_names.get(key)
         if kept is not None:
             plan.fp_refs[f.stem] = f"{lib}:{Path(kept).stem}"
@@ -199,10 +201,10 @@ def _plan_footprints(files: list[Path], target: ImportTarget, plan: _Plan) -> No
         text = _read_vendor_text(f)
         text = target.upgrader.footprint(f.name, text, target.fp_format)
         require_compatible(f.name, text, target.fp_format, target.fp_dir, "fp")
-        plan.fp_names[key] = f.name
+        plan.fp_names[key] = name
         plan.fp_refs[f.stem] = f"{lib}:{f.stem}"
-        plan.footprints[key] = (target.fp_dir / f.name, fix_3d_path(text, plan.models))
-        plan.lines.append(f"  FP   add: {f.name}")
+        plan.footprints[key] = (target.fp_dir / name, fix_3d_path(text, plan.models))
+        plan.lines.append(f"  FP   add: {name}")
 
 
 def _plan_symbols(files: list[Path], target: ImportTarget, plan: _Plan) -> None:
