@@ -1,510 +1,227 @@
-"""Tests for update command group and subcommands."""
+"""Tests for the `kilm update` command group."""
 
-from unittest.mock import MagicMock, patch
+import importlib.metadata
+from dataclasses import dataclass, field
 
 import pytest
-import typer
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
-from kicad_lib_manager.commands.update.check import check_update_command
+from kicad_lib_manager.commands.update import check, info, perform
 from kicad_lib_manager.commands.update.command import update_app
-from kicad_lib_manager.commands.update.info import info_command
-from kicad_lib_manager.commands.update.perform import perform_update_command
-
-# Create test applications for individual commands
-check_app = typer.Typer()
-check_app.command()(check_update_command)
-
-info_app = typer.Typer()
-info_app.command()(info_command)
-
-perform_app = typer.Typer()
-perform_app.command()(perform_update_command)
+from kicad_lib_manager.services import update_service
+from kicad_lib_manager.services.install_method import InstallMethod
+from kicad_lib_manager.services.update_service import UpdateService
 
 
-@pytest.fixture
-def runner():
-    """Create a CLI runner for testing."""
-    return CliRunner()
+@dataclass
+class FakeInstallation:
+    """An installed kilm 1.0.0 whose installer and PyPI are simulated."""
 
+    method: InstallMethod = "pipx"
+    latest: str | None = "1.1.0"
+    upgrade_error: str | None = None
+    use_cache_calls: list[bool] = field(default_factory=list)
+    upgrades: list[list[str]] = field(default_factory=list)
 
-@pytest.fixture
-def mock_update_service():
-    """Mock UpdateService for testing."""
-    with (
-        patch(
-            "kicad_lib_manager.commands.update.check.UpdateService"
-        ) as mock_service_check,
-        patch(
-            "kicad_lib_manager.commands.update.info.UpdateService"
-        ) as mock_service_info,
-        patch(
-            "kicad_lib_manager.commands.update.perform.UpdateService"
-        ) as mock_service_perform,
-    ):
-        service_instance = MagicMock()
-        mock_service_check.return_value = service_instance
-        mock_service_info.return_value = service_instance
-        mock_service_perform.return_value = service_instance
-        yield service_instance
+    def service(self, current_version: str) -> UpdateService:
+        """Build the service the commands use, seeing this installation."""
+        return UpdateService(current_version, method=self.method, version_checker=self)
+
+    def check_latest_version(self, *, use_cache: bool = True) -> str | None:
+        """Answer version checks with `latest`, recording the cache choice."""
+        self.use_cache_calls.append(use_cache)
+        return self.latest
+
+    def run_upgrade(self, command: list[str]) -> str | None:
+        """Record an installer run; it fails with `upgrade_error` if set."""
+        self.upgrades.append(command)
+        return self.upgrade_error
 
 
 @pytest.fixture
-def mock_version():
-    """Mock importlib.metadata.version."""
-    with (
-        patch(
-            "kicad_lib_manager.commands.update.check.importlib.metadata.version"
-        ) as mock_ver_check,
-        patch(
-            "kicad_lib_manager.commands.update.info.importlib.metadata.version"
-        ) as mock_ver_info,
-        patch(
-            "kicad_lib_manager.commands.update.perform.importlib.metadata.version"
-        ) as mock_ver_perform,
-    ):
-        mock_ver_check.return_value = "1.0.0"
-        mock_ver_info.return_value = "1.0.0"
-        mock_ver_perform.return_value = "1.0.0"
-        yield mock_ver_check
+def installation(monkeypatch: pytest.MonkeyPatch) -> FakeInstallation:
+    """Route the update commands to a simulated installation."""
+    fake = FakeInstallation()
+    monkeypatch.setattr(importlib.metadata, "version", lambda _name: "1.0.0")
+    for module in (check, info, perform):
+        monkeypatch.setattr(module, "UpdateService", fake.service)
+    monkeypatch.setattr(update_service, "run_upgrade", fake.run_upgrade)
+    return fake
 
 
-class TestUpdateCheckCommand:
-    """Test the 'kilm update check' command."""
+def kilm_update(*args: str) -> Result:
+    """Run `kilm update ARGS`."""
+    return CliRunner().invoke(update_app, list(args))
 
-    def test_check_update_available(self, runner, mock_update_service, mock_version):
-        """Test check command when update is available."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-        mock_update_service.get_update_instructions.return_value = (
-            "pip install --upgrade kilm"
-        )
 
-        result = runner.invoke(check_app)
+class TestCheck:
+    """`kilm update check`."""
 
-        assert result.exit_code == 1  # Exit code 1 indicates update available
+    def test_update_available(self, installation: FakeInstallation) -> None:
+        """A newer release is reported with exit status 1."""
+        result = kilm_update("check")
+        assert result.exit_code == 1
         assert "Update available!" in result.stdout
         assert "Current version: 1.0.0" in result.stdout
         assert "Latest version: 1.1.0" in result.stdout
+        assert "Installation method: pipx" in result.stdout
+        assert "kilm update perform" in result.stdout
+        assert installation.use_cache_calls == [True]
 
-    def test_check_no_update_available(self, runner, mock_update_service, mock_version):
-        """Test check command when no update is available."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
+    def test_up_to_date(self, installation: FakeInstallation) -> None:
+        """Up to date exits 0, silently with --quiet."""
+        installation.latest = "1.0.0"
+        result = kilm_update("check")
+        assert result.exit_code == 0
+        assert "You are using the latest version (v1.0.0)" in result.stdout
 
-        result = runner.invoke(check_app)
+        quiet = kilm_update("check", "--quiet")
+        assert quiet.exit_code == 0
+        assert not quiet.stdout.strip()
 
-        assert result.exit_code == 0  # Exit code 0 indicates no update needed
-        assert "You are using the latest version" in result.stdout
-
-    def test_check_quiet_mode_with_update(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test check command in quiet mode when update is available."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-
-        result = runner.invoke(check_app, ["--quiet"])
-
+    def test_quiet_still_reports_an_update(
+        self, installation: FakeInstallation
+    ) -> None:
+        """--quiet only silences the up-to-date message."""
+        result = kilm_update("check", "-q")
         assert result.exit_code == 1
         assert "Update available!" in result.stdout
+        assert installation.upgrades == []
 
-    def test_check_quiet_mode_no_update(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test check command in quiet mode when no update is available."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
+    def test_force_bypasses_the_cache(self, installation: FakeInstallation) -> None:
+        """--force asks PyPI even when a recent answer is cached."""
+        kilm_update("check", "--force")
+        assert installation.use_cache_calls == [False]
 
-        result = runner.invoke(check_app, ["--quiet"])
-
-        assert result.exit_code == 0
-        # Should have minimal output in quiet mode
-        assert result.stdout.strip() == ""
-
-    def test_check_force_flag(self, runner, mock_update_service, mock_version):
-        """Test check command with force flag to bypass cache."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-
-        result = runner.invoke(check_app, ["--force"])
-
-        assert result.exit_code == 0
-        # Verify cache was bypassed (use_cache=False)
-        mock_update_service.check_for_updates.assert_called_with(use_cache=False)
-
-    def test_check_manual_update_required(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test check command when manual update is required."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-            "method": "homebrew",
-            "supports_auto_update": False,
-        }
-        mock_update_service.get_update_instructions.return_value = "brew upgrade kilm"
-
-        result = runner.invoke(check_app)
-
+    def test_manual_update_required(self, installation: FakeInstallation) -> None:
+        """Installs KiLM cannot update get the manual instruction."""
+        installation.method = "nix"
+        result = kilm_update("check")
         assert result.exit_code == 1
-        assert "Manual update required" in result.stdout
-        assert "brew upgrade kilm" in result.stdout
+        assert "Manual update required: nix flake update" in result.stdout
 
 
-class TestUpdateInfoCommand:
-    """Test the 'kilm update info' command."""
+class TestInfo:
+    """`kilm update info`."""
 
-    def test_info_display(self, runner, mock_update_service, mock_version):
-        """Test info command display."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-        mock_update_service.get_installation_method.return_value = "pip"
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.get_update_instructions.return_value = (
-            "pip install --upgrade kilm"
-        )
-
-        result = runner.invoke(info_app)
-
+    def test_up_to_date(self, installation: FakeInstallation) -> None:
+        """The panel shows version, installation details, and the commands."""
+        installation.latest = "1.0.0"
+        result = kilm_update("info")
         assert result.exit_code == 0
-        assert "Version Information" in result.stdout
-        assert "Installation Details" in result.stdout
+        assert "Current version: 1.0.0 (latest)" in result.stdout
+        assert "Method: pipx" in result.stdout
+        assert "Update command: pipx upgrade kilm" in result.stdout
         assert "Available Commands" in result.stdout
 
-    def test_info_with_update_available(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test info command when update is available."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-        mock_update_service.get_installation_method.return_value = "pip"
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.get_update_instructions.return_value = (
-            "pip install --upgrade kilm"
-        )
-
-        result = runner.invoke(info_app)
-
+    def test_update_available(self, installation: FakeInstallation) -> None:
+        """A newer release is shown next to the current version."""
+        result = kilm_update("info", "--force-check")
         assert result.exit_code == 0
         assert "1.1.0 available" in result.stdout
+        assert installation.use_cache_calls == [False]
 
-    def test_info_force_check(self, runner, mock_update_service, mock_version):
-        """Test info command with force check flag."""
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-            "method": "pip",
-            "supports_auto_update": True,
-        }
-        mock_update_service.get_installation_method.return_value = "pip"
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.get_update_instructions.return_value = (
-            "pip install --upgrade kilm"
-        )
 
-        result = runner.invoke(info_app, ["--force-check"])
+class TestPerform:
+    """`kilm update perform`."""
 
+    def test_installs_the_latest_release(self, installation: FakeInstallation) -> None:
+        """An available update is installed with the method's installer."""
+        result = kilm_update("perform")
         assert result.exit_code == 0
-        # Verify cache was bypassed
-        mock_update_service.check_for_updates.assert_called_with(use_cache=False)
-
-
-class TestUpdatePerformCommand:
-    """Test the 'kilm update perform' command."""
-
-    def test_perform_successful_update(self, runner, mock_update_service, mock_version):
-        """Test successful update performance."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-        }
-        mock_update_service.perform_update.return_value = (
-            True,
-            "Update completed successfully!",
-        )
-
-        result = runner.invoke(perform_app)
-
-        assert result.exit_code == 0
-        assert "Update completed successfully!" in result.stdout
-
-    def test_perform_update_failed(self, runner, mock_update_service, mock_version):
-        """Test failed update performance."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-        }
-        mock_update_service.perform_update.return_value = (False, "Update failed")
-
-        result = runner.invoke(perform_app)
-
-        assert result.exit_code == 1
-        assert "Update failed" in result.stdout
-
-    def test_perform_no_auto_update_support(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test perform command when auto-update is not supported."""
-        mock_update_service.can_auto_update.return_value = False
-        mock_update_service.get_installation_method.return_value = "homebrew"
-        mock_update_service.get_update_instructions.return_value = "brew upgrade kilm"
-
-        result = runner.invoke(perform_app)
-
-        assert result.exit_code == 1
-        assert "Automatic update not supported" in result.stdout
-        assert "brew upgrade kilm" in result.stdout
-
-    def test_perform_no_update_needed(self, runner, mock_update_service, mock_version):
-        """Test perform command when no update is needed."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-        }
-
-        result = runner.invoke(perform_app)
-
-        assert result.exit_code == 0
-        assert "Already using the latest version" in result.stdout
-
-    def test_perform_force_update(self, runner, mock_update_service, mock_version):
-        """Test perform command with force flag."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.perform_update.return_value = (
-            True,
-            "Update completed successfully!",
-        )
-
-        result = runner.invoke(perform_app, ["--force"])
-
-        assert result.exit_code == 0
-        # Should skip the update check when forced
-        mock_update_service.perform_update.assert_called_with(
-            target_version=None, force=True, dry_run=False
-        )
-
-    def test_perform_dry_run(self, runner, mock_update_service, mock_version):
-        """Test perform command in dry run mode."""
-        mock_update_service.perform_update.return_value = (True, "Dry run message")
-
-        result = runner.invoke(perform_app, ["--dry-run"])
-
-        assert result.exit_code == 0
-        assert "Dry run completed" in result.stdout
-        mock_update_service.perform_update.assert_called_with(
-            target_version=None, force=False, dry_run=True
-        )
-
-    def test_perform_target_version(self, runner, mock_update_service, mock_version):
-        """Test perform command with specific target version."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-        }
-        mock_update_service.perform_update.return_value = (
-            True,
-            "Update completed successfully!",
-        )
-
-        result = runner.invoke(perform_app, ["--target-version", "1.0.5"])
-
-        assert result.exit_code == 0
-        mock_update_service.perform_update.assert_called_with(
-            target_version="1.0.5", force=False, dry_run=False
-        )
-
-    def test_perform_no_cache(self, runner, mock_update_service, mock_version):
-        """Test perform command with no-cache flag."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-        }
-
-        result = runner.invoke(perform_app, ["--no-cache"])
-
-        assert result.exit_code == 0
-        # Should bypass cache
-        mock_update_service.check_for_updates.assert_called_with(use_cache=False)
-
-    def test_deprecation_notice_displayed(
-        self, runner, mock_update_service, mock_version
-    ):
-        """Test that deprecation notice is displayed."""
-        mock_update_service.can_auto_update.return_value = True
-        mock_update_service.check_for_updates.return_value = {
-            "has_update": False,
-            "current_version": "1.0.0",
-            "latest_version": "1.0.0",
-        }
-
-        result = runner.invoke(perform_app)
-
         assert "BREAKING CHANGE NOTICE" in result.stdout
         assert "kilm sync" in result.stdout
+        assert "Updating from 1.0.0 to 1.1.0" in result.stdout
+        assert "Update completed successfully!" in result.stdout
+        assert installation.upgrades == [["pipx", "upgrade", "kilm"]]
 
+    def test_installer_failure(self, installation: FakeInstallation) -> None:
+        """A failed installer exits 1 with its error and the manual command."""
+        installation.upgrade_error = "pipx: network unreachable"
+        result = kilm_update("perform")
+        assert result.exit_code == 1
+        assert "Update failed: pipx: network unreachable" in result.stdout
+        assert "Try manually: pipx upgrade kilm" in result.stdout
 
-class TestUpdateCommandGroup:
-    """Test the update command group integration."""
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_unsupported_method(
+        self, installation: FakeInstallation, *, dry_run: bool
+    ) -> None:
+        """Methods without an installer exit 1, in a dry run too."""
+        installation.method = "homebrew"
+        result = kilm_update("perform", *(["--dry-run"] if dry_run else []))
+        assert result.exit_code == 1
+        assert "Automatic update not supported" in result.stdout
+        assert "Installation method: homebrew" in result.stdout
+        assert installation.upgrades == []
 
-    def test_update_app_help(self, runner):
-        """Test that the update command group shows help correctly."""
-        result = runner.invoke(update_app, ["--help"])
-
+    def test_up_to_date(self, installation: FakeInstallation) -> None:
+        """Nothing is installed when the latest release is installed."""
+        installation.latest = "1.0.0"
+        result = kilm_update("perform")
         assert result.exit_code == 0
+        assert "Already using the latest version (v1.0.0)" in result.stdout
+        assert installation.upgrades == []
+
+    def test_force_reinstalls(self, installation: FakeInstallation) -> None:
+        """--force installs without asking PyPI whether an update exists."""
+        installation.latest = "1.0.0"
+        result = kilm_update("perform", "--force")
+        assert result.exit_code == 0
+        assert installation.use_cache_calls == []
+        assert installation.upgrades == [["pipx", "upgrade", "kilm"]]
+
+    def test_dry_run(self, installation: FakeInstallation) -> None:
+        """A dry run shows the installer command and installs nothing."""
+        result = kilm_update("perform", "--dry-run", "-t", "1.0.5")
+        assert result.exit_code == 0
+        assert "pipx install --force kilm==1.0.5" in result.stdout
+        assert "Dry run completed" in result.stdout
+        assert installation.upgrades == []
+
+    def test_target_version_downgrade(self, installation: FakeInstallation) -> None:
+        """A target version is installed even when it is older."""
+        installation.latest = "1.0.0"
+        result = kilm_update("perform", "--target-version", "0.9.0")
+        assert result.exit_code == 0
+        assert "Updating from 1.0.0 to 0.9.0" in result.stdout
+        assert installation.upgrades == [["pipx", "install", "--force", "kilm==0.9.0"]]
+
+    def test_target_version_already_installed(
+        self, installation: FakeInstallation
+    ) -> None:
+        """Asking for the installed version changes nothing without --force."""
+        result = kilm_update("perform", "-t", "1.0")
+        assert result.exit_code == 0
+        assert "Already using version 1.0.0" in result.stdout
+        assert installation.upgrades == []
+
+    def test_invalid_target_version(self, installation: FakeInstallation) -> None:
+        """A target that is no version number is a usage error."""
+        result = kilm_update("perform", "-t", "latest-please")
+        assert result.exit_code == 2
+        assert installation.upgrades == []
+
+    def test_no_cache(self, installation: FakeInstallation) -> None:
+        """--no-cache asks PyPI even when a recent answer is cached."""
+        kilm_update("perform", "--no-cache")
+        assert installation.use_cache_calls == [False]
+
+
+class TestGroup:
+    """The `kilm update` group itself."""
+
+    @pytest.mark.parametrize("args", [[], ["--help"]])
+    def test_help_lists_the_subcommands(self, args: list[str]) -> None:
+        """Without a subcommand, or with --help, the group shows its help."""
+        result = kilm_update(*args)
         assert "Update KiLM CLI to the latest version" in result.stdout
-        assert "check" in result.stdout
-        assert "info" in result.stdout
-        assert "perform" in result.stdout
+        for name in ("check", "info", "perform"):
+            assert name in result.stdout
 
-    def test_update_app_no_args_shows_help(self, runner):
-        """Test that running update with no args shows help."""
-        result = runner.invoke(update_app, [])
-
-        # Different Typer/Click versions may return 0 or 2 for no_args_is_help
-        assert result.exit_code in [0, 2]
+    @pytest.mark.parametrize("name", ["check", "info", "perform"])
+    def test_subcommand_help(self, name: str) -> None:
+        """Every subcommand documents its usage."""
+        result = kilm_update(name, "--help")
+        assert result.exit_code == 0
         assert "Usage:" in result.stdout
-        assert "Commands" in result.stdout  # Rich formatting uses "╭─ Commands ───"
-
-    def test_subcommand_help_messages(self, runner):
-        """Test that each subcommand has proper help."""
-        subcommands = ["check", "info", "perform"]
-
-        for subcommand in subcommands:
-            result = runner.invoke(update_app, [subcommand, "--help"])
-            assert result.exit_code == 0
-            assert "Usage:" in result.stdout
-
-
-class TestIntegrationScenarios:
-    """Test realistic integration scenarios."""
-
-    def test_uv_tool_update_workflow(self, runner):
-        """Test complete workflow for UV tool installation."""
-        with (
-            patch(
-                "kicad_lib_manager.commands.update.check.UpdateService"
-            ) as mock_service_class,
-            patch("importlib.metadata.version") as mock_version,
-        ):
-            mock_version.return_value = "1.0.0"
-            mock_service = MagicMock()
-            mock_service_class.return_value = mock_service
-
-            # Mock UV tool installation
-            mock_service.check_for_updates.return_value = {
-                "has_update": True,
-                "current_version": "1.0.0",
-                "latest_version": "1.1.0",
-                "method": "uv",
-                "supports_auto_update": True,
-            }
-            mock_service.get_update_instructions.return_value = "uv tool upgrade kilm"
-
-            # Test check command
-            result = runner.invoke(check_app)
-            assert result.exit_code == 1
-            assert "Update available!" in result.stdout
-            assert "kilm update perform" in result.stdout
-
-    def test_pipx_installation_workflow(self, runner):
-        """Test complete workflow for pipx installation."""
-        with (
-            patch(
-                "kicad_lib_manager.commands.update.info.UpdateService"
-            ) as mock_service_class,
-            patch("importlib.metadata.version") as mock_version,
-        ):
-            mock_version.return_value = "1.0.0"
-            mock_service = MagicMock()
-            mock_service_class.return_value = mock_service
-
-            # Mock pipx installation
-            mock_service.check_for_updates.return_value = {
-                "has_update": False,
-                "current_version": "1.0.0",
-                "latest_version": "1.0.0",
-                "method": "pipx",
-                "supports_auto_update": True,
-            }
-            mock_service.get_installation_method.return_value = "pipx"
-            mock_service.can_auto_update.return_value = True
-            mock_service.get_update_instructions.return_value = "pipx upgrade kilm"
-
-            # Test info command
-            result = runner.invoke(info_app)
-            assert result.exit_code == 0
-            assert "pipx" in result.stdout
-            assert "pipx upgrade kilm" in result.stdout
-
-    def test_homebrew_manual_update_workflow(self, runner):
-        """Test workflow for homebrew installation requiring manual update."""
-        with (
-            patch(
-                "kicad_lib_manager.commands.update.perform.UpdateService"
-            ) as mock_service_class,
-            patch("importlib.metadata.version") as mock_version,
-        ):
-            mock_version.return_value = "1.0.0"
-            mock_service = MagicMock()
-            mock_service_class.return_value = mock_service
-
-            # Mock homebrew installation (no auto-update support)
-            mock_service.can_auto_update.return_value = False
-            mock_service.get_installation_method.return_value = "homebrew"
-            mock_service.get_update_instructions.return_value = (
-                "Homebrew package not yet available (planned for future)"
-            )
-
-            # Test perform command
-            result = runner.invoke(perform_app)
-            assert result.exit_code == 1
-            assert "Automatic update not supported" in result.stdout
-            assert "homebrew" in result.stdout

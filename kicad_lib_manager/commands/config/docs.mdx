@@ -30,7 +30,7 @@ kilm config list [OPTIONS]
     _Example:_ `kilm config list --type github`
 
 - `-v, --verbose`:
-  Displays more detailed information about each library, reading from both `config.yaml` and the library's metadata file (`kilm.yaml` or `.kilm_cloud_metadata`). Shows path, description, version, environment variable, capabilities/model count, etc.
+  Displays more detailed information about each library, reading from both `config.yaml` and the library's metadata file (`kilm.yaml` or `.kilm_metadata`). Shows path, description, version, environment variable, and the library's features (symbols, footprints, templates) or 3D model count. Without a stated model count, the `.step`, `.stp`, `.wrl`, and `.wings` files are counted.
   _Example:_ `kilm config list --verbose`
 
 - `--help`:
@@ -117,7 +117,7 @@ kilm config set-default --type cloud
 </TabItem>
 <TabItem label="remove">
 
-Removes a registered library from the KiLM configuration (`config.yaml`). This does _not_ delete the library files or its metadata file, only the entry in KiLM's central config.
+Removes a registered library from the KiLM configuration (`config.yaml`). This does _not_ delete the library files or its metadata file, only the entry in KiLM's central config. Removing the default library clears the default, so commands fall back to the first registered library of each type.
 
 #### Usage
 

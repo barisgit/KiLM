@@ -1,17 +1,25 @@
-"""Update perform command implementation."""
+"""`kilm update perform`: install a new KiLM release with its own installer."""
 
 import importlib.metadata
 from typing import Annotated
 
 import typer
+from packaging.version import InvalidVersion, Version
 from rich.panel import Panel
 
+from kicad_lib_manager.services.update_service import UpdateService
 from kicad_lib_manager.utils.console import get_console
 
-from ...services.update_service import UpdateService
+BREAKING_CHANGE_NOTICE = (
+    "[bold yellow]BREAKING CHANGE NOTICE (KiLM 0.4.0)[/bold yellow]\n\n"
+    "The [bold]kilm update[/bold] command now updates KiLM itself.\n"
+    "To update library content, use [bold cyan]kilm sync[/bold cyan] instead.\n"
+    "This notice will be removed in a future version."
+)
 
 
 def perform_update_command(
+    *,
     target_version: Annotated[
         str | None,
         typer.Option(
@@ -39,86 +47,111 @@ def perform_update_command(
     version from PyPI. The update method depends on how KiLM was installed
     (pip, pipx, uv tool, etc.).
 
-    ⚠️  DEPRECATION NOTICE:
+    DEPRECATION NOTICE:
     In KiLM 0.4.0, the 'update' command now updates KiLM itself.
     To update library content, use 'kilm sync' instead.
     This banner will be removed in a future version.
     """
-    # Show deprecation notice
-    deprecation_notice = (
-        "[bold yellow]⚠️  BREAKING CHANGE NOTICE (KiLM 0.4.0)[/bold yellow]\n\n"
-        "The [bold]kilm update[/bold] command now updates KiLM itself.\n"
-        "To update library content, use [bold cyan]kilm sync[/bold cyan] instead.\n"
-        "This notice will be removed in a future version."
-    )
-    get_console().print(Panel(deprecation_notice, expand=False, border_style="yellow"))
-
-    version = importlib.metadata.version("kilm")
-    update_service = UpdateService(version)
+    console = get_console()
+    console.print(Panel(BREAKING_CHANGE_NOTICE, expand=False, border_style="yellow"))
+    if target_version is not None:
+        _validate_version(target_version)
+    update_service = UpdateService(importlib.metadata.version("kilm"))
 
     if dry_run:
-        get_console().print(
-            "[yellow]Dry run mode - showing what would be done[/yellow]"
-        )
-        get_console().print()
+        console.print("[yellow]Dry run mode - showing what would be done[/yellow]")
+        console.print()
+    # A dry run fails the same way as the real update would.
+    if not update_service.can_auto_update:
+        _exit_with_manual_instruction(update_service)
+    if dry_run:
+        _show_update_plan(update_service, target_version)
+        raise typer.Exit(0)
+    if not force:
+        _announce_update_or_exit(update_service, target_version, use_cache=not no_cache)
 
-    # Check if we can auto-update (skip during dry run)
-    if not dry_run and not update_service.can_auto_update():
-        get_console().print(
-            "[yellow]⚠[/yellow] Automatic update not supported for your installation method."
-        )
-        method = update_service.get_installation_method()
-        update_cmd = update_service.get_update_instructions()
-
-        get_console().print(f"Installation method: [bold]{method}[/bold]")
-        get_console().print(f"Please run manually: [bold cyan]{update_cmd}[/bold cyan]")
+    result = update_service.perform_update(target_version)
+    if not result.success:
+        console.print(f"\n[red]Update failed:[/red] {result.message}")
         raise typer.Exit(1)
+    console.print("\n[green]Update completed successfully![/green]")
+    console.print(
+        "You may need to restart your shell or run [cyan]hash -r[/cyan]"
+        " to use the new version"
+    )
 
-    # Perform update check first (unless forced)
-    if not force and not dry_run:
-        update_info = update_service.check_for_updates(use_cache=not no_cache)
-        if not update_info["has_update"]:
-            get_console().print(
-                f"[green]✓[/green] Already using the latest version ([bold cyan]v{update_info['current_version']}[/bold cyan])"
-            )
-            get_console().print(
-                "\nUse [cyan]--force[/cyan] to reinstall the current version"
+
+def _validate_version(target_version: str) -> None:
+    """Reject a --target-version that is not a version number (exit status 2)."""
+    try:
+        Version(target_version)
+    except InvalidVersion:
+        message = f"'{target_version}' is not a version number"
+        raise typer.BadParameter(message, param_hint="--target-version") from None
+
+
+def _exit_with_manual_instruction(update_service: UpdateService) -> None:
+    """Explain how to update an installation KiLM cannot update, then exit 1."""
+    console = get_console()
+    console.print(
+        "[yellow]Warning:[/yellow] Automatic update not supported"
+        " for your installation method."
+    )
+    console.print(f"Installation method: [bold]{update_service.method}[/bold]")
+    instruction = update_service.update_instruction()
+    console.print(f"Update manually: [bold cyan]{instruction}[/bold cyan]")
+    raise typer.Exit(1)
+
+
+def _announce_update_or_exit(
+    update_service: UpdateService, target_version: str | None, *, use_cache: bool
+) -> None:
+    """Print what the update installs, or exit 0 when nothing would change."""
+    console = get_console()
+    current = update_service.current_version
+    if target_version is not None:
+        if Version(target_version) == Version(current):
+            console.print(
+                f"[green]Already using version[/green] [bold cyan]{current}[/bold cyan]"
             )
             raise typer.Exit(0)
-
-        current = update_info["current_version"]
-        latest = update_info["latest_version"]
-        target = target_version or latest
-
-        if not dry_run:
-            get_console().print(
-                f"Updating from [blue]{current}[/blue] to [green]{target}[/green]"
-            )
-            get_console().print()
-
-    # Perform the update
-    success, message = update_service.perform_update(
-        target_version=target_version, force=force, dry_run=dry_run
-    )
-
-    if dry_run:
-        if success:
-            get_console().print(
-                "\n[green]✓[/green] Dry run completed - automatic update is supported"
-            )
-        else:
-            get_console().print("\n[red]✗[/red] Automatic update not available")
-            get_console().print("Manual update will be required")
-        raise typer.Exit(0)
-
-    if success:
-        get_console().print("\n[green]✓[/green] Update completed successfully!")
-        get_console().print(
-            "You may need to restart your shell or run [cyan]hash -r[/cyan] to use the new version"
-        )
+        target = target_version
     else:
-        get_console().print(f"\n[red]✗[/red] Update failed: {message}")
-        get_console().print(
-            "Please try updating manually or check the error messages above"
+        status = update_service.check_for_updates(use_cache=use_cache)
+        if not status["has_update"]:
+            console.print(
+                "[green]Already using the latest version[/green]"
+                f" ([bold cyan]v{current}[/bold cyan])"
+            )
+            console.print("\nUse [cyan]--force[/cyan] to reinstall the current version")
+            raise typer.Exit(0)
+        target = status["latest_version"]
+    console.print(f"Updating from [blue]{current}[/blue] to [green]{target}[/green]")
+    console.print()
+
+
+def _show_update_plan(
+    update_service: UpdateService, target_version: str | None
+) -> None:
+    """Print the installer command a real update would run."""
+    package_spec = "kilm" if target_version is None else f"kilm=={target_version}"
+    command = update_service.update_instruction(target_version)
+    get_console().print(
+        Panel(
+            "\n".join(
+                [
+                    "[bold]Update Plan (Dry Run)[/bold]",
+                    "",
+                    f"Installation method: [cyan]{update_service.method}[/cyan]",
+                    f"Target package: [green]{package_spec}[/green]",
+                    "Auto-update supported: [green]True[/green]",
+                    "",
+                    "Command that would be executed:",
+                    f"[bold cyan]{command}[/bold cyan]",
+                ]
+            ),
+            title="[bold yellow]Dry Run[/bold yellow]",
+            border_style="yellow",
         )
-        raise typer.Exit(1)
+    )
+    get_console().print("\nDry run completed - automatic update is supported")
