@@ -80,11 +80,17 @@ jobs:
             echo "::error::$name $version is on PyPI but has no GitHub release. Use 'Re-run failed jobs' on the Release run that published it; a new run cannot prove which commit PyPI holds."
             exit 1
           fi
-          if [[ $on_pypi == false && $has_release == true ]]; then
-            tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
-            if [[ $tag_sha != "$RELEASE_SHA" ]]; then
-              echo "::error::Release $tag exists at $tag_sha, not $RELEASE_SHA; bump the version."
-              exit 1
+          # A tag can exist without a release, so check it on its own: publishing
+          # to PyPI cannot be undone if the github job then rejects the tag.
+          if [[ $on_pypi == false ]]; then
+            tag_ref=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" \
+              --jq ".[] | select(.ref == \"refs/tags/$tag\") | .ref")
+            if [[ -n $tag_ref ]]; then
+              tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag_ref" --jq .sha)
+              if [[ $tag_sha != "$RELEASE_SHA" ]]; then
+                echo "::error::Tag $tag exists at $tag_sha, not $RELEASE_SHA; bump the version."
+                exit 1
+              fi
             fi
           fi
 
