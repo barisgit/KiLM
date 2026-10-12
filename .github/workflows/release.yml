@@ -111,8 +111,8 @@ jobs:
         pip install kilm-${{ steps.get_version.outputs.version }}-py3-none-any.whl
         ```
 
-        ### Auto-Update (Coming Soon)
-        Future versions will include `kilm update` functionality for easy updates.
+        ### Updating
+        Run `kilm update` to upgrade an existing installation.
         EOF
 
         # Store release notes for next step
