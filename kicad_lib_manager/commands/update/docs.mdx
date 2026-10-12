@@ -21,6 +21,8 @@ kilm update perform [OPTIONS]
 
 Running `kilm update` without a subcommand prints the available subcommands.
 
+The latest version found on PyPI is cached for a day in `~/.cache/kilm/version_check.json`; within that day `check`, `info`, `perform`, and the update notice in `kilm --help` reuse it unless a bypass option is given.
+
 ## Subcommands
 
 ### check
@@ -64,7 +66,7 @@ KiLM reports **unknown** when nothing identifies the installer, for example a di
 
 With `--target-version`, the automatic methods install that exact version: `pipx install --force kilm==VERSION`, `uv tool install kilm==VERSION`, or `pip install --upgrade kilm==VERSION`.
 
-For methods without automatic updates, `kilm update perform` prints the manual instruction and exits with status `1`.
+For methods without automatic updates, `kilm update perform` prints the manual instruction and exits with status `1`. When the installer itself fails, it prints the last lines of the installer's error output and the command to run by hand, and exits with status `1`.
 
 ## Examples
 
