@@ -40,12 +40,13 @@ files; tests run in `just check`.
   copies each `docs.mdx` into the site's CLI reference, so update it in the same
   change as the command. Larger commands split into further modules beside
   `command.py` (for example `setup/`, `template/`, `update/`, `import_zip/`).
-- `kicad_lib_manager/commands/shared.py` and `kicad_common.py`: option helpers
-  and typed `kicad_common.json` access shared by several commands.
+- `kicad_lib_manager/commands/shared.py`: option helpers shared by several
+  commands.
 - `kicad_lib_manager/services/`: configuration, KiCad, library, and
   self-update services.
 - `kicad_lib_manager/utils/`: file operations, backups, metadata, the
-  `template/` package, environment variables, git helpers, and `console.py`.
+  `template/` package, environment variables, git helpers, `console.py`, and
+  `kicad_common.py` (the one typed `kicad_common.json` access layer).
 - `tests/`: pytest suite; `tests/fault_injection.py` simulates failed writes.
 - `docs/`: Astro Starlight site; guides in `docs/src/content/docs/`.
 - `flake.nix`, `pkgs/kilm.nix`: Nix package, built and tested by CI. It reads
