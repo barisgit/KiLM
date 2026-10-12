@@ -20,7 +20,7 @@ LIBRARY_FOLDERS: Final = ("symbols", "footprints", "templates")
 
 
 class LibraryService:
-    """Library operations used by the init, list, pin, setup, and unpin commands.
+    """Library operations behind the init, list, pin, setup, status, and unpin commands.
 
     `add_libraries` and `find_kicad_config` are the module functions of
     library_table and kicad_config. They stay class attributes because

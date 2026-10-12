@@ -17,11 +17,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from kicad_lib_manager.services.kicad_service import KiCadService
+from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.services.user_paths import user_config_file
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import KICAD_COMMON_FILE
-from kicad_lib_manager.utils.file_ops import LibraryTableEntry
+from kicad_lib_manager.utils.file_ops import (
+    LibraryTableEntry,
+    list_configured_libraries,
+)
 from kicad_lib_manager.utils.kicad_common import (
     PINNED_FOOTPRINTS_KEY,
     PINNED_SYMBOLS_KEY,
@@ -54,15 +57,14 @@ def status(
     """Show the current KiCad configuration status."""
     console = get_console()
     try:
-        kicad_service = KiCadService()
         _show_kilm_configuration()
         console.print("\n[bold cyan]KiCad Configuration[/bold cyan]")
-        kicad_config = kicad_service.find_kicad_config_dir()
+        kicad_config = LibraryService.find_kicad_config()
         console.print(f"KiCad configuration directory: [blue]{kicad_config}[/blue]")
         _show_kicad_environment_variables(kicad_config)
         _show_pinned_libraries(kicad_config)
         if verbose:
-            _show_configured_libraries(kicad_config, kicad_service)
+            _show_configured_libraries(kicad_config)
     except Exception as e:
         console.print(f"[red]Error getting KiCad configuration: {e}[/red]")
         raise typer.Exit(1) from e
@@ -270,10 +272,10 @@ def _print_configured(kind: str, libraries: list[LibraryTableEntry]) -> None:
     console.print(table)
 
 
-def _show_configured_libraries(kicad_config: Path, kicad_service: KiCadService) -> None:
+def _show_configured_libraries(kicad_config: Path) -> None:
     """Show the libraries in KiCad's symbol and footprint library tables."""
     try:
-        symbols, footprints = kicad_service.get_configured_libraries(kicad_config)
+        symbols, footprints = list_configured_libraries(kicad_config)
     except (OSError, ValueError) as e:
         get_console().print(f"[red]Error listing configured libraries: {e}[/red]")
         return

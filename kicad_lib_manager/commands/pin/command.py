@@ -8,7 +8,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from kicad_lib_manager.commands.shared import resolve_kicad_lib_dir
-from kicad_lib_manager.services.kicad_service import KiCadService
 from kicad_lib_manager.services.library_service import LibraryService
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import DEFAULT_MAX_BACKUPS, SYMBOL_DIR_VAR
@@ -19,7 +18,7 @@ def _find_kicad_config(*, verbose: bool) -> Path:
     """Return KiCad's configuration directory; exit when it cannot be found."""
     console = get_console()
     try:
-        kicad_config = KiCadService().find_kicad_config_dir()
+        kicad_config = LibraryService.find_kicad_config()
     except Exception as e:
         console.print(f"[red]Error finding KiCad configuration: {e}[/red]")
         raise typer.Exit(1) from e
