@@ -31,6 +31,7 @@ from kicad_lib_manager.commands.kicad_common import (
 from kicad_lib_manager.services.kicad_service import KiCadService
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import CONFIG_DIR_NAME, CONFIG_FILE_NAME
+from kicad_lib_manager.utils.file_ops import LibraryTableEntry
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
 
 LEGACY_PINNED_FILE = "pinned"
@@ -254,7 +255,7 @@ def _show_legacy_pinned_libraries(pinned_file: Path) -> None:
     )
 
 
-def _print_configured(kind: str, libraries: list[dict[str, str]]) -> None:
+def _print_configured(kind: str, libraries: list[LibraryTableEntry]) -> None:
     """Print the libraries in one KiCad library table."""
     console = get_console()
     console.print(f"\n[bold]Configured {kind} Libraries:[/bold]")
@@ -265,7 +266,7 @@ def _print_configured(kind: str, libraries: list[dict[str, str]]) -> None:
     table.add_column("Library Name", style="cyan", no_wrap=True)
     table.add_column("URI", style="blue")
     for library in libraries:
-        table.add_row(library.get("name", ""), library.get("uri", ""))
+        table.add_row(library["name"], library.get("uri", ""))
     console.print(table)
 
 

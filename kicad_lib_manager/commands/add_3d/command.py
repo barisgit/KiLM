@@ -15,6 +15,7 @@ from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.metadata import (
     CLOUD_METADATA_FILE,
+    CloudMetadata,
     generate_env_var_name,
     get_default_cloud_metadata,
     read_cloud_metadata,
@@ -22,8 +23,6 @@ from kicad_lib_manager.utils.metadata import (
 )
 
 MODEL_EXTENSIONS = (".step", ".stp", ".wrl", ".wings")
-
-CloudMetadata = dict[str, str | int | None]
 
 
 @dataclass(frozen=True)
@@ -84,8 +83,10 @@ def _update_existing(
         console.print("[yellow]Disabling environment variable as requested[/yellow]")
 
     if overrides.given():
-        metadata["name"] = name
-        metadata["description"] = description
+        if name is not None:
+            metadata["name"] = name
+        if description is not None:
+            metadata["description"] = description
         metadata["env_var"] = (
             env_var if _present(env_var) and not overrides.no_env_var else None
         )
