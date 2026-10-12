@@ -480,9 +480,9 @@ def create_template_structure(
     MAX_PATH_LENGTH = 512
 
     # Track main KiCad files
-    main_project_file: str | None = None
-    main_schematic_file: str | None = None
-    main_pcb_file: str | None = None
+    main_project_file: Path | None = None
+    main_schematic_file: Path | None = None
+    main_pcb_file: Path | None = None
 
     # First scan to find main KiCad files
     click.echo("Scanning for main KiCad files...")
@@ -515,17 +515,17 @@ def create_template_structure(
                 file_lower = file_name.lower()
 
                 if file_lower.endswith(KICAD_PROJECT_EXT) and not main_project_file:
-                    main_project_file = str(Path(root) / file_name)
+                    main_project_file = Path(root) / file_name
                     click.echo(f"Found main project file: {file_name}")
 
                 elif (
                     file_lower.endswith(KICAD_SCHEMATIC_EXT) and not main_schematic_file
                 ):
-                    main_schematic_file = str(Path(root) / file_name)
+                    main_schematic_file = Path(root) / file_name
                     click.echo(f"Found main schematic file: {file_name}")
 
                 elif file_lower.endswith(KICAD_PCB_EXT) and not main_pcb_file:
-                    main_pcb_file = str(Path(root) / file_name)
+                    main_pcb_file = Path(root) / file_name
                     click.echo(f"Found main PCB file: {file_name}")
 
     # Copy files from source to template

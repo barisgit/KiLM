@@ -1,5 +1,6 @@
 """Tests for template utilities and commands."""
 
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -16,6 +17,7 @@ from kicad_lib_manager.utils.template import (
     TEMPLATES_DIR,
     create_project_from_template,
     create_template_metadata,
+    create_template_structure,
     find_all_templates,
     render_filename,
     render_filename_custom,
@@ -331,6 +333,34 @@ def test_find_all_templates_keeps_first_duplicate(tmp_path: Path) -> None:
     assert board["source_library"] == "first"
     assert board["library_path"] == str(tmp_path / "first")
 
+
+def test_main_kicad_files_are_named_after_the_new_project(tmp_path: Path) -> None:
+    """The main project, schematic, and PCB take the project_filename variable."""
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "Board.kicad_pro").write_text('{"meta": {"filename": "Board.kicad_pro"}}')
+    (source / "Board.kicad_sch").write_text('(kicad_sch (project "Board"))')
+    (source / "Board.kicad_pcb").write_text('(kicad_pcb (sheetfile "Board.kicad_sch"))')
+    template_dir = tmp_path / "template"
+    create_template_structure(source, template_dir, create_template_metadata("tpl"))
+    project = tmp_path / "project"
+
+    create_project_from_template(
+        template_dir,
+        project,
+        {"project_name": "Widget", "project_filename": "Widget"},
+        skip_hooks=True,
+    )
+
+    assert sorted(path.name for path in project.iterdir()) == [
+        "Widget.kicad_pcb",
+        "Widget.kicad_pro",
+        "Widget.kicad_sch",
+    ]
+    project_file = json.loads((project / "Widget.kicad_pro").read_text())
+    assert project_file["meta"]["filename"] == "Widget.kicad_pro"
+    assert '(project "Widget")' in (project / "Widget.kicad_sch").read_text()
+    assert '(sheetfile "Widget.kicad_sch")' in (project / "Widget.kicad_pcb").read_text()
 
 if __name__ == "__main__":
     pytest.main()
