@@ -2,8 +2,9 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+import pytest
 from click.testing import Result
 
 from kicad_lib_manager.main import app
@@ -95,9 +96,11 @@ def _kicad8_library(library_tree: Path) -> tuple[Path, Path]:
     return sym_lib, fp_dir
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_upgrade_never_makes_library_format_newer(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """kicad-cli upgrades that would exceed the library's format are dropped."""
     # A library saved by KiCad 8 must stay loadable by KiCad 8 even when the
     # importing machine has a newer kicad-cli.
     sym_lib, fp_dir = _kicad8_library(library_tree)
@@ -114,9 +117,11 @@ def test_upgrade_never_makes_library_format_newer(
     assert "SAMPLELIB.3dshapes/OldPart.stp" in fp_text
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_upgrade_applies_when_library_format_allows(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """kicad-cli upgrades apply when the library already uses that format."""
     sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
     sym_lib.write_text(
         SAMPLE_SYM_LIB.replace(
@@ -133,9 +138,9 @@ def test_upgrade_applies_when_library_format_allows(
     assert f"(version {NEW_FORMAT})" in fp.read_text(encoding="utf-8")
 
 
-def test_newer_vendor_symbols_are_rejected(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_newer_vendor_symbols_are_rejected(tmp_path: Path, library_tree: Path) -> None:
+    """Symbols newer than the target library's format fail their ZIP."""
     # Merged under the library's 20231120 header, KiCad 8 would reject the
     # newer embedded_fonts token and with it the whole library.
     sym_lib, _ = _kicad8_library(library_tree)
@@ -161,15 +166,19 @@ def test_newer_vendor_symbols_are_rejected(
     assert not (library_tree / "SAMPLELIB.3dshapes" / "NewPart.stp").exists()
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_newer_vendor_footprints_are_rejected(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """Footprints newer than the footprint library's format fail their ZIP."""
     _, fp_dir = _kicad8_library(library_tree)
     zip_path = zip_with(
         tmp_path,
         "newer",
         {
-            "N/KiCad/NewFP.kicad_mod": f'(footprint "NewFP"\n\t(version {NEW_FORMAT})\n)\n'
+            "N/KiCad/NewFP.kicad_mod": (
+                f'(footprint "NewFP"\n\t(version {NEW_FORMAT})\n)\n'
+            )
         },
     )
 

@@ -4,6 +4,8 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from tests.import_zip.helpers import (
     SAMPLE_SYM_LIB,
     run_import,
@@ -19,9 +21,11 @@ def _sym_text(library_tree: Path, name: str = "SAMPLELIB") -> str:
     return (library_tree / "symbols" / f"{name}.kicad_sym").read_text(encoding="utf-8")
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_samacsys_zip_adds_symbol_footprint_and_model(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """A SamacSys ZIP adds its symbol, footprint, and model, linked together."""
     result = run_import(str(samacsys_zip(tmp_path, "TestPart")))
 
     assert result.exit_code == 0, result.output
@@ -32,9 +36,9 @@ def test_samacsys_zip_adds_symbol_footprint_and_model(
     assert (library_tree / "SAMPLELIB.3dshapes" / "TestPart.stp").exists()
 
 
-def test_ultralibrarian_zip_adds_part(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_ultralibrarian_zip_adds_part(tmp_path: Path, library_tree: Path) -> None:
+    """An UltraLibrarian export with a nested .pretty dir imports."""
     result = run_import(str(ultralibrarian_zip(tmp_path, "UlPart")))
 
     assert result.exit_code == 0, result.output
@@ -46,9 +50,9 @@ def test_ultralibrarian_zip_adds_part(
     ).exists()
 
 
-def test_snapmagic_zip_adds_part(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_snapmagic_zip_adds_part(tmp_path: Path, library_tree: Path) -> None:
+    """A SnapMagic ZIP with its files at the root imports."""
     result = run_import(str(snapmagic_zip(tmp_path, "SnapPart")))
 
     assert result.exit_code == 0, result.output
@@ -59,9 +63,9 @@ def test_snapmagic_zip_adds_part(
     assert (library_tree / "SAMPLELIB.3dshapes" / "SnapPart.step").exists()
 
 
-def test_dry_run_changes_nothing(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_dry_run_changes_nothing(tmp_path: Path, library_tree: Path) -> None:
+    """--dry-run reports the parts but writes no file."""
     before = sorted(p.relative_to(library_tree) for p in library_tree.rglob("*"))
 
     result = run_import("--dry-run", str(samacsys_zip(tmp_path, "DryPart")))
@@ -74,9 +78,9 @@ def test_dry_run_changes_nothing(
     assert _sym_text(library_tree) == SAMPLE_SYM_LIB
 
 
-def test_existing_parts_are_skipped(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_existing_parts_are_skipped(tmp_path: Path, library_tree: Path) -> None:
+    """A symbol already in the library is reported as existing, not added again."""
     result = run_import(str(samacsys_zip(tmp_path, "ExistingPart")))
 
     assert result.exit_code == 0, result.output
@@ -84,9 +88,9 @@ def test_existing_parts_are_skipped(
     assert _sym_text(library_tree).count('(symbol "ExistingPart"') == 1
 
 
-def test_several_libraries_require_a_choice(
-    tmp_path: Path, category_tree: Path
-) -> None:
+@pytest.mark.usefixtures("category_tree")
+def test_several_libraries_require_a_choice(tmp_path: Path) -> None:
+    """With several symbol libraries and no --symbol-lib the command stops."""
     result = run_import(str(samacsys_zip(tmp_path, "AmbPart")))
 
     assert result.exit_code == 1
@@ -94,7 +98,9 @@ def test_several_libraries_require_a_choice(
     assert "CAT_IC" in result.output
 
 
-def test_unknown_library_lists_available(tmp_path: Path, category_tree: Path) -> None:
+@pytest.mark.usefixtures("category_tree")
+def test_unknown_library_lists_available(tmp_path: Path) -> None:
+    """An unknown --symbol-lib name lists the available libraries."""
     zip_path = samacsys_zip(tmp_path, "XPart")
 
     result = run_import(
@@ -108,6 +114,7 @@ def test_unknown_library_lists_available(tmp_path: Path, category_tree: Path) ->
 def test_import_into_chosen_category_libraries(
     tmp_path: Path, category_tree: Path
 ) -> None:
+    """--symbol-lib and --footprint-lib pick the libraries in a split library."""
     zip_path = zip_with(
         tmp_path,
         "VendChip",
@@ -127,9 +134,11 @@ def test_import_into_chosen_category_libraries(
     assert "VendChip" not in _sym_text(category_tree)
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_missing_kicad_cli_path_stops_before_changes(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """A --kicad-cli path that does not exist stops the run before any write."""
     zip_path = samacsys_zip(tmp_path, "CliPart")
 
     result = run_import(
@@ -144,6 +153,7 @@ def test_missing_kicad_cli_path_stops_before_changes(
 def test_default_library_is_the_current_library(
     tmp_path: Path, library_tree: Path, mock_config: MagicMock
 ) -> None:
+    """Without --library the current KiLM library is the target."""
     # Like setup and template, import targets the library made current by
     # 'kilm init' / 'kilm config set-default', not merely the first one.
     other = tmp_path / "other"
@@ -160,9 +170,11 @@ def test_default_library_is_the_current_library(
     assert "CurPart" not in _sym_text(library_tree)
 
 
+@pytest.mark.usefixtures("library_tree", "mock_config")
 def test_dry_run_matches_real_run_for_parts_repeated_across_zips(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path,
 ) -> None:
+    """A dry run skips parts repeated across ZIPs exactly as a real run does."""
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
     a = samacsys_zip(tmp_path / "a", "Twin")
@@ -176,9 +188,11 @@ def test_dry_run_matches_real_run_for_parts_repeated_across_zips(
     assert summary(dry.output) == summary(real.output)
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_undecodable_footprint_fails_dry_run_and_writes_nothing(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """A footprint that is not UTF-8 fails its ZIP in a dry run and a real run."""
     zip_path = samacsys_zip(tmp_path, "BadPart")
     with zipfile.ZipFile(zip_path, "a") as zf:
         zf.writestr("BadPart/KiCad/BadFP.kicad_mod", b'(footprint "BadFP" "\xff")\n')

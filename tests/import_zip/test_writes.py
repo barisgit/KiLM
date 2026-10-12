@@ -5,7 +5,7 @@ import os
 import stat
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -23,9 +23,11 @@ def _no_space(_fd: int) -> None:
     raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_failed_symbol_write_leaves_library_intact(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """A failed symbol write leaves the library unchanged and no temp file behind."""
     sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
     zip_path = zip_with(
         tmp_path,
@@ -44,16 +46,17 @@ def test_failed_symbol_write_leaves_library_intact(
     assert not list(sym_lib.parent.glob(".*.tmp"))
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_files_written_before_a_failed_write_are_kept_for_later_zips(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
-    # A later ZIP must skip what a failed ZIP already wrote, not replace it.
-    from kicad_lib_manager.utils.file_ops import write_atomically as real_write
+    """Files written before a failed write stay and later ZIPs skip them."""
 
+    # A later ZIP must skip what a failed ZIP already wrote, not replace it.
     def fail_symbol_writes(path: Path, data: bytes) -> None:
         if path.suffix == ".kicad_sym":
             _no_space(0)
-        real_write(path, data)
+        write_atomically(path, data)
 
     a = zip_with(
         tmp_path,
@@ -88,9 +91,11 @@ def test_files_written_before_a_failed_write_are_kept_for_later_zips(
     assert model.read_text(encoding="utf-8") == "STEP from a"
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_symbol_library_is_backed_up_once_per_run(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """The symbol library is backed up before its first change in a run only."""
     sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
     (tmp_path / "a").mkdir()
 
@@ -106,9 +111,11 @@ def test_symbol_library_is_backed_up_once_per_run(
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
+@pytest.mark.usefixtures("mock_config")
 def test_written_files_keep_library_line_endings(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock, newline: str
+    tmp_path: Path, library_tree: Path, newline: str
 ) -> None:
+    """Merged symbols take the library's line endings; other bytes are kept."""
     # Rewriting every line ending of a git-tracked library (Windows text-mode
     # writes, or CRLF vendor files) would bury the import in a whole-file diff.
     sym_lib = library_tree / "symbols" / "SAMPLELIB.kicad_sym"
@@ -128,6 +135,7 @@ def test_written_files_keep_library_line_endings(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
 def test_write_atomically_keeps_permissions(tmp_path: Path) -> None:
+    """write_atomically keeps the replaced file's permission bits."""
     path = tmp_path / "lib.kicad_sym"
     path.write_text("old")
     path.chmod(0o664)

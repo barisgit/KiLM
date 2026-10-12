@@ -4,7 +4,6 @@ import struct
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -66,6 +65,7 @@ def _invalid_utf8_name(path: Path) -> Path:
 
 
 def test_zip_slip_entry_rejects_the_archive(tmp_path: Path) -> None:
+    """An entry that would land outside the extraction dir rejects the whole ZIP."""
     zip_path = zip_with(tmp_path, "evil", {"../../outside.kicad_mod": "x"})
     dest = tmp_path / "extract"
     dest.mkdir()
@@ -76,6 +76,7 @@ def test_zip_slip_entry_rejects_the_archive(tmp_path: Path) -> None:
 
 
 def test_only_part_files_are_extracted(tmp_path: Path) -> None:
+    """Only symbol, footprint, and 3D model members are extracted."""
     zip_path = samacsys_zip(tmp_path, "P")
     with zipfile.ZipFile(zip_path, "a") as zf:
         zf.writestr("P/readme.html", "<html></html>")
@@ -92,12 +93,13 @@ def test_only_part_files_are_extracted(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "damage", [_encrypted, _imploded, _corrupt_lzma, _invalid_utf8_name]
 )
+@pytest.mark.usefixtures("mock_config")
 def test_unreadable_members_fail_only_their_zip(
     tmp_path: Path,
     library_tree: Path,
-    mock_config: MagicMock,
     damage: Callable[[Path], Path],
 ) -> None:
+    """An encrypted or unsupported member fails its ZIP; the other ZIPs import."""
     (tmp_path / "bad").mkdir()
     bad = damage(samacsys_zip(tmp_path / "bad", "BadPart"))
     good = samacsys_zip(tmp_path, "GoodPart")
@@ -112,9 +114,9 @@ def test_unreadable_members_fail_only_their_zip(
     assert "BadPart" not in sym_text
 
 
-def test_macos_metadata_entries_are_ignored(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
-) -> None:
+@pytest.mark.usefixtures("mock_config")
+def test_macos_metadata_entries_are_ignored(tmp_path: Path, library_tree: Path) -> None:
+    """__MACOSX resource forks with part extensions are not imported."""
     zip_path = samacsys_zip(tmp_path, "MacPart")
     with zipfile.ZipFile(zip_path, "a") as zf:
         for name in ("._MacPart.kicad_mod", "._MacPart.kicad_sym", "._MacPart.stp"):
@@ -131,9 +133,11 @@ def test_macos_metadata_entries_are_ignored(
     assert not list((library_tree / "footprints").rglob("._*"))
 
 
+@pytest.mark.usefixtures("mock_config")
 def test_missing_or_invalid_zip_fails_the_run_after_importing_the_rest(
-    tmp_path: Path, library_tree: Path, mock_config: MagicMock
+    tmp_path: Path, library_tree: Path
 ) -> None:
+    """Missing and corrupt ZIPs exit 1 only after the valid ones are imported."""
     not_zip = tmp_path / "notes.zip"
     not_zip.write_text("not a zip")
     good = samacsys_zip(tmp_path, "GoodPart")
