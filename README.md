@@ -21,6 +21,7 @@ Professional command-line tool for managing KiCad libraries across projects and 
 - Dry-run mode to preview changes
 - Compatible with KiCad 6.x and newer
 - Project template management to standardize new designs
+- Import vendor part ZIPs (SamacSys/Mouser, UltraLibrarian, SnapMagic) into your library
 
 ## Quick Start
 
