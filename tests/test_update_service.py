@@ -236,6 +236,10 @@ class TestUpdateManager:
         assert update_manager.is_newer_version_available("1.0.0") is False
         assert update_manager.is_newer_version_available("0.9.0") is False
 
+    def test_version_checks_identify_the_installed_version(self, update_manager):
+        """PyPI requests carry the running kilm version in the User-Agent."""
+        assert update_manager.version_checker.user_agent.startswith("KiLM/1.0.0 ")
+
     def test_invalid_version_comparison(self, update_manager):
         """Test handling of invalid version strings."""
         assert update_manager.is_newer_version_available("invalid-version") is False

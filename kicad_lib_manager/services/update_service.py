@@ -281,7 +281,7 @@ class UpdateManager:
     """Manages update checking and execution for KiLM."""
 
     def __init__(self, current_version: str):
-        self.version_checker = PyPIVersionChecker("kilm")
+        self.version_checker = PyPIVersionChecker("kilm", current_version)
         self.current_version = current_version
         self.installation_method: InstallMethod = detect_installation_method()
 
