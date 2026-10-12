@@ -72,7 +72,7 @@ def find_kicad_config(
         msg = f"No KiCad version directories found in {root}. {RUN_KICAD_FIRST}"
         raise FileNotFoundError(msg)
 
-    latest = max(versions, key=lambda entry: (_version_key(entry), entry.name))
+    latest = max(versions, key=lambda entry: (version_key(entry.name), entry.name))
     if (
         not (latest / SYMBOL_TABLE_FILE).exists()
         and not (latest / FOOTPRINT_TABLE_FILE).exists()
@@ -82,6 +82,9 @@ def find_kicad_config(
     return latest
 
 
-def _version_key(version_dir: Path) -> tuple[int, ...]:
-    """Return the numbers in a version directory name, for numeric ordering."""
-    return tuple(int(part) for part in re.findall(r"\d+", version_dir.name))
+def version_key(name: str) -> tuple[int, ...]:
+    """Return the numbers in a KiCad version directory name, for numeric ordering.
+
+    Directories such as "9.0" and "10.0" sort as (9, 0) < (10, 0).
+    """
+    return tuple(int(part) for part in re.findall(r"\d+", name))

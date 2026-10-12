@@ -1,7 +1,6 @@
 """Finding kicad-cli and upgrading vendor files with it."""
 
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -10,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from kicad_lib_manager.commands.import_zip.formats import format_version
+from kicad_lib_manager.services.kicad_config import version_key
 from kicad_lib_manager.utils.console import get_console
 
 _KICAD_CLI_CANDIDATES: tuple[Path, ...] = (
@@ -30,11 +30,9 @@ def _windows_kicad_cli_candidates() -> list[Path]:
     """
     program_files = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
     found = program_files.glob("KiCad/*/bin/kicad-cli.exe")
-
-    def version_key(path: Path) -> list[int]:
-        return [int(n) for n in re.findall(r"\d+", path.parent.parent.name)]
-
-    return sorted(found, key=version_key, reverse=True)
+    return sorted(
+        found, key=lambda path: version_key(path.parent.parent.name), reverse=True
+    )
 
 
 def detect_kicad_cli() -> Path | None:
