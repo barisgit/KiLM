@@ -1,6 +1,6 @@
 """Library paths from the user's environment, and KiCad's kicad_common.json.
 
-find_environment_variables looks a library path up the way a user would set
+find_library_variable looks a library path up the way a user would set
 it. The update functions change the environment variables and pinned
 libraries in kicad_common.json, backing the file up first and replacing it
 atomically.
@@ -56,7 +56,7 @@ _LIBRARY_VARIABLES = {
 _SHELL_FILES = (".bashrc", ".bash_profile", ".profile", ".zshrc")
 
 
-def find_environment_variables(var_name: str) -> str | None:
+def find_library_variable(var_name: str) -> str | None:
     """Return the value of var_name from the first source that defines it.
 
     The sources, in order: the KiLM configuration (current library paths, for

@@ -1,7 +1,7 @@
 """Where ``kilm setup`` finds the libraries it configures.
 
-The command line comes first, then the KiLM configuration, then environment
-variables.
+The command line comes first, then the selected configured libraries, then
+``find_library_variable`` discovery for a main directory still missing.
 """
 
 from collections.abc import Callable, Mapping
@@ -16,7 +16,7 @@ from kicad_lib_manager.commands.shared import given
 from kicad_lib_manager.services.config_service import Config, LibraryDict
 from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.constants import MODELS_DIR_VAR, SYMBOL_DIR_VAR
-from kicad_lib_manager.utils.env_vars import find_environment_variables
+from kicad_lib_manager.utils.env_vars import find_library_variable
 from kicad_lib_manager.utils.metadata import read_cloud_metadata, read_github_metadata
 
 
@@ -30,14 +30,15 @@ class LibrarySources:
         from_command_line: Directories given as options, by library type.
         from_config: Each selected configured library's environment variable
             and path; setup writes these variables to KiCad too.
-        from_environment: Directories found in environment variables.
+        discovered: Main directories found by ``find_library_variable``,
+            by variable name.
     """
 
     symbol_dir: str | None
     models_dir: str | None
     from_command_line: dict[str, str] = field(default_factory=dict)
     from_config: dict[str, str] = field(default_factory=dict)
-    from_environment: dict[str, str] = field(default_factory=dict)
+    discovered: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -230,8 +231,12 @@ def _environment_variable(
     return None, "[yellow]Not configured[/yellow]"
 
 
-def fall_back_to_environment(sources: LibrarySources) -> str:
-    """Fill missing main directories from environment variables.
+def fall_back_to_discovery(sources: LibrarySources) -> str:
+    """Fill missing main directories through ``find_library_variable``.
+
+    It searches the KiLM configuration, the current directory, the
+    environment, and shell startup files. The printed labels say
+    "environment variable" because that is how users set these paths.
 
     Returns:
         The main symbol library directory.
@@ -242,7 +247,7 @@ def fall_back_to_environment(sources: LibrarySources) -> str:
     console = get_console()
     symbol_dir = sources.symbol_dir
     if symbol_dir is None:
-        symbol_dir = given(find_environment_variables(SYMBOL_DIR_VAR))
+        symbol_dir = given(find_library_variable(SYMBOL_DIR_VAR))
         if symbol_dir is None:
             console.print("[red]Error: KICAD_USER_LIB not set and not provided[/red]")
             console.print(
@@ -251,14 +256,14 @@ def fall_back_to_environment(sources: LibrarySources) -> str:
             )
             raise typer.Exit(1)
         sources.symbol_dir = symbol_dir
-        sources.from_environment[SYMBOL_DIR_VAR] = symbol_dir
+        sources.discovered[SYMBOL_DIR_VAR] = symbol_dir
         console.print(
             "[green]Using KiCad library from environment variable:[/green] "
             f"[blue]{symbol_dir}[/blue]"
         )
 
     if sources.models_dir is None:
-        models_dir = given(find_environment_variables(MODELS_DIR_VAR))
+        models_dir = given(find_library_variable(MODELS_DIR_VAR))
         if models_dir is None:
             console.print(
                 "[yellow]Warning: KICAD_3D_LIB not set, 3D models might not work "
@@ -270,7 +275,7 @@ def fall_back_to_environment(sources: LibrarySources) -> str:
             )
         else:
             sources.models_dir = models_dir
-            sources.from_environment[MODELS_DIR_VAR] = models_dir
+            sources.discovered[MODELS_DIR_VAR] = models_dir
             console.print(
                 "[green]Using 3D model library from environment variable:[/green] "
                 f"[blue]{models_dir}[/blue]"
@@ -285,7 +290,7 @@ def print_source_summary(sources: LibrarySources) -> None:
     for heading, paths in (
         ("From command line", sources.from_command_line),
         ("From config file", sources.from_config),
-        ("From environment variables", sources.from_environment),
+        ("From environment variables", sources.discovered),
     ):
         if paths:
             console.print(f"  {heading}:")

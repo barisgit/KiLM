@@ -25,7 +25,7 @@ INVALID_URI_TABLE = (
 @pytest.fixture
 def kicad_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Return an isolated KiCad configuration directory that setup finds."""
-    monkeypatch.setattr(setup_sources, "find_environment_variables", lambda _name: None)
+    monkeypatch.setattr(setup_sources, "find_library_variable", lambda _name: None)
     config = tmp_path / "kicad"
     config.mkdir()
     (config / "sym-lib-table").write_text(EMPTY_SYM_TABLE, encoding="utf-8")

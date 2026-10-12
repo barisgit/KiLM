@@ -135,7 +135,7 @@ def test_sync_auto_setup_runs_setup_with_its_defaults(
     upstream: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Setup runs with its option defaults, so it looks up the library itself."""
-    monkeypatch.setattr(setup_sources, "find_environment_variables", lambda _name: None)
+    monkeypatch.setattr(setup_sources, "find_library_variable", lambda _name: None)
     _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")
 
     result = CliRunner().invoke(app, ["sync", "--auto-setup"])

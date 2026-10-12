@@ -8,7 +8,7 @@ import pytest
 
 from kicad_lib_manager.utils import env_vars
 from kicad_lib_manager.utils.env_vars import (
-    find_environment_variables,
+    find_library_variable,
     update_kicad_env_vars,
     update_pinned_libraries,
 )
@@ -179,18 +179,18 @@ def test_sources_are_tried_in_order(
     isolated_sources: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Shell files < environment < library in cwd < KiLM configuration."""
-    assert find_environment_variables("KICAD_USER_LIB") is None
+    assert find_library_variable("KICAD_USER_LIB") is None
 
     (isolated_sources / ".zshrc").write_text(
         'export KICAD_USER_LIB="/from/zshrc"\n', encoding="utf-8"
     )
-    assert find_environment_variables("KICAD_USER_LIB") == "/from/zshrc"
+    assert find_library_variable("KICAD_USER_LIB") == "/from/zshrc"
 
     monkeypatch.setenv("KICAD_USER_LIB", "/from/environment")
-    assert find_environment_variables("KICAD_USER_LIB") == "/from/environment"
+    assert find_library_variable("KICAD_USER_LIB") == "/from/environment"
 
     (tmp_path / "kilm.yaml").write_text("name: here\n", encoding="utf-8")
-    assert find_environment_variables("KICAD_USER_LIB") == str(tmp_path.resolve())
+    assert find_library_variable("KICAD_USER_LIB") == str(tmp_path.resolve())
 
     monkeypatch.setattr(_FakeConfig, "library_path", "/from/config")
-    assert find_environment_variables("KICAD_USER_LIB") == "/from/config"
+    assert find_library_variable("KICAD_USER_LIB") == "/from/config"

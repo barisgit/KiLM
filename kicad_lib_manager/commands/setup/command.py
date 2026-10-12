@@ -14,7 +14,7 @@ from kicad_lib_manager.commands.setup.sources import (
     LibrarySources,
     add_config_libraries,
     command_line_sources,
-    fall_back_to_environment,
+    fall_back_to_discovery,
     print_source_summary,
     requested_names,
 )
@@ -115,7 +115,7 @@ def setup(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         ),
     )
     _read_config(sources, selection, verbose=verbose)
-    symbol_dir = fall_back_to_environment(sources)
+    symbol_dir = fall_back_to_discovery(sources)
     if verbose:
         print_source_summary(sources)
 
