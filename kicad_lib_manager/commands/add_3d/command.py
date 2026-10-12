@@ -1,14 +1,19 @@
-"""Add cloud-based 3D models directory command for KiCad Library Manager (Typer version)."""
+"""The ``add-3d`` command: register a directory of 3D models with KiLM.
 
+The directory's settings live in a cloud metadata file inside it, so the same
+name and environment variable apply on every machine that syncs the folder.
+"""
+
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from kicad_lib_manager.commands.shared import given
+from kicad_lib_manager.services.config_service import Config
 from kicad_lib_manager.utils.console import get_console
-
-from ...services.config_service import Config
-from ...utils.metadata import (
+from kicad_lib_manager.utils.metadata import (
     CLOUD_METADATA_FILE,
     generate_env_var_name,
     get_default_cloud_metadata,
@@ -16,8 +21,165 @@ from ...utils.metadata import (
     write_cloud_metadata,
 )
 
+MODEL_EXTENSIONS = (".step", ".stp", ".wrl", ".wings")
 
-def add_3d(
+CloudMetadata = dict[str, str | int | None]
+
+
+@dataclass(frozen=True)
+class _Overrides:
+    """Metadata values given on the command line; None means not given."""
+
+    name: str | None
+    description: str | None
+    env_var: str | None
+    no_env_var: bool
+
+    def given(self) -> bool:
+        """Return whether any value was given."""
+        return (
+            self.name is not None
+            or self.description is not None
+            or self.env_var is not None
+            or self.no_env_var
+        )
+
+
+def _present(value: str | int | None) -> bool:
+    """Return whether a metadata value is set to something non-empty."""
+    return value is not None and bool(value)
+
+
+def _update_existing(
+    directory: Path, metadata: CloudMetadata, overrides: _Overrides
+) -> CloudMetadata:
+    """Apply ``overrides`` to the directory's metadata and save any change."""
+    console = get_console()
+    console.print(
+        f"[green]Found existing metadata file[/green] ({CLOUD_METADATA_FILE})"
+    )
+    name = metadata.get("name")
+    description = metadata.get("description")
+    env_var = metadata.get("env_var")
+    console.print(f"Using existing name: [blue]{name}[/blue]")
+    if _present(env_var) and not overrides.no_env_var:
+        console.print(
+            f"Using existing environment variable: [yellow]{env_var}[/yellow]"
+        )
+
+    if overrides.name is not None:
+        name = overrides.name
+        console.print(f"Overriding with provided name: [blue]{name}[/blue]")
+    if overrides.description is not None:
+        description = overrides.description
+        console.print(
+            f"Overriding with provided description: [blue]{description}[/blue]"
+        )
+    if overrides.env_var is not None:
+        env_var = overrides.env_var
+        console.print(
+            f"Overriding with provided environment variable: [yellow]{env_var}[/yellow]"
+        )
+    elif overrides.no_env_var:
+        console.print("[yellow]Disabling environment variable as requested[/yellow]")
+
+    if overrides.given():
+        metadata["name"] = name
+        metadata["description"] = description
+        metadata["env_var"] = (
+            env_var if _present(env_var) and not overrides.no_env_var else None
+        )
+        metadata["updated_with"] = "kilm"
+        write_cloud_metadata(directory, metadata)
+        console.print("[green]Updated metadata file with new information[/green]")
+    return metadata
+
+
+def _create_new(
+    directory: Path, overrides: _Overrides, *, overwriting: bool
+) -> CloudMetadata:
+    """Write fresh metadata for the directory, applying ``overrides``."""
+    console = get_console()
+    if overwriting:
+        console.print(
+            "[yellow]Overwriting existing metadata file[/yellow] "
+            f"({CLOUD_METADATA_FILE})"
+        )
+    else:
+        console.print(
+            f"[green]Creating new metadata file[/green] ({CLOUD_METADATA_FILE})"
+        )
+
+    metadata = get_default_cloud_metadata(directory)
+    if overrides.name is not None:
+        metadata["name"] = overrides.name
+        # A new name implies a matching variable unless one is given or refused.
+        if overrides.env_var is None and not overrides.no_env_var:
+            metadata["env_var"] = generate_env_var_name(overrides.name, "KICAD_3D")
+    if overrides.description is not None:
+        metadata["description"] = overrides.description
+    if overrides.env_var is not None:
+        metadata["env_var"] = overrides.env_var
+    elif overrides.no_env_var:
+        metadata["env_var"] = None
+
+    write_cloud_metadata(directory, metadata)
+    console.print("[green]Metadata file created[/green]")
+    return metadata
+
+
+def _count_models(directory: Path) -> int:
+    """Return the number of 3D model files below ``directory``."""
+    return sum(
+        len(list(directory.glob(f"**/*{extension}"))) for extension in MODEL_EXTENSIONS
+    )
+
+
+def _confirm_models(model_count: int) -> None:
+    """Ask before registering a directory without models; exit on refusal."""
+    if model_count > 0:
+        return
+    console = get_console()
+    console.print("[yellow]Warning: No 3D model files found in this directory[/yellow]")
+    if not typer.confirm("Continue anyway?", default=True):
+        console.print("[red]Operation cancelled[/red]")
+        raise typer.Exit(0)
+
+
+def _print_usage(name: str, directory: Path, env_var: str | int | None) -> None:
+    """Explain how to use the library through its environment variable."""
+    if not _present(env_var):
+        return
+    console = get_console()
+    console.print(f"[yellow]Assigned environment variable:[/yellow] {env_var}")
+    console.print("\n[bold]You can use this directory with:[/bold]")
+    console.print(f"  [cyan]kilm setup --threed-lib-dirs '{name}'[/cyan]")
+    console.print("  [dim]# or by setting the environment variable[/dim]")
+    console.print(f"  [cyan]export {env_var}='{directory}'[/cyan]")
+
+
+def _print_cloud_libraries(config: Config) -> None:
+    """List every registered 3D model directory when there is more than one."""
+    libraries = config.get_libraries("cloud")
+    if len(libraries) <= 1:
+        return
+    console = get_console()
+    console.print("\n[bold]All registered cloud-based 3D model directories:[/bold]")
+    for library in libraries:
+        name = library.get("name", "unnamed")
+        path = library.get("path", "unknown")
+        metadata = read_cloud_metadata(Path(path))
+        env_var = None if metadata is None else metadata.get("env_var")
+        if not _present(env_var):
+            console.print(f"  - [cyan]{name}[/cyan]: {path}")
+        else:
+            console.print(
+                f"  - [cyan]{name}[/cyan]: {path} [yellow](ENV: {env_var})[/yellow]"
+            )
+
+
+def add_3d(  # noqa: PLR0913 -- each CLI option is a Typer parameter
+    *,
     name: Annotated[
         str | None,
         typer.Option(
@@ -68,188 +230,44 @@ def add_3d(
 
     If no directory is specified, the current directory will be used.
     """
-    # Use current directory if not specified
     directory = Path.cwd().resolve() if directory is None else directory.resolve()
-
-    get_console().print(
+    console = get_console()
+    console.print(
         f"[bold cyan]Adding cloud-based 3D models directory:[/bold cyan] {directory}"
     )
 
-    # Check for existing metadata
-    metadata = read_cloud_metadata(directory)
-
-    if metadata and not force:
-        get_console().print(
-            f"[green]Found existing metadata file[/green] ({CLOUD_METADATA_FILE})"
-        )
-        library_name = metadata.get("name")
-        library_description = metadata.get("description")
-        library_env_var = metadata.get("env_var")
-        get_console().print(f"Using existing name: [blue]{library_name}[/blue]")
-
-        # Show environment variable if present
-        if library_env_var and not no_env_var:
-            get_console().print(
-                f"Using existing environment variable: [yellow]{library_env_var}[/yellow]"
-            )
-
-        # Override with command line parameters if provided
-        if name:
-            library_name = name
-            get_console().print(
-                f"Overriding with provided name: [blue]{library_name}[/blue]"
-            )
-
-        if description:
-            library_description = description
-            get_console().print(
-                f"Overriding with provided description: [blue]{library_description}[/blue]"
-            )
-
-        if env_var:
-            library_env_var = env_var
-            get_console().print(
-                f"Overriding with provided environment variable: [yellow]{library_env_var}[/yellow]"
-            )
-        elif no_env_var:
-            library_env_var = None
-            get_console().print(
-                "[yellow]Disabling environment variable as requested[/yellow]"
-            )
-
-        # Update metadata if command line parameters were provided
-        if name or description or env_var or no_env_var:
-            metadata["name"] = library_name
-            metadata["description"] = library_description
-            if library_env_var and not no_env_var:
-                metadata["env_var"] = library_env_var
-            else:
-                metadata["env_var"] = None
-            metadata["updated_with"] = "kilm"
-            write_cloud_metadata(directory, metadata)
-            get_console().print(
-                "[green]Updated metadata file with new information[/green]"
-            )
+    overrides = _Overrides(
+        name=given(name),
+        description=given(description),
+        env_var=given(env_var),
+        no_env_var=no_env_var,
+    )
+    existing = read_cloud_metadata(directory)
+    has_existing = existing is not None and len(existing) > 0
+    if existing is not None and has_existing and not force:
+        metadata = _update_existing(directory, existing, overrides)
     else:
-        # Create a new metadata file
-        if metadata and force:
-            get_console().print(
-                f"[yellow]Overwriting existing metadata file[/yellow] ({CLOUD_METADATA_FILE})"
-            )
-        else:
-            get_console().print(
-                f"[green]Creating new metadata file[/green] ({CLOUD_METADATA_FILE})"
-            )
+        metadata = _create_new(directory, overrides, overwriting=has_existing)
 
-        # Generate metadata
-        metadata = get_default_cloud_metadata(directory)
-
-        # Override with command line parameters if provided
-        if name:
-            metadata["name"] = name
-            # If name is provided but env_var isn't, regenerate the env_var based on the new name
-            if not env_var and not no_env_var:
-                metadata["env_var"] = generate_env_var_name(name, "KICAD_3D")
-
-        if description:
-            metadata["description"] = description
-
-        if env_var:
-            metadata["env_var"] = env_var
-        elif no_env_var:
-            metadata["env_var"] = None
-
-        # Write metadata file
-        write_cloud_metadata(directory, metadata)
-        get_console().print("[green]Metadata file created[/green]")
-
-        library_name = metadata["name"]
-        library_env_var = metadata.get("env_var")
-
-    # Verify if this looks like a 3D model directory
-    model_extensions = [".step", ".stp", ".wrl", ".wings"]
-    found_models = False
-
-    # Do a quick check for model files
-    for ext in model_extensions:
-        if list(directory.glob(f"**/*{ext}")):
-            found_models = True
-            break
-
-    if not found_models:
-        get_console().print(
-            "[yellow]Warning: No 3D model files found in this directory[/yellow]"
-        )
-        if not typer.confirm("Continue anyway?", default=True):
-            get_console().print("[red]Operation cancelled[/red]")
-            raise typer.Exit(0)
-
-    # Update metadata with actual model count
-    model_count = 0
-    for ext in model_extensions:
-        model_count += len(list(directory.glob(f"**/*{ext}")))
-
+    model_count = _count_models(directory)
+    _confirm_models(model_count)
     metadata["model_count"] = model_count
     write_cloud_metadata(directory, metadata)
 
-    # Update the configuration
+    raw_name = metadata.get("name")
+    library_name = directory.name if raw_name is None else str(raw_name)
     try:
         config = Config()
-        # Add as a cloud-based 3D model library
-        if library_name is None:
-            library_name = metadata.get("name", directory.name)
-
-        # Ensure library_name is a string
-        final_library_name = (
-            str(library_name) if library_name is not None else directory.name
+        config.add_library(library_name, str(directory), "cloud")
+        console.print(
+            f"[bold green]3D models directory '{library_name}' added "
+            "successfully![/bold green]"
         )
-        config.add_library(final_library_name, str(directory), "cloud")
-
-        get_console().print(
-            f"[bold green]3D models directory '{final_library_name}' added successfully![/bold green]"
-        )
-        get_console().print(f"[blue]Path:[/blue] {directory}")
+        console.print(f"[blue]Path:[/blue] {directory}")
         if model_count > 0:
-            get_console().print(f"[green]Found {model_count} 3D model files[/green]")
-
-        if library_env_var:
-            get_console().print(
-                f"[yellow]Assigned environment variable:[/yellow] {library_env_var}"
-            )
-            get_console().print("\n[bold]You can use this directory with:[/bold]")
-            get_console().print(
-                f"  [cyan]kilm setup --threed-lib-dirs '{library_name}'[/cyan]"
-            )
-            get_console().print("  [dim]# or by setting the environment variable[/dim]")
-            get_console().print(
-                f"  [cyan]export {library_env_var}='{directory}'[/cyan]"
-            )
-
-        # Show current cloud libraries
-        libraries = config.get_libraries("cloud")
-        if len(libraries) > 1:
-            get_console().print(
-                "\n[bold]All registered cloud-based 3D model directories:[/bold]"
-            )
-            for lib in libraries:
-                lib_name = lib.get("name", "unnamed")
-                lib_path = lib.get("path", "unknown")
-                lib_env_var = None
-
-                # Try to get the environment variable from metadata
-                try:
-                    lib_metadata = read_cloud_metadata(Path(lib_path))
-                    if lib_metadata and "env_var" in lib_metadata:
-                        lib_env_var = lib_metadata["env_var"]
-                except Exception:
-                    pass
-
-                if lib_env_var:
-                    get_console().print(
-                        f"  - [cyan]{lib_name}[/cyan]: {lib_path} [yellow](ENV: {lib_env_var})[/yellow]"
-                    )
-                else:
-                    get_console().print(f"  - [cyan]{lib_name}[/cyan]: {lib_path}")
+            console.print(f"[green]Found {model_count} 3D model files[/green]")
+        _print_usage(library_name, directory, metadata.get("env_var"))
+        _print_cloud_libraries(config)
     except Exception as e:
-        get_console().print(f"[red]Error adding 3D models directory: {e}[/red]")
+        console.print(f"[red]Error adding 3D models directory: {e}[/red]")
         raise typer.Exit(1) from e
