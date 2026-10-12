@@ -57,33 +57,21 @@ class InstallationDetector:
         )
 
     def detect_uv(self) -> bool:
-        """Detect UV tool installation."""
-        # Check for explicit UV path patterns in the executable path - most reliable
-        uv_path_patterns = any(
-            part in self.executable_str for part in [".local/share/uv", "uv/tools"]
+        """Detect a uv tool install: the interpreter lives in a uv tools directory.
+
+        uv keeps tool environments in ``uv/tools`` under its data directory
+        (``uv/data/tools`` on Windows) unless ``UV_TOOL_DIR`` moves them. The
+        variable alone is no evidence: it is also set where uv manages other
+        tools, so only an interpreter inside that directory counts.
+        """
+        if any(
+            part in self.executable_str for part in ("/uv/tools/", "/uv/data/tools/")
+        ):
+            return True
+        tool_dir = os.environ.get("UV_TOOL_DIR")
+        return bool(tool_dir) and self.executable_path.is_relative_to(
+            type(self.executable_path)(tool_dir)
         )
-
-        # More specific check: only if executable is actually within uv tools directory
-        uv_tools_executable = False
-        if self.is_unix_like():
-            uv_tools_path = Path.home() / ".local" / "share" / "uv" / "tools"
-            # Only consider it uv if the executable is actually within the uv tools directory
-            try:
-                self.executable_path.relative_to(uv_tools_path)
-                uv_tools_executable = True
-            except ValueError:
-                # executable_path is not within uv_tools_path
-                uv_tools_executable = False
-
-        # Check environment variables only if no explicit path evidence
-        # This prevents false positives when uv is installed system-wide but we're in a venv
-        uv_env_vars = False
-        if not uv_path_patterns and not uv_tools_executable:
-            uv_env_vars = bool(
-                os.environ.get("UV_TOOL_DIR") or os.environ.get("UV_TOOL_BIN_DIR")
-            )
-
-        return uv_path_patterns or uv_tools_executable or uv_env_vars
 
     def detect_virtual_env(self) -> bool:
         """Detect virtual environment (pip in venv)."""

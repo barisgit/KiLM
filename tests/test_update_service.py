@@ -66,13 +66,28 @@ class TestInstallationDetection:
         assert detector.detect_conda() is True
         assert detector.detect() == "conda"
 
-    def test_detect_uv_installation_env_vars(self, monkeypatch):
-        """Test detection of UV installation via environment variables."""
-        monkeypatch.setenv("UV_TOOL_DIR", "/Users/user/.local/share/uv")
+    def test_detect_uv_installation_in_custom_tool_dir(self, monkeypatch):
+        """An executable inside UV_TOOL_DIR is a uv tool install."""
+        monkeypatch.setenv("UV_TOOL_DIR", "/custom/uv-tools")
 
-        detector = InstallationDetector(executable_path=Path("/usr/bin/python"))
+        detector = InstallationDetector(
+            executable_path=Path("/custom/uv-tools/kilm/bin/python")
+        )
         assert detector.detect_uv() is True
         assert detector.detect() == "uv"
+
+    def test_uv_env_vars_alone_are_not_a_uv_install(self, monkeypatch):
+        """UV_TOOL_DIR and UV_TOOL_BIN_DIR only say where uv puts tools.
+
+        They are set on CI runners and in shells that use uv for other tools,
+        so they must not turn a kilm running elsewhere into a uv install.
+        """
+        monkeypatch.setenv("UV_TOOL_DIR", "/Users/user/.local/share/uv/tools")
+        monkeypatch.setenv("UV_TOOL_BIN_DIR", "/Users/user/.local/bin")
+
+        detector = InstallationDetector(executable_path=Path("/usr/bin/python"))
+        assert detector.detect_uv() is False
+        assert detector.detect() != "uv"
 
     def test_detect_uv_installation_path_patterns(self):
         """Test detection of UV installation via path patterns."""
@@ -88,6 +103,10 @@ class TestInstallationDetection:
             (r"C:\Users\user\pipx\venvs\kilm\Scripts\python.exe", "pipx"),
             (
                 r"C:\Users\user\AppData\Roaming\uv\tools\kilm\Scripts\python.exe",
+                "uv",
+            ),
+            (
+                r"C:\Users\user\AppData\Roaming\uv\data\tools\kilm\Scripts\python.exe",
                 "uv",
             ),
         ],
