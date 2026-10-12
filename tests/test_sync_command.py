@@ -173,3 +173,14 @@ def test_check_for_library_changes_without_history(tmp_path: Path) -> None:
         "footprints",
         "templates",
     ]
+
+def test_check_for_library_changes_detects_a_renamed_library(tmp_path: Path) -> None:
+    """A renamed library file is a new library name that setup must add."""
+    repo = tmp_path / "renamed"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _commit_file(repo, "symbols/Old.kicad_sym", "symbols")
+    _git(repo, "mv", "symbols/Old.kicad_sym", "symbols/New.kicad_sym")
+    _git(repo, "commit", "--quiet", "--message", "rename")
+
+    assert check_for_library_changes(repo) == ["symbols"]

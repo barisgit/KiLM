@@ -231,7 +231,7 @@ def check_for_library_changes(lib_path: Path, since: str = "HEAD~1") -> list[str
     try:
         # Get the diff between HEAD~1 and HEAD to see what changed in the pull
         result = subprocess.run(
-            ["git", "diff", "--name-status", since, "HEAD"],
+            ["git", "diff", "--name-only", "--diff-filter=AMR", since, "HEAD"],
             cwd=lib_path,
             capture_output=True,
             text=True,
@@ -247,20 +247,8 @@ def check_for_library_changes(lib_path: Path, since: str = "HEAD~1") -> list[str
             return changes
 
         # Parse the diff output to find relevant changes
-        for line in diff_output.split("\n"):
-            if not line.strip():
-                continue
-
-            # Parse git diff --name-status format: STATUS\tPATH
-            parts = line.split("\t", 1)
-            if len(parts) != 2:
-                continue
-
-            status, path = parts
-            # Only consider added (A) or modified (M) files, ignore deletions
-            if status not in ["A", "M", "R"]:
-                continue
-
+        # Added, modified, and renamed paths (a rename under its new name)
+        for path in diff_output.splitlines():
             # Check for symbol library changes
             if _is_symbol_library_change(path) and "symbols" not in changes:
                 changes.append("symbols")
