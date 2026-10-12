@@ -143,3 +143,31 @@ def test_create_renders_percent_syntax_defaults(
 
     assert offered == {"directory_name": "my-board", "project_filename": "My Board"}
     assert (tmp_path / "my-board" / "My Board.txt").read_text() == "my-board"
+
+
+def test_make_keeps_description_when_detected_variable_is_described(
+    home: Path, tmp_path: Path
+) -> None:
+    """Describing a detected variable does not replace the template description."""
+    add_library(home, "lib")
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "notes.txt").write_text('author = "Jane"')
+    output = tmp_path / "out"
+
+    invoke(
+        "make",
+        "board",
+        str(source),
+        "--description",
+        "Board template",
+        "--use-case",
+        "Boards",
+        "--output-directory",
+        str(output),
+        user_input="y\nAuthor name\nn\n",
+    )
+
+    metadata = yaml.safe_load((output / TEMPLATE_METADATA).read_text())
+    assert metadata["description"] == "Board template"
+    assert metadata["variables"]["jane"]["description"] == "Author name"

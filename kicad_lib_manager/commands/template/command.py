@@ -737,12 +737,12 @@ def make(
                 ):
                     # Use the first value as default
                     default_value = values[0] if values else ""
-                    description = typer.prompt(
+                    var_description = typer.prompt(
                         "  Description", default=f"Value for {var_name}"
                     )
 
                     detected_variables[var_name] = {
-                        "description": description,
+                        "description": var_description,
                         "default": default_value,
                     }
 
