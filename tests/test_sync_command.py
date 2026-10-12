@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from kicad_lib_manager.commands.setup import command as setup_command
+from kicad_lib_manager.commands.setup import sources as setup_sources
 from kicad_lib_manager.commands.sync import command as sync_command
 from kicad_lib_manager.commands.sync.command import check_for_library_changes
 from kicad_lib_manager.main import app
@@ -81,7 +81,8 @@ def library(tmp_path: Path, upstream: Path, monkeypatch: pytest.MonkeyPatch) -> 
     return clone
 
 
-def test_sync_reports_an_up_to_date_library(library: Path) -> None:
+@pytest.mark.usefixtures("library")
+def test_sync_reports_an_up_to_date_library() -> None:
     """A pull that brings nothing counts as up to date."""
     result = CliRunner().invoke(app, ["sync"])
 
@@ -133,13 +134,12 @@ def test_sync_dry_run_does_not_pull(upstream: Path, library: Path) -> None:
     assert not (library / "symbols").exists()
 
 
+@pytest.mark.usefixtures("library")
 def test_sync_auto_setup_runs_setup_with_its_defaults(
-    upstream: Path, library: Path, monkeypatch: pytest.MonkeyPatch
+    upstream: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Setup runs with its option defaults, so it looks up the library itself."""
-    monkeypatch.setattr(
-        setup_command, "find_environment_variables", lambda _name: None
-    )
+    monkeypatch.setattr(setup_sources, "find_environment_variables", lambda _name: None)
     _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")
 
     result = CliRunner().invoke(app, ["sync", "--auto-setup"])
