@@ -225,3 +225,25 @@ def test_add_entries_with_special_chars(tmp_path):
     assert "/Users/test/žćš/footprints.pretty" in content
     assert "/Users/test/žćš/symbols.kicad_sym" in content
     assert "žćš" in content  # Verify special characters are preserved
+
+
+def test_add_entries_escapes_quotes_and_backslashes(tmp_path):
+    """Quotes and backslashes in entry fields keep the table well formed."""
+    table_path = tmp_path / "sym-lib-table"
+    table_path.write_text("(sym_lib_table\n  (version 7)\n)\n", encoding="utf-8")
+
+    LibraryService.add_entries_to_table(
+        table_path,
+        [
+            {
+                "name": "Quoted",
+                "uri": "C:\\libs\\a.kicad_sym",
+                "options": "",
+                "description": 'The "main"\nparts',
+            }
+        ],
+    )
+
+    content = table_path.read_text(encoding="utf-8")
+    assert '(uri "C:\\\\libs\\\\a.kicad_sym")' in content
+    assert '(descr "The \\"main\\"\\nparts")' in content

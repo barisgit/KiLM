@@ -531,11 +531,11 @@ class LibraryService:
                     # Format the entry with proper escaping
                     entry_str = (
                         f"  (lib "
-                        f'(name "{entry["name"]}")'
+                        f"(name {_quote(entry['name'])})"
                         f'(type "KiCad")'
-                        f'(uri "{uri}")'
-                        f'(options "{entry["options"]}")'
-                        f'(descr "{entry["description"]}"))\n'
+                        f"(uri {_quote(uri)})"
+                        f"(options {_quote(entry['options'])})"
+                        f"(descr {_quote(entry['description'])}))\n"
                     )
                     new_content += entry_str
 
@@ -544,3 +544,14 @@ class LibraryService:
         # Write updated content, ensuring UTF-8 encoding
         with table_path.open("w", encoding="utf-8") as f:
             f.write(new_content)
+
+
+def _quote(value: str) -> str:
+    """Quote value as a KiCad S-expression string, as KiCad's own writer does."""
+    escaped = (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
+    return f'"{escaped}"'
