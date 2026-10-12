@@ -18,14 +18,14 @@ LEAF_COMMANDS = [
 
 
 @pytest.mark.parametrize("command", LEAF_COMMANDS)
-def test_leaf_command_usage_has_no_subcommand_placeholder(command):
+def test_leaf_command_usage_has_no_subcommand_placeholder(command: str) -> None:
     result = CliRunner().invoke(app, [command, "--help"])
     usage = next(line for line in result.output.splitlines() if "Usage:" in line)
     assert "COMMAND" not in usage
     assert "[ARGS]" not in usage
 
 
-def test_group_usage_keeps_subcommand_placeholder():
+def test_group_usage_keeps_subcommand_placeholder() -> None:
     result = CliRunner().invoke(app, ["template", "--help"])
     usage = next(line for line in result.output.splitlines() if "Usage:" in line)
     assert "COMMAND [ARGS]..." in usage
