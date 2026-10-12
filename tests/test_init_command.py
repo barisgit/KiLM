@@ -25,7 +25,9 @@ def test_init_reports_which_folders_it_created(library: Path) -> None:
     """Init separates folders that already existed from the ones it created."""
     (library / "symbols").mkdir()
 
-    result = CliRunner().invoke(app, ["init", "--name", "parts"], env={"COLUMNS": "200"})
+    result = CliRunner().invoke(
+        app, ["init", "--name", "parts"], env={"COLUMNS": "200"}
+    )
 
     assert result.exit_code == 0, result.output
     assert "Found existing folders: symbols\n" in result.output
