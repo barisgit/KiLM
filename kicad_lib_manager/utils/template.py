@@ -998,17 +998,25 @@ def render_filename(filename: str, variables: Mapping[str, str | int | bool]) ->
     return filename
 
 
-def find_all_templates(config: Any) -> dict[str, TemplateMetadata]:
+def find_all_templates(
+    config: Any, library: str | None = None
+) -> dict[str, TemplateMetadata]:
     """Find all templates in all configured libraries.
 
     Args:
         config: The configuration object
+        library: Only search the library with this name (case-insensitive)
 
     Returns:
         Dictionary mapping template names to template metadata
     """
     all_templates: dict[str, TemplateMetadata] = {}
     all_libraries = config.get_libraries()  # type: ignore[attr-defined]
+
+    if library is not None:
+        all_libraries = [
+            lib for lib in all_libraries if lib.get("name", "").lower() == library.lower()
+        ]
 
     for library in all_libraries:
         library_path = library.get("path")

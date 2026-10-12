@@ -110,10 +110,11 @@ def create(
     config = Config()
 
     # Find all available templates
-    all_templates = find_all_templates(config)
+    all_templates = find_all_templates(config, library)
 
     if not all_templates:
-        get_console().print("No templates found in any configured libraries.")
+        where = f"library '{library}'" if library else "any configured libraries"
+        get_console().print(f"No templates found in {where}.")
         get_console().print("Use 'kilm template make' to create a template first.")
         return
 
@@ -155,9 +156,9 @@ def create(
                 get_console().print(f"Template '{template}' not found.")
                 get_console().print("Available templates:")
                 for t_name, t_data in all_templates.items():
-                    library = t_data.get("source_library", "unknown")
+                    source = t_data.get("source_library", "unknown")
                     description = t_data.get("description", "")
-                    get_console().print(f"  {t_name} ({library}): {description}")
+                    get_console().print(f"  {t_name} ({source}): {description}")
                 return
     else:
         # Interactive template selection using questionary
@@ -955,9 +956,22 @@ def list_templates(
     kilm template list --json
     """
     config = Config()
+    all_templates = find_all_templates(config, library)
 
-    # Find all available templates
-    all_templates = find_all_templates(config)
+    if not all_templates and library:
+        get_console().print()
+        get_console().print(
+            Panel(
+                f"[yellow]No templates found in library '[cyan]{library}[/cyan]'.[/yellow]\n\n"
+                "[cyan]💡 Try:[/cyan]\n"
+                f"• List all libraries: [blue]kilm list-libraries[/blue]\n"
+                f"• Create template in '{library}': [blue]kilm template make --library {library}[/blue]\n"
+                "• List all templates: [blue]kilm template list[/blue]",
+                title="[bold yellow]⚠️ No Templates Found[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+        return
 
     if not all_templates:
         get_console().print()
@@ -972,29 +986,6 @@ def list_templates(
             )
         )
         return
-
-    # Filter by library if requested
-    if library:
-        all_templates = {
-            name: data
-            for name, data in all_templates.items()
-            if data.get("source_library", "").lower() == library.lower()
-        }
-
-        if not all_templates:
-            get_console().print()
-            get_console().print(
-                Panel(
-                    f"[yellow]No templates found in library '[cyan]{library}[/cyan]'.[/yellow]\n\n"
-                    "[cyan]💡 Try:[/cyan]\n"
-                    f"• List all libraries: [blue]kilm list-libraries[/blue]\n"
-                    f"• Create template in '{library}': [blue]kilm template make --library {library}[/blue]\n"
-                    "• List all templates: [blue]kilm template list[/blue]",
-                    title="[bold yellow]⚠️ No Templates Found[/bold yellow]",
-                    border_style="yellow",
-                )
-            )
-            return
 
     # If JSON output is requested
     if json_output:

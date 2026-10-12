@@ -71,3 +71,40 @@ def test_list_json_is_valid_json_for_long_values(home: Path) -> None:
     templates = json.loads(invoke("list", "--json"))
 
     assert templates["board"]["description"] == "x" * 150
+
+
+def test_create_uses_template_from_requested_library(
+    home: Path, tmp_path: Path
+) -> None:
+    """--library selects that library's template when names clash."""
+    for library_name in ("first", "second"):
+        add_template(
+            add_library(home, library_name),
+            "board",
+            {"origin.txt.jinja2": library_name},
+            variables={"directory_name": {"description": "", "default": ""}},
+        )
+
+    invoke(
+        "create",
+        "Widget",
+        str(tmp_path),
+        "--template",
+        "board",
+        "--library",
+        "second",
+        "--set-var",
+        "directory_name=widget",
+    )
+
+    assert (tmp_path / "widget" / "origin.txt").read_text() == "second"
+
+
+def test_list_filters_library_before_resolving_name_clashes(home: Path) -> None:
+    """--library lists that library's template even when an earlier one shares its name."""
+    for library_name in ("first", "second"):
+        add_template(add_library(home, library_name), "board", {}, description=library_name)
+
+    templates = json.loads(invoke("list", "--library", "second", "--json"))
+
+    assert templates["board"]["description"] == "second"
