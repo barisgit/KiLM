@@ -55,7 +55,7 @@ Build, or drop into a dev shell:
 
 ```bash
 nix build github:barisgit/KiLM   # ./result/bin/kilm
-nix develop                      # dev shell with pytest + ruff
+nix develop                      # Python, deps, pytest, and uv for lint gates
 ```
 
 Add to a NixOS / home-manager config via the overlay:
