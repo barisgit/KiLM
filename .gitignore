@@ -49,3 +49,6 @@ TODO.md
 .claude/doc/
 temp/
 templates/
+# Nix build output
+result
+result-*
