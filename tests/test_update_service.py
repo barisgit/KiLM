@@ -20,6 +20,22 @@ from kicad_lib_manager.services.update_service import (
 class TestInstallationDetection:
     """Test installation method detection logic using the modular detector."""
 
+    @pytest.fixture(autouse=True)
+    def _clear_detection_env(self, monkeypatch):
+        """Keep detection hermetic: CI runners and dev shells may export these.
+
+        setup-uv on Windows runners sets UV_TOOL_DIR, for example, which made
+        the venv tests detect "uv" instead of "pip-venv".
+        """
+        for var in (
+            "PIPX_HOME",
+            "CONDA_DEFAULT_ENV",
+            "UV_TOOL_DIR",
+            "UV_TOOL_BIN_DIR",
+            "VIRTUAL_ENV",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
     def test_detect_pipx_installation_path_pattern(self):
         """Test detection of pipx installation via path pattern."""
         detector = InstallationDetector(
