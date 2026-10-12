@@ -10,11 +10,7 @@ from kicad_lib_manager.main import app
 
 @pytest.fixture
 def library(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Return an empty library directory, made current, with a private home."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
+    """Return an empty library directory, made current."""
     directory = tmp_path / "library"
     directory.mkdir()
     monkeypatch.chdir(directory)

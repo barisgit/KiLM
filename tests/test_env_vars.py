@@ -164,12 +164,10 @@ class _FakeConfig:
 
 
 @pytest.fixture
-def isolated_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def isolated_sources(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
     """No source defines KICAD_USER_LIB; returns the empty home directory."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.delenv("KICAD_USER_LIB", raising=False)
     monkeypatch.setattr(env_vars, "Config", _FakeConfig)
     monkeypatch.setattr(env_vars.shutil, "which", lambda _name: None)

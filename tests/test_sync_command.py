@@ -47,12 +47,8 @@ class FakeConfig:
 
 
 @pytest.fixture(autouse=True)
-def isolated_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep git and KiLM away from the user's configuration."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
+def isolated_git(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep git away from the user's configuration and its output in English."""
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(home / ".gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     monkeypatch.setenv("LC_ALL", "C")
