@@ -53,6 +53,19 @@ def _corrupt_lzma(path: Path) -> Path:
     return path
 
 
+def _invalid_utf8_name(path: Path) -> Path:
+    """Mark every member name as UTF-8 and make its first byte invalid UTF-8."""
+    _set_header_field(path, local=6, central=8, value=0x800)  # flag bit 11
+    data = bytearray(path.read_bytes())
+    for signature, name_offset in ((b"PK\x03\x04", 30), (b"PK\x01\x02", 46)):
+        i = data.find(signature)
+        while i != -1:
+            data[i + name_offset] = 0xFF
+            i = data.find(signature, i + 4)
+    path.write_bytes(bytes(data))
+    return path
+
+
 def test_zip_slip_entry_rejects_the_archive(tmp_path: Path) -> None:
     zip_path = zip_with(tmp_path, "evil", {"../../outside.kicad_mod": "x"})
     dest = tmp_path / "extract"
@@ -77,7 +90,9 @@ def test_only_part_files_are_extracted(tmp_path: Path) -> None:
     assert sorted(f.name for f in files) == ["P.kicad_mod", "P.kicad_sym", "P.stp"]
 
 
-@pytest.mark.parametrize("damage", [_encrypted, _imploded, _corrupt_lzma])
+@pytest.mark.parametrize(
+    "damage", [_encrypted, _imploded, _corrupt_lzma, _invalid_utf8_name]
+)
 def test_unreadable_members_fail_only_their_zip(
     tmp_path: Path,
     library_tree: Path,

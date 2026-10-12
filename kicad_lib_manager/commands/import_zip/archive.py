@@ -20,12 +20,14 @@ def _lzma_errors() -> tuple[type[Exception], ...]:
 
 
 # What zipfile raises for a corrupt archive, including the errors it lets
-# through from decompressors fed corrupt member data.
+# through from decompressors fed corrupt member data and from decoding a
+# member name flagged as UTF-8 that is not.
 _CORRUPT_ARCHIVE_ERRORS: tuple[type[Exception], ...] = (
     zipfile.BadZipFile,
     zipfile.LargeZipFile,
     zlib.error,
     EOFError,
+    UnicodeDecodeError,
     *_lzma_errors(),
 )
 
