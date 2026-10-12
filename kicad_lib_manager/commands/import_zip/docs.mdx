@@ -30,12 +30,14 @@ The target library needs at least one `.kicad_sym` file in `symbols/` and one `.
 
 For each ZIP, the command:
 
-1. **Extracts the archive safely**: Entries that would land outside the extraction directory are rejected, and macOS metadata (`__MACOSX/`, `._*`) and hidden files are ignored. KiCad files are found by extension, so the vendor's folder layout does not matter.
+1. **Extracts the archive safely**: An archive with an entry that would land outside the extraction directory is rejected. KiCad files are found by extension, so the vendor's folder layout does not matter; other files, macOS metadata (`__MACOSX/`, `._*`), and hidden files are ignored.
 2. **Copies 3D models** (`.step`, `.stp`, `.step.gz`, `.stp.gz`): A model already present in any `*.3dshapes` directory of the library is reused instead of copied again.
-3. **Copies footprints** (`.kicad_mod`): Model references are pointed at the library's 3D models, and footprints that already exist are skipped.
+3. **Copies footprints** (`.kicad_mod`): References to models the library holds are pointed at them; other references, such as those into KiCad's own 3D libraries, are kept. Footprints that already exist are skipped.
 4. **Merges symbols** (`.kicad_sym`): Symbols that already exist are skipped, and each new symbol's `Footprint` field is pointed at the footprint library that received its footprint. The symbol library keeps its line endings.
 
-Re-running an import is safe: existing symbols, footprints, and models are reported as skipped and left untouched. A dry run reports exactly what a real run would add, including parts repeated across several ZIPs.
+Every file of a ZIP is read, upgraded, and checked before anything is written, so a dry run reports the same additions and failures as a real run, and a ZIP that fails these checks changes nothing. Each file is written to a temporary sibling and then renamed over the target, so an interrupted import never leaves a truncated library. Before its first change in a run, the symbol library is copied to `<name>.kicad_sym.backup.<timestamp>` next to it; the five newest backups are kept.
+
+Re-running an import is safe: existing symbols, footprints, and models are reported as skipped and left untouched. File names that differ only in case count as the same file, so a library stays usable on case-insensitive filesystems (macOS, Windows). A dry run reports exactly what a real run would add, including parts repeated across several ZIPs.
 
 ### 3D model paths
 
@@ -50,6 +52,8 @@ Without an environment variable, model paths are absolute to the current machine
 ### Format upgrades
 
 When `kicad-cli` is available, legacy `(module ...)` footprints and vendor symbols are upgraded to the format of the installed KiCad. An upgrade is kept only if it does not make the library's format newer than it already is, because older KiCad releases cannot open newer files. If the installed KiCad writes a newer format than the library uses, the vendor format is kept; KiCad reads it either way.
+
+A vendor symbol or footprint that is already newer than the library is rejected, along with the rest of its ZIP: merged under the library's older header, it would make the library unreadable for the KiCad releases that use it now. If every KiCad that uses the library reads the newer format, upgrade the library with `kicad-cli sym upgrade` or `kicad-cli fp upgrade` and import again.
 
 ## Examples
 
@@ -74,7 +78,9 @@ kilm import -s MyLib_Power -f MyLib_QFN ~/Downloads/LIB_BQ25303JRTER.zip
 ## Error Handling
 
 - **Missing or invalid ZIP**: Reported, and the remaining ZIPs are still imported.
-- **Unsafe or unreadable archive**: Reported, and the remaining ZIPs are still imported. Items added from that ZIP before the error stay; a re-run skips them.
+- **Unsafe, corrupt, or password-protected archive, or an unsupported compression method**: Reported, nothing from that ZIP is written, and the remaining ZIPs are still imported.
+- **Vendor file that is not valid UTF-8 or is newer than the library's format**: Reported the same way, in a dry run too.
+- **Write failure** (for example a full disk): The file being written is left as it was. Files written before it from the same ZIP stay; a re-run skips them.
 - **Several symbol or footprint libraries**: The command lists them and asks for `--symbol-lib` or `--footprint-lib`.
 - **`--kicad-cli` path does not exist**: The command stops before changing anything.
 - **`kicad-cli` fails or times out**: The file is imported in its vendor format.
