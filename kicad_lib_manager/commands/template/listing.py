@@ -41,7 +41,8 @@ def list_templates(
         return
     if json_output:
         # Plain echo: a Rich console would wrap long values and break the JSON.
-        typer.echo(json.dumps(templates, indent=2))
+        # Custom keys may hold YAML dates and such, which print as text.
+        typer.echo(json.dumps(templates, indent=2, default=str))
         return
 
     by_library: dict[str, list[tuple[str, DiscoveredTemplate]]] = {}

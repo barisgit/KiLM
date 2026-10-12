@@ -3,9 +3,9 @@
 # PEP 810: on Python 3.15+ these imports load on first use.
 __lazy_modules__ = {"yaml"}
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
-from typing import TypeAlias, TypedDict
+from typing import TypeAlias, TypedDict, cast
 
 import yaml
 
@@ -52,6 +52,17 @@ class DiscoveredTemplate(TemplateMetadata, total=True):
     library_path: str
 
 
+# The keys each TypedDict declares (inherited ones included). Other keys in
+# metadata.yaml are custom and kept as loaded.
+_TEMPLATE_KEYS = (
+    DiscoveredTemplate.__required_keys__ | DiscoveredTemplate.__optional_keys__
+)
+_VARIABLE_KEYS = TemplateVariable.__required_keys__ | TemplateVariable.__optional_keys__
+_DEPENDENCY_KEYS = (
+    TemplateDependencies.__required_keys__ | TemplateDependencies.__optional_keys__
+)
+
+
 class MetadataError(Exception):
     """A ``metadata.yaml`` file could not be read or parsed."""
 
@@ -79,8 +90,10 @@ def parse_template_metadata(raw: object) -> TemplateMetadata | None:
 
     Known keys are kept with their declared types: scalars become strings, a
     variable without a description or default gets the ones ``template create``
-    shows, and malformed values are dropped. Unknown keys are dropped. Returns
-    None unless ``raw`` is a non-empty mapping.
+    shows, and malformed values are dropped. Other keys, also inside a
+    variable or ``dependencies``, are kept as loaded for hooks and ``template
+    list --json``; the keys that discovery adds (``path`` and the library) are
+    not taken from the file. Returns None unless ``raw`` is a non-empty mapping.
     """
     fields = _string_keyed(raw)
     if fields is None or not fields:
@@ -100,7 +113,11 @@ def parse_template_metadata(raw: object) -> TemplateMetadata | None:
         metadata["variables"] = _variables(variables)
     if (dependencies := _string_keyed(fields.get("dependencies"))) is not None:
         metadata["dependencies"] = _dependencies(dependencies)
-    return metadata
+    # TypedDicts allow extra keys; the declared ones were checked above.
+    return cast(
+        "TemplateMetadata",
+        _with_custom_keys(dict(metadata), fields, _TEMPLATE_KEYS),
+    )
 
 
 def write_template_metadata(directory: Path, metadata: TemplateMetadata) -> None:
@@ -133,17 +150,34 @@ def _text(value: object) -> str | None:
     return str(value)
 
 
+def _with_custom_keys(
+    validated: dict[str, object],
+    fields: Mapping[str, object],
+    declared: Collection[str],
+) -> dict[str, object]:
+    """Return ``validated`` followed by the ``fields`` that are not ``declared``."""
+    return {
+        **validated,
+        **{key: value for key, value in fields.items() if key not in declared},
+    }
+
+
 def _variables(raw: dict[str, object]) -> dict[str, TemplateVariable]:
     variables: dict[str, TemplateVariable] = {}
     for name, value in raw.items():
         fields = _string_keyed(value) or {}
         description = _text(fields.get("description"))
         default = _text(fields.get("default"))
-        variables[name] = TemplateVariable(
+        variable = TemplateVariable(
             description=default_description(name)
             if description is None
             else description,
             default="" if default is None else default,
+        )
+        # TypedDicts allow extra keys; the declared ones were set above.
+        variables[name] = cast(
+            "TemplateVariable",
+            _with_custom_keys(dict(variable), fields, _VARIABLE_KEYS),
         )
     return variables
 
@@ -151,6 +185,11 @@ def _variables(raw: dict[str, object]) -> dict[str, TemplateVariable]:
 def _dependencies(raw: dict[str, object]) -> TemplateDependencies:
     recommended = raw.get("recommended")
     names = recommended if isinstance(recommended, list) else []
-    return TemplateDependencies(
+    dependencies = TemplateDependencies(
         recommended=[text for item in names if (text := _text(item)) is not None]
+    )
+    # TypedDicts allow extra keys; the declared one was set above.
+    return cast(
+        "TemplateDependencies",
+        _with_custom_keys(dict(dependencies), raw, _DEPENDENCY_KEYS),
     )

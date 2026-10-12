@@ -64,6 +64,18 @@ def test_list_json_is_valid_json_for_long_values(home: Path) -> None:
     assert templates["board"]["description"] == "x" * 150
 
 
+def test_list_json_keeps_custom_metadata(home: Path) -> None:
+    """Keys KiLM does not know, YAML dates included, appear in the JSON."""
+    template_dir = add_template(add_library(home, "lib"), "board", {})
+    with (template_dir / TEMPLATE_METADATA).open("a", encoding="utf-8") as f:
+        f.write("released: 2026-01-02\nhook_options:\n  greeting: Hi\n")
+
+    templates = json.loads(invoke("list", "--json"))
+
+    assert templates["board"]["hook_options"] == {"greeting": "Hi"}
+    assert templates["board"]["released"] == "2026-01-02"
+
+
 def test_create_uses_template_from_requested_library(
     home: Path, tmp_path: Path
 ) -> None:

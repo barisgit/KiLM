@@ -55,7 +55,11 @@ def post_create(context):
 
 
 class HookContext(TypedDict):
-    """The argument passed to a template's ``post_create`` function."""
+    """The argument passed to a template's ``post_create`` function.
+
+    ``template`` keeps the keys of ``metadata.yaml`` that KiLM does not know,
+    so a hook can read its own settings from there.
+    """
 
     project_dir: str
     variables: RenderVariables

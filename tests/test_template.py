@@ -9,6 +9,7 @@ import pytest
 from kicad_lib_manager.utils.constants import (
     HOOKS_DIR,
     TEMPLATE_CONTENT_DIR,
+    TEMPLATE_METADATA,
     TEMPLATES_DIR,
 )
 from kicad_lib_manager.utils.template.authoring import (
@@ -185,6 +186,37 @@ def test_create_project_from_template(
     text = (project_dir / "MyProject.txt").read_text(encoding="utf-8")
     assert text == "Hello from MyProject!"
     assert (project_dir / "hook.txt").read_text(encoding="utf-8") == "MyProject"
+
+
+def test_hook_reads_custom_metadata(tmp_path: Path) -> None:
+    """Keys KiLM does not know reach the hook as metadata.yaml has them."""
+    template_dir = tmp_path / "template"
+    (template_dir / TEMPLATE_CONTENT_DIR).mkdir(parents=True)
+    (template_dir / TEMPLATE_CONTENT_DIR / "README.md").write_text("", encoding="utf-8")
+    (template_dir / HOOKS_DIR).mkdir()
+    (template_dir / TEMPLATE_METADATA).write_text(
+        "name: tpl\n"
+        "hook_options:\n  greeting: Hi\n"
+        "variables:\n  board:\n    default: A\n    choices: [A, B]\n",
+        encoding="utf-8",
+    )
+    (template_dir / HOOKS_DIR / POST_CREATE_HOOK).write_text(
+        "from pathlib import Path\n\n\ndef post_create(context):\n"
+        "    template = context['template']\n"
+        "    choices = template['variables']['board']['choices']\n"
+        "    text = template['hook_options']['greeting'] + ' ' + ','.join(choices)\n"
+        "    Path(context['project_dir'], 'hook.txt').write_text(text)\n",
+        encoding="utf-8",
+    )
+    metadata = read_template_metadata(template_dir)
+    assert metadata is not None
+    project_dir = tmp_path / "project"
+
+    assert create_project_from_template(
+        _discovered(template_dir, metadata), project_dir, PROJECT
+    )
+
+    assert (project_dir / "hook.txt").read_text(encoding="utf-8") == "Hi A,B"
 
 
 def test_create_project_dry_run_writes_nothing(
