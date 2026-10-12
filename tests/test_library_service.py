@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kicad_lib_manager.services import library_service
 from kicad_lib_manager.services.library_service import LibraryService
@@ -49,6 +50,21 @@ def test_existing_metadata_is_kept_with_overrides(tmp_path: Path) -> None:
     assert read_github_metadata(tmp_path) == metadata
 
 
+def test_init_keeps_entries_the_typed_metadata_cannot_hold(tmp_path: Path) -> None:
+    """Non-string keys and mistyped fields survive; a refused variable goes."""
+    (tmp_path / "kilm.yaml").write_text(
+        "2026: retained\nname: old\nversion: 2\nenv_var: 5\n", encoding="utf-8"
+    )
+
+    LibraryService.initialize_library(tmp_path, no_env_var=True)
+
+    written = yaml.safe_load((tmp_path / "kilm.yaml").read_text(encoding="utf-8"))
+    assert written[2026] == "retained"
+    assert written["name"] == "old"
+    assert written["version"] == 2
+    assert "env_var" not in written
+
+
 def test_force_replaces_existing_metadata(tmp_path: Path) -> None:
     """With force, the metadata starts fresh."""
     write_github_metadata(tmp_path, {"name": "old", "version": "2.0.0"})
@@ -64,7 +80,9 @@ def test_unwritable_metadata_fails(
 ) -> None:
     """A metadata file that cannot be written is an error, not a silent success."""
     monkeypatch.setattr(
-        library_service, "write_github_metadata", lambda _directory, _metadata: False
+        library_service,
+        "write_github_metadata",
+        lambda _directory, _metadata, _unsupported: False,
     )
 
     with pytest.raises(OSError, match=r"kilm\.yaml"):

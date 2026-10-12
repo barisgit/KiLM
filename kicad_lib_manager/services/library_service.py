@@ -12,7 +12,7 @@ from kicad_lib_manager.utils.metadata import (
     generate_env_var_name,
     get_default_github_metadata,
     library_capabilities,
-    read_github_metadata,
+    read_github_metadata_file,
     write_github_metadata,
 )
 
@@ -53,19 +53,21 @@ class LibraryService:
         description, and env_var (when given) replacing its fields. New
         metadata derives the environment variable from name unless env_var
         or no_env_var is given. The library folders are created, and the
-        capabilities and metadata file reflect them.
+        capabilities and metadata file reflect them. Without force, entries
+        the metadata cannot hold (see `read_github_metadata_file`) are kept.
 
         Raises:
             OSError: A folder or the metadata file cannot be written.
         """
         overrides = (name, description, env_var)
-        existing = read_github_metadata(directory)
-        if force or existing is None or not existing:
+        existing = read_github_metadata_file(directory)
+        unsupported: dict[object, object] = {}
+        if force or existing is None or not (existing.metadata or existing.unsupported):
             metadata = get_default_github_metadata(directory)
             if name is not None and env_var is None and not no_env_var:
                 metadata["env_var"] = generate_env_var_name(name, "KICAD_LIB")
         else:
-            metadata = existing
+            metadata, unsupported = existing
             if no_env_var or any(value is not None for value in overrides):
                 metadata["updated_with"] = "kilm"
 
@@ -77,12 +79,13 @@ class LibraryService:
             metadata["env_var"] = env_var
         elif no_env_var:
             metadata.pop("env_var", None)
+            unsupported.pop("env_var", None)
 
         for folder in LIBRARY_FOLDERS:
             (directory / folder).mkdir(parents=True, exist_ok=True)
         # Every folder exists now, so every capability is set.
         metadata["capabilities"] = library_capabilities(directory)
-        if not write_github_metadata(directory, metadata):
+        if not write_github_metadata(directory, metadata, unsupported):
             msg = f"Could not write {GITHUB_METADATA_FILE} in {directory}"
             raise OSError(msg)
         return metadata

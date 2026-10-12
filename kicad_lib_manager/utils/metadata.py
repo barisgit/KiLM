@@ -4,6 +4,9 @@ kilm.yaml describes a symbol/footprint library, .kilm_metadata a 3D model
 library. Reading validates the fields KiLM knows: a field with the wrong type
 is left out, as if absent. Fields KiLM does not know are kept, so a read,
 change, and write cycle preserves what users or other tools added to the file.
+kilm.yaml entries that the typed view cannot hold at all (non-string keys and
+mistyped known fields) come back separately from `read_github_metadata_file`
+for `write_github_metadata` to put back.
 Read and write failures are reported on stderr and returned as None or False,
 because every caller treats unreadable metadata as missing.
 """
@@ -15,7 +18,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Final, TypedDict, cast
+from typing import Final, NamedTuple, TypedDict, cast
 
 import yaml
 
@@ -33,6 +36,7 @@ __all__ = [
     "LIBRARY_FOLDERS",
     "CloudMetadata",
     "GitHubMetadata",
+    "GitHubMetadataFile",
     "LibraryCapabilities",
     "count_model_files",
     "generate_env_var_name",
@@ -41,6 +45,7 @@ __all__ = [
     "library_capabilities",
     "read_cloud_metadata",
     "read_github_metadata",
+    "read_github_metadata_file",
     "write_cloud_metadata",
     "write_github_metadata",
 ]
@@ -89,6 +94,18 @@ class CloudMetadata(_LibraryMetadata, total=False):
     model_count: int
 
 
+class GitHubMetadataFile(NamedTuple):
+    """A kilm.yaml split into its typed fields and the entries they cannot hold.
+
+    unsupported has the entries with non-string keys and the known fields of
+    the wrong type. Passing it back to `write_github_metadata` keeps them, so
+    rewriting the file loses nothing.
+    """
+
+    metadata: GitHubMetadata
+    unsupported: dict[object, object]
+
+
 FieldCheck = Callable[[object], bool]
 
 
@@ -128,21 +145,23 @@ _GITHUB_FIELDS: dict[str, FieldCheck] = {
 _CLOUD_FIELDS: dict[str, FieldCheck] = {**_COMMON_FIELDS, "model_count": _is_count}
 
 
-def _valid_fields(
+def _split_fields(
     document: object, fields: Mapping[str, FieldCheck]
-) -> dict[str, object]:
-    """The string-keyed entries of document, minus known fields of the wrong type.
+) -> tuple[dict[str, object], dict[object, object]]:
+    """Split document into its valid string-keyed entries and all the others.
 
+    The others are the non-string keys and the known fields of the wrong type.
     A document that is not a mapping counts as empty.
     """
-    if not isinstance(document, dict):
-        return {}
-    entries = cast("dict[object, object]", document)
-    return {
-        key: value
-        for key, value in entries.items()
-        if isinstance(key, str) and fields.get(key, _is_anything)(value)
-    }
+    valid: dict[str, object] = {}
+    others: dict[object, object] = {}
+    if isinstance(document, dict):
+        for key, value in cast("dict[object, object]", document).items():
+            if isinstance(key, str) and fields.get(key, _is_anything)(value):
+                valid[key] = value
+            else:
+                others[key] = value
+    return valid, others
 
 
 def _is_anything(_value: object) -> bool:
@@ -160,6 +179,17 @@ def read_github_metadata(directory: Path) -> GitHubMetadata | None:
         The metadata (empty when the file holds no mapping), or None when the
         file is missing or unreadable.
     """
+    loaded = read_github_metadata_file(directory)
+    return None if loaded is None else loaded.metadata
+
+
+def read_github_metadata_file(directory: Path) -> GitHubMetadataFile | None:
+    """Read directory's kilm.yaml with the entries its metadata cannot hold.
+
+    Returns:
+        The file's contents (both parts empty when it holds no mapping), or
+        None when the file is missing or unreadable.
+    """
     metadata_file = directory / GITHUB_METADATA_FILE
     if not metadata_file.exists():
         return None
@@ -169,16 +199,29 @@ def read_github_metadata(directory: Path) -> GitHubMetadata | None:
     except (OSError, ValueError, yaml.YAMLError) as e:
         _report(f"Error reading metadata file: {e}")
         return None
-    # The known fields were checked against GitHubMetadata just above.
-    return cast("GitHubMetadata", _valid_fields(document, _GITHUB_FIELDS))
+    valid, unsupported = _split_fields(document, _GITHUB_FIELDS)
+    # The known fields in valid were checked against GitHubMetadata.
+    return GitHubMetadataFile(cast("GitHubMetadata", valid), unsupported)
 
 
-def write_github_metadata(directory: Path, metadata: GitHubMetadata) -> bool:
-    """Write metadata to directory's kilm.yaml; return whether it succeeded."""
+def write_github_metadata(
+    directory: Path,
+    metadata: GitHubMetadata,
+    unsupported: Mapping[object, object] | None = None,
+) -> bool:
+    """Write metadata to directory's kilm.yaml; return whether it succeeded.
+
+    Entries of unsupported (from `read_github_metadata_file`) are written
+    too, unless metadata has a field of the same name.
+    """
+    document: dict[object, object] = {
+        key: value for key, value in (unsupported or {}).items() if key not in metadata
+    }
+    document.update(metadata)
     metadata_file = directory / GITHUB_METADATA_FILE
     try:
         with metadata_file.open("w", encoding="utf-8") as f:
-            yaml.dump(metadata, f, default_flow_style=False)
+            yaml.dump(document, f, default_flow_style=False)
     except (OSError, yaml.YAMLError) as e:
         _report(f"Error writing metadata file: {e}")
         return False
@@ -202,7 +245,7 @@ def read_cloud_metadata(directory: Path) -> CloudMetadata | None:
         _report(f"Error reading cloud metadata file: {e}")
         return None
     # The known fields were checked against CloudMetadata just above.
-    return cast("CloudMetadata", _valid_fields(document, _CLOUD_FIELDS))
+    return cast("CloudMetadata", _split_fields(document, _CLOUD_FIELDS)[0])
 
 
 def write_cloud_metadata(directory: Path, metadata: CloudMetadata) -> bool:
