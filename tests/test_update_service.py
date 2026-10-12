@@ -138,7 +138,7 @@ class TestShowUpdateNotification:
         assert make_service("pipx").show_update_notification(quiet=True)
         output = capsys.readouterr().out
         assert "1.0.0 → Latest: 1.1.0" in output
-        assert "kilm update" in output
+        assert "Run kilm update perform to update" in output
 
     def test_manual_update_instruction(
         self, capsys: pytest.CaptureFixture[str]

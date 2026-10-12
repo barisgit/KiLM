@@ -132,7 +132,10 @@ class UpdateService:
         ]
         if status["supports_auto_update"]:
             lines += [
-                "Run [bold cyan]kilm update[/bold cyan] to update automatically",
+                (
+                    "Run [bold cyan]kilm update perform[/bold cyan] "
+                    "to update automatically"
+                ),
                 f"Installation method: [dim]{self.method}[/dim]",
             ]
         else:

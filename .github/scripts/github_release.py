@@ -286,7 +286,7 @@ def publication_from_environment(dist_dir: Path) -> Publication:
     notes = (
         f"Install with `pipx install {name}=={version}` or "
         f"`uv tool install {name}=={version}`; "
-        "upgrade an existing install with `kilm update`."
+        "upgrade an existing install with `kilm update perform`."
     )
     return Publication(
         tag=tag,
