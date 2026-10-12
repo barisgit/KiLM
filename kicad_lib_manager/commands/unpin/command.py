@@ -9,6 +9,7 @@ from kicad_lib_manager.utils.console import get_console
 
 from ...services.library_service import LibraryService
 from ...utils.backup import create_backup
+from ...utils.file_ops import write_atomically
 
 
 def unpin(
@@ -154,8 +155,7 @@ def unpin(
             # Create backup before making changes
             create_backup(kicad_common, max_backups)
 
-            with kicad_common.open("w") as f:
-                json.dump(config, f, indent=2)
+            write_atomically(kicad_common, json.dumps(config, indent=2).encode())
 
         if changes_needed:
             if dry_run:
