@@ -16,10 +16,12 @@ from kicad_lib_manager.utils.console import get_console
 from kicad_lib_manager.utils.metadata import (
     CLOUD_METADATA_FILE,
     CloudMetadata,
+    CloudMetadataFile,
     count_model_files,
     generate_env_var_name,
     get_default_cloud_metadata,
     read_cloud_metadata,
+    read_cloud_metadata_file,
     write_cloud_metadata,
 )
 
@@ -48,49 +50,53 @@ def _present(value: str | int | None) -> bool:
     return value is not None and bool(value)
 
 
+def _apply_overrides(metadata: CloudMetadata, overrides: _Overrides) -> None:
+    """Set the values given on the command line in ``metadata``, announcing each."""
+    console = get_console()
+    if overrides.name is not None:
+        metadata["name"] = overrides.name
+        console.print(f"Overriding with provided name: [blue]{overrides.name}[/blue]")
+    if overrides.description is not None:
+        metadata["description"] = overrides.description
+        console.print(
+            "Overriding with provided description: "
+            f"[blue]{overrides.description}[/blue]"
+        )
+    if overrides.env_var is not None:
+        metadata["env_var"] = overrides.env_var
+        console.print(
+            "Overriding with provided environment variable: "
+            f"[yellow]{overrides.env_var}[/yellow]"
+        )
+    elif overrides.no_env_var:
+        metadata["env_var"] = None
+        console.print("[yellow]Disabling environment variable as requested[/yellow]")
+
+
 def _update_existing(
-    directory: Path, metadata: CloudMetadata, overrides: _Overrides
+    directory: Path, existing: CloudMetadataFile, overrides: _Overrides
 ) -> CloudMetadata:
-    """Apply ``overrides`` to the directory's metadata and save any change."""
+    """Apply ``overrides`` to the directory's metadata and save any change.
+
+    Entries the metadata cannot hold are written back unless an override
+    replaces them.
+    """
+    metadata, unsupported = existing
     console = get_console()
     console.print(
         f"[green]Found existing metadata file[/green] ({CLOUD_METADATA_FILE})"
     )
-    name = metadata.get("name")
-    description = metadata.get("description")
+    console.print(f"Using existing name: [blue]{metadata.get('name')}[/blue]")
     env_var = metadata.get("env_var")
-    console.print(f"Using existing name: [blue]{name}[/blue]")
     if _present(env_var) and not overrides.no_env_var:
         console.print(
             f"Using existing environment variable: [yellow]{env_var}[/yellow]"
         )
 
-    if overrides.name is not None:
-        name = overrides.name
-        console.print(f"Overriding with provided name: [blue]{name}[/blue]")
-    if overrides.description is not None:
-        description = overrides.description
-        console.print(
-            f"Overriding with provided description: [blue]{description}[/blue]"
-        )
-    if overrides.env_var is not None:
-        env_var = overrides.env_var
-        console.print(
-            f"Overriding with provided environment variable: [yellow]{env_var}[/yellow]"
-        )
-    elif overrides.no_env_var:
-        console.print("[yellow]Disabling environment variable as requested[/yellow]")
-
     if overrides.given():
-        if name is not None:
-            metadata["name"] = name
-        if description is not None:
-            metadata["description"] = description
-        metadata["env_var"] = (
-            env_var if _present(env_var) and not overrides.no_env_var else None
-        )
+        _apply_overrides(metadata, overrides)
         metadata["updated_with"] = "kilm"
-        write_cloud_metadata(directory, metadata)
+        write_cloud_metadata(directory, metadata, unsupported)
         console.print("[green]Updated metadata file with new information[/green]")
     return metadata
 
@@ -235,17 +241,21 @@ def add_3d(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         env_var=given(env_var),
         no_env_var=no_env_var,
     )
-    existing = read_cloud_metadata(directory)
-    has_existing = existing is not None and len(existing) > 0
+    existing = read_cloud_metadata_file(directory)
+    has_existing = existing is not None and bool(
+        existing.metadata or existing.unsupported
+    )
+    unsupported: dict[object, object] = {}
     if existing is not None and has_existing and not force:
         metadata = _update_existing(directory, existing, overrides)
+        unsupported = existing.unsupported
     else:
         metadata = _create_new(directory, overrides, overwriting=has_existing)
 
     model_count = count_model_files(directory)
     _confirm_models(model_count)
     metadata["model_count"] = model_count
-    write_cloud_metadata(directory, metadata)
+    write_cloud_metadata(directory, metadata, unsupported)
 
     raw_name = metadata.get("name")
     library_name = directory.name if raw_name is None else str(raw_name)

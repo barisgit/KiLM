@@ -4,9 +4,9 @@ kilm.yaml describes a symbol/footprint library, .kilm_metadata a 3D model
 library. Reading validates the fields KiLM knows: a field with the wrong type
 is left out, as if absent. Fields KiLM does not know are kept, so a read,
 change, and write cycle preserves what users or other tools added to the file.
-kilm.yaml entries that the typed view cannot hold at all (non-string keys and
-mistyped known fields) come back separately from `read_github_metadata_file`
-for `write_github_metadata` to put back.
+Entries that the typed view cannot hold at all (non-string keys and mistyped
+known fields) come back separately from `read_github_metadata_file` and
+`read_cloud_metadata_file`, for the matching writer to put back.
 Writes replace the file atomically. Read and write failures are reported on
 stderr and returned as None or False, because every caller treats unreadable
 metadata as missing.
@@ -37,6 +37,7 @@ __all__ = [
     "GITHUB_METADATA_FILE",
     "LIBRARY_FOLDERS",
     "CloudMetadata",
+    "CloudMetadataFile",
     "GitHubMetadata",
     "GitHubMetadataFile",
     "LibraryCapabilities",
@@ -46,6 +47,7 @@ __all__ = [
     "get_default_github_metadata",
     "library_capabilities",
     "read_cloud_metadata",
+    "read_cloud_metadata_file",
     "read_github_metadata",
     "read_github_metadata_file",
     "write_cloud_metadata",
@@ -105,6 +107,18 @@ class GitHubMetadataFile(NamedTuple):
     """
 
     metadata: GitHubMetadata
+    unsupported: dict[object, object]
+
+
+class CloudMetadataFile(NamedTuple):
+    """A .kilm_metadata split into its typed fields and the entries they cannot hold.
+
+    unsupported has the known fields of the wrong type (JSON keys are always
+    strings). Passing it back to `write_cloud_metadata` keeps them, so
+    rewriting the file loses nothing.
+    """
+
+    metadata: CloudMetadata
     unsupported: dict[object, object]
 
 
@@ -170,6 +184,21 @@ def _is_anything(_value: object) -> bool:
     return True
 
 
+def _with_unsupported(
+    metadata: Mapping[str, object], unsupported: Mapping[object, object] | None
+) -> dict[object, object]:
+    """Return the document to write: metadata plus the unsupported entries.
+
+    An unsupported entry is left out when metadata has a field of its name,
+    so a field set by the caller replaces the mistyped one it was read as.
+    """
+    document: dict[object, object] = {
+        key: value for key, value in (unsupported or {}).items() if key not in metadata
+    }
+    document.update(metadata)
+    return document
+
+
 def _report(message: str) -> None:
     get_console(stderr=True).print(message, markup=False, highlight=False)
 
@@ -216,10 +245,7 @@ def write_github_metadata(
     Entries of unsupported (from `read_github_metadata_file`) are written
     too, unless metadata has a field of the same name.
     """
-    document: dict[object, object] = {
-        key: value for key, value in (unsupported or {}).items() if key not in metadata
-    }
-    document.update(metadata)
+    document = _with_unsupported(metadata, unsupported)
     try:
         text = yaml.dump(document, default_flow_style=False)
         write_atomically(directory / GITHUB_METADATA_FILE, text.encode("utf-8"))
@@ -236,6 +262,17 @@ def read_cloud_metadata(directory: Path) -> CloudMetadata | None:
         The metadata (empty when the file holds no JSON object), or None when
         the file is missing or unreadable.
     """
+    loaded = read_cloud_metadata_file(directory)
+    return None if loaded is None else loaded.metadata
+
+
+def read_cloud_metadata_file(directory: Path) -> CloudMetadataFile | None:
+    """Read directory's .kilm_metadata with the entries its metadata cannot hold.
+
+    Returns:
+        The file's contents (both parts empty when it holds no JSON object),
+        or None when the file is missing or unreadable.
+    """
     metadata_file = directory / CLOUD_METADATA_FILE
     if not metadata_file.exists():
         return None
@@ -245,14 +282,23 @@ def read_cloud_metadata(directory: Path) -> CloudMetadata | None:
     except (OSError, ValueError) as e:
         _report(f"Error reading cloud metadata file: {e}")
         return None
-    # The known fields were checked against CloudMetadata just above.
-    return cast("CloudMetadata", _split_fields(document, _CLOUD_FIELDS)[0])
+    valid, unsupported = _split_fields(document, _CLOUD_FIELDS)
+    # The known fields in valid were checked against CloudMetadata.
+    return CloudMetadataFile(cast("CloudMetadata", valid), unsupported)
 
 
-def write_cloud_metadata(directory: Path, metadata: CloudMetadata) -> bool:
-    """Write metadata to directory's .kilm_metadata; return whether it succeeded."""
+def write_cloud_metadata(
+    directory: Path,
+    metadata: CloudMetadata,
+    unsupported: Mapping[object, object] | None = None,
+) -> bool:
+    """Write metadata to directory's .kilm_metadata; return whether it succeeded.
+
+    Entries of unsupported (from `read_cloud_metadata_file`) are written
+    too, unless metadata has a field of the same name.
+    """
     try:
-        text = json.dumps(metadata, indent=2)
+        text = json.dumps(_with_unsupported(metadata, unsupported), indent=2)
         write_atomically(directory / CLOUD_METADATA_FILE, text.encode("utf-8"))
     except (OSError, TypeError, ValueError) as e:
         _report(f"Error writing cloud metadata file: {e}")
