@@ -21,7 +21,7 @@ class TestInstallationDetection:
     """Test installation method detection logic using the modular detector."""
 
     @pytest.fixture(autouse=True)
-    def _clear_detection_env(self, monkeypatch):
+    def _clear_detection_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Keep detection hermetic: CI runners and dev shells may export these.
 
         setup-uv on Windows runners sets UV_TOOL_DIR, for example, which made
