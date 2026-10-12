@@ -1,313 +1,284 @@
-"""Environment variable handling utilities"""
+"""Library paths from the user's environment, and KiCad's kicad_common.json.
+
+find_environment_variables looks a library path up the way a user would set
+it. The update functions change the environment variables and pinned
+libraries in kicad_common.json, backing the file up first and replacing it
+atomically.
+"""
 
 import json
 import os
 import re
 import shutil
 import subprocess
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
+from kicad_lib_manager.services.config_service import Config
+from kicad_lib_manager.utils.backup import create_backup
+from kicad_lib_manager.utils.constants import (
+    CLOUD_METADATA_FILE,
+    DEFAULT_MAX_BACKUPS,
+    GITHUB_METADATA_FILE,
+    KICAD_COMMON_FILE,
+)
 from kicad_lib_manager.utils.file_ops import write_atomically
 
-# Import Config here, but only use it when needed to avoid circular imports
-try:
-    from ..services.config_service import Config
-except ImportError:
-    Config = None
+JsonObject = dict[str, object]
 
-# Try to import metadata utilities without causing circular imports
-try:
-    from ..utils.metadata import (
-        CLOUD_METADATA_FILE,
-        GITHUB_METADATA_FILE,
-        read_cloud_metadata,
-        read_github_metadata,
-    )
-except ImportError:
-    read_github_metadata = None
-    read_cloud_metadata = None
-    GITHUB_METADATA_FILE = "kilm.yaml"
-    CLOUD_METADATA_FILE = ".kilm_metadata"
+
+class KiCadConfigError(ValueError):
+    """kicad_common.json is not valid JSON or not shaped as KiCad writes it."""
+
+
+# The library variables KiLM can derive from its configuration and from the
+# metadata file of a library in the current directory.
+_CONFIG_PATHS: dict[str, Callable[[Config], str | None]] = {
+    "KICAD_USER_LIB": lambda config: config.get_symbol_library_path(),
+    "KICAD_3D_LIB": lambda config: config.get_3d_library_path(),
+}
+_LIBRARY_MARKERS = {
+    "KICAD_USER_LIB": GITHUB_METADATA_FILE,
+    "KICAD_3D_LIB": CLOUD_METADATA_FILE,
+}
+_SHELL_FILES = (".bashrc", ".bash_profile", ".profile", ".zshrc")
 
 
 def find_environment_variables(var_name: str) -> str | None:
-    """Find environment variables from various sources in the following order:
-    1. Config file
-    2. Metadata files in current directory
-    3. Environment variables
-    4. Shell config files
+    """Return the value of var_name from the first source that defines it.
 
-    Args:
-        var_name: The name of the environment variable to find
+    The sources, in order: the KiLM configuration (current library paths, for
+    KICAD_USER_LIB and KICAD_3D_LIB), a library metadata file in the current
+    directory (the directory then is the library), the process environment,
+    fish universal variables, and export lines in ~/.bashrc, ~/.bash_profile,
+    ~/.profile, and ~/.zshrc. A source that fails to read is skipped.
 
     Returns:
-        The value of the environment variable, or None if not found
+        The value, or None when no source defines it.
     """
-    # First check configuration file if it's a known variable
-    if Config is not None:
-        try:
-            config = Config()
+    lookups: tuple[Callable[[str], str | None], ...] = (
+        _from_config,
+        _from_current_directory,
+        os.environ.get,
+        _from_fish,
+        _from_shell_files,
+    )
+    for lookup in lookups:
+        value = lookup(var_name)
+        if value is not None:
+            return value
+    return None
 
-            # Check for KiCad library variables in config
-            if var_name == "KICAD_USER_LIB":
-                lib_path = config.get_symbol_library_path()
-                if lib_path:
-                    return lib_path
 
-            # Check for 3D model variables in config
-            elif var_name == "KICAD_3D_LIB":
-                lib_path = config.get_3d_library_path()
-                if lib_path:
-                    return lib_path
-        except Exception:
-            # If there's any error with config, fall back to other methods
-            pass
+def _from_config(var_name: str) -> str | None:
+    read_path = _CONFIG_PATHS.get(var_name)
+    if read_path is None:
+        return None
+    try:
+        path = read_path(Config())
+    except (OSError, LookupError, TypeError, ValueError):
+        return None
+    return path or None
 
-    # Check for metadata file in current directory
+
+def _from_current_directory(var_name: str) -> str | None:
+    marker = _LIBRARY_MARKERS.get(var_name)
+    if marker is None:
+        return None
     try:
         current_dir = Path.cwd().resolve()
+        is_library = (current_dir / marker).exists()
+    except OSError:
+        return None
+    return str(current_dir) if is_library else None
 
-        # For KiCad library directory, check for GitHub metadata
-        if var_name == "KICAD_USER_LIB" and read_github_metadata:
-            metadata_file = current_dir / GITHUB_METADATA_FILE
-            if metadata_file.exists():
-                # Found metadata file in current directory, probably a KiCad library
-                return str(current_dir)
 
-        # For 3D library directory, check for cloud metadata
-        elif var_name == "KICAD_3D_LIB" and read_cloud_metadata:
-            metadata_file = current_dir / CLOUD_METADATA_FILE
-            if metadata_file.exists():
-                # Found metadata file in current directory, probably a 3D model library
-                return str(current_dir)
-    except Exception:
-        # If any error occurs, continue to other methods
-        pass
+def _from_fish(var_name: str) -> str | None:
+    fish = shutil.which("fish")
+    if fish is None:
+        return None
+    try:
+        result = subprocess.run(  # noqa: S603 -- fixed fish command; var_name comes from KiLM code, not user input
+            [fish, "-c", f"echo ${var_name}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    return result.stdout.strip() or None
 
-    # Check environment directly
-    if var_name in os.environ:
-        return os.environ[var_name]
 
-    # Check for fish universal variables
-    if shutil.which("fish"):
-        try:
-            result = subprocess.run(
-                ["fish", "-c", f"echo ${var_name}"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.stdout.strip():
-                return result.stdout.strip()
-        except Exception:
-            pass
-
-    # Check common shell config files
+def _from_shell_files(var_name: str) -> str | None:
+    pattern = re.compile(rf"^(?:export\s+)?{re.escape(var_name)}=[\'\"]?(.*?)[\'\"]?$")
     home = Path.home()
-    config_files = [
-        home / ".bashrc",
-        home / ".bash_profile",
-        home / ".profile",
-        home / ".zshrc",
-    ]
-
-    pattern = re.compile(rf"^(?:export\s+)?{var_name}=[\'\"]?(.*?)[\'\"]?$")
-
-    for config_file in config_files:
-        if not config_file.exists():
-            continue
-
+    for name in _SHELL_FILES:
         try:
-            with Path(config_file).open() as f:
-                for line in f:
-                    match = pattern.search(line.strip())
-                    if match:
-                        return match.group(1)
-        except Exception:
-            pass
-
+            text = (home / name).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            match = pattern.search(line.strip())
+            if match:
+                return str(match.group(1))
     return None
 
 
 def expand_user_path(path: str) -> str:
-    """Expand a path that might start with ~ to an absolute path
-
-    Args:
-        path: The path to expand
-
-    Returns:
-        The expanded path
-    """
+    """Return path with a leading ~ expanded to the home directory."""
     if path.startswith("~"):
         return str(Path(path).expanduser())
     return path
 
 
 def update_kicad_env_vars(
-    kicad_config: Path, env_vars: dict, dry_run: bool = False, max_backups: int = 5
+    kicad_config: Path,
+    env_vars: Mapping[str, str | None],
+    dry_run: bool = False,  # noqa: FBT001, FBT002 -- setup and KiCadService pass it positionally; make it keyword-only once they pass it by name
+    max_backups: int = DEFAULT_MAX_BACKUPS,
 ) -> bool:
-    """Update environment variables in KiCad's common configuration file
+    """Set or remove environment variables in kicad_common.json.
+
+    A None value removes the variable; blank values are ignored. Paths are
+    stored with forward slashes. The file is backed up and rewritten only
+    when something changes, and never in a dry run.
 
     Args:
-        kicad_config: Path to the KiCad configuration directory
-        env_vars: Dictionary of environment variables to set
-        dry_run: If True, don't make any changes
-        max_backups: Maximum number of backups to keep
+        kicad_config: KiCad's configuration directory.
+        env_vars: Variable name to value (None removes it).
+        dry_run: Report whether anything would change without writing.
+        max_backups: Number of backups of kicad_common.json to keep.
 
     Returns:
-        True if changes were made, False otherwise
+        Whether the variables differ (or would differ) from the file.
 
     Raises:
-        FileNotFoundError: If the KiCad common configuration file is not found
+        FileNotFoundError: kicad_common.json does not exist.
+        KiCadConfigError: kicad_common.json is not valid JSON of the expected shape.
     """
-    from .backup import create_backup
-
-    # Validate input
-    if not env_vars or not isinstance(env_vars, dict):
+    requested = {k: v for k, v in env_vars.items() if v is None or v.strip()}
+    if not requested:
         return False
 
-    # Filter out empty strings from env_vars, but keep None values
-    valid_env_vars = {k: v for k, v in env_vars.items() if v is None or str(v).strip()}
-
-    # If no environment variables to process, return False
-    if not valid_env_vars:
-        return False
-
-    kicad_common = kicad_config / "kicad_common.json"
-
-    if not kicad_common.exists():
-        raise FileNotFoundError(
-            f"KiCad common configuration file not found at {kicad_common}"
-        )
-
-    try:
-        with Path(kicad_common).open() as f:
-            config = json.load(f)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON format in {kicad_common}") from e
-
-    # Check if environment section exists
-    if "environment" not in config:
-        config["environment"] = {"vars": {}}
-    elif "vars" not in config["environment"]:
-        config["environment"]["vars"] = {}
-
-    # Check if changes are needed
-    changes_needed = False
-    current_vars = config["environment"]["vars"]
-
-    for key, value in valid_env_vars.items():
-        # Handle None values by removing the variable
+    kicad_common, config = _load_kicad_common(kicad_config)
+    environment = _object_entry(config, "environment", kicad_common)
+    current = _object_entry(environment, "vars", kicad_common)
+    updated = dict(current)
+    for key, value in requested.items():
         if value is None:
-            if key in current_vars:
-                changes_needed = True
-                if not dry_run:
-                    del current_vars[key]
-            continue
+            updated.pop(key, None)
+        else:
+            updated[key] = value.replace("\\", "/")
 
-        # Ensure path uses forward slashes
-        normalized_value = value.replace("\\", "/")
-
-        if key not in current_vars or current_vars[key] != normalized_value:
-            changes_needed = True
-            if not dry_run:
-                current_vars[key] = normalized_value
-
-    # Write changes if needed
-    if changes_needed and not dry_run:
-        # Create backup before making changes
-        create_backup(kicad_common, max_backups)
-
-        write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
-
-    return changes_needed
+    if updated == current:
+        return False
+    if not dry_run:
+        environment["vars"] = updated
+        _save_kicad_common(kicad_common, config, max_backups)
+    return True
 
 
 def update_pinned_libraries(
     kicad_config: Path,
-    symbol_libs: list[str] | None = None,
-    footprint_libs: list[str] | None = None,
+    *,
+    symbol_libs: Sequence[str] | None = None,
+    footprint_libs: Sequence[str] | None = None,
     dry_run: bool = False,
-    max_backups: int = 5,
+    max_backups: int = DEFAULT_MAX_BACKUPS,
 ) -> bool:
-    """Update pinned libraries in KiCad's common configuration file
+    """Pin libraries in kicad_common.json, keeping those already pinned.
+
+    The file is backed up and rewritten only when a library is newly pinned,
+    and never in a dry run.
 
     Args:
-        kicad_config: Path to the KiCad configuration directory
-        symbol_libs: List of symbol libraries to pin
-        footprint_libs: List of footprint libraries to pin
-        dry_run: If True, don't make any changes
-        max_backups: Maximum number of backups to keep
+        kicad_config: KiCad's configuration directory.
+        symbol_libs: Symbol library names to pin.
+        footprint_libs: Footprint library names to pin.
+        dry_run: Report whether anything would change without writing.
+        max_backups: Number of backups of kicad_common.json to keep.
 
     Returns:
-        True if changes were made, False otherwise
+        Whether a library is (or would be) newly pinned.
 
     Raises:
-        FileNotFoundError: If the KiCad common configuration file is not found
+        FileNotFoundError: kicad_common.json does not exist.
+        KiCadConfigError: kicad_common.json is not valid JSON of the expected shape.
     """
-    from .backup import create_backup
-
-    # Default empty lists if None
-    symbol_libs = symbol_libs or []
-    footprint_libs = footprint_libs or []
-
-    # Skip if both are empty
-    if not symbol_libs and not footprint_libs:
+    requested = {
+        "pinned_symbol_libs": () if symbol_libs is None else symbol_libs,
+        "pinned_fp_libs": () if footprint_libs is None else footprint_libs,
+    }
+    if not any(requested.values()):
         return False
 
-    kicad_common = kicad_config / "kicad_common.json"
-
-    if not kicad_common.exists():
-        raise FileNotFoundError(
-            f"KiCad common configuration file not found at {kicad_common}"
-        )
-
-    try:
-        with Path(kicad_common).open() as f:
-            config = json.load(f)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON format in {kicad_common}") from e
-
-    # Ensure session section exists
-    if "session" not in config:
+    kicad_common, config = _load_kicad_common(kicad_config)
+    if config.get("session") is None:
         config["session"] = {
             "pinned_symbol_libs": [],
             "pinned_fp_libs": [],
             "remember_open_files": False,
         }
+    session = _object_entry(config, "session", kicad_common)
+    changed = False
+    for key, libs in requested.items():
+        pinned = _list_entry(session, key, kicad_common)
+        new = [lib for lib in dict.fromkeys(libs) if lib not in pinned]
+        changed = changed or bool(new)
+        if not dry_run:
+            pinned.extend(new)
 
-    # Ensure the pinned libraries sections exist
-    if "pinned_symbol_libs" not in config["session"]:
-        config["session"]["pinned_symbol_libs"] = []
-    if "pinned_fp_libs" not in config["session"]:
-        config["session"]["pinned_fp_libs"] = []
+    if changed and not dry_run:
+        _save_kicad_common(kicad_common, config, max_backups)
+    return changed
 
-    # Convert lists to keep track of original state
-    current_pinned_symbols = list(config["session"]["pinned_symbol_libs"])
-    current_pinned_footprints = list(config["session"]["pinned_fp_libs"])
 
-    # Check for changes to symbol libraries
-    changes_needed = False
+def _load_kicad_common(kicad_config: Path) -> tuple[Path, JsonObject]:
+    """Path and parsed content of kicad_common.json in kicad_config."""
+    kicad_common = kicad_config / KICAD_COMMON_FILE
+    if not kicad_common.exists():
+        msg = f"KiCad common configuration file not found at {kicad_common}"
+        raise FileNotFoundError(msg)
+    try:
+        document: object = json.loads(kicad_common.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        msg = f"Invalid JSON format in {kicad_common}"
+        raise KiCadConfigError(msg) from e
+    if not isinstance(document, dict):
+        msg = f"Invalid KiCad configuration in {kicad_common}: expected an object"
+        raise KiCadConfigError(msg)
+    return kicad_common, cast("JsonObject", document)
 
-    # Add new symbol libraries that aren't already pinned
-    for lib in symbol_libs:
-        if lib not in current_pinned_symbols:
-            changes_needed = True
-            if not dry_run:
-                config["session"]["pinned_symbol_libs"].append(lib)
 
-    # Add new footprint libraries that aren't already pinned
-    for lib in footprint_libs:
-        if lib not in current_pinned_footprints:
-            changes_needed = True
-            if not dry_run:
-                config["session"]["pinned_fp_libs"].append(lib)
+def _save_kicad_common(
+    kicad_common: Path, config: JsonObject, max_backups: int
+) -> None:
+    create_backup(kicad_common, max_backups)
+    write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
 
-    # Write changes if needed
-    if changes_needed and not dry_run:
-        # Create backup before making changes
-        create_backup(kicad_common, max_backups)
 
-        write_atomically(kicad_common, json.dumps(config, indent=2).encode("utf-8"))
+def _object_entry(parent: JsonObject, key: str, kicad_common: Path) -> JsonObject:
+    """parent[key] as a JSON object; an absent or null entry becomes {}."""
+    value = parent.get(key)
+    if value is None:
+        created: JsonObject = {}
+        parent[key] = created
+        return created
+    if not isinstance(value, dict):
+        msg = f"Invalid {key!r} in {kicad_common}: expected an object"
+        raise KiCadConfigError(msg)
+    return cast("JsonObject", value)
 
-    return changes_needed
+
+def _list_entry(parent: JsonObject, key: str, kicad_common: Path) -> list[object]:
+    """parent[key] as a JSON array; an absent or null entry becomes []."""
+    value = parent.get(key)
+    if value is None:
+        created: list[object] = []
+        parent[key] = created
+        return created
+    if not isinstance(value, list):
+        msg = f"Invalid {key!r} in {kicad_common}: expected an array"
+        raise KiCadConfigError(msg)
+    return cast("list[object]", value)

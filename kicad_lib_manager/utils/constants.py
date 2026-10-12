@@ -4,6 +4,9 @@
 GITHUB_METADATA_FILE = "kilm.yaml"
 CLOUD_METADATA_FILE = ".kilm_metadata"
 
+# KiCad's own configuration file in its configuration directory
+KICAD_COMMON_FILE = "kicad_common.json"
+
 # Configuration paths and directories
 CONFIG_DIR_NAME = "kicad-lib-manager"
 CONFIG_FILE_NAME = "config.yaml"

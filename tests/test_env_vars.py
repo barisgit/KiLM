@@ -6,13 +6,15 @@ from pathlib import Path
 
 import pytest
 
+from kicad_lib_manager.utils import env_vars
 from kicad_lib_manager.utils.env_vars import (
+    find_environment_variables,
     update_kicad_env_vars,
     update_pinned_libraries,
 )
 
 
-def test_update_kicad_env_vars(tmp_path):
+def test_update_kicad_env_vars(tmp_path: Path) -> None:
     """Test updating environment variables in KiCad configuration."""
     # Create a temporary KiCad configuration directory
     kicad_config = tmp_path / "kicad"
@@ -101,18 +103,18 @@ def test_update_kicad_env_vars(tmp_path):
     with Path(kicad_common).open("w") as f:
         f.write("invalid json")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid JSON format"):
         update_kicad_env_vars(kicad_config, env_vars)
 
 
-class _EncoderFailure(OSError):
+class _DiskFullError(OSError):
     """Stands in for a disk error in the middle of writing JSON."""
 
 
 def _failing_iterencode(*_args: object, **_kwargs: object) -> Iterator[str]:
     """Yield the start of a JSON document, then fail like a full disk."""
     yield '{"environment": '
-    raise _EncoderFailure
+    raise _DiskFullError
 
 
 @pytest.mark.parametrize(
@@ -134,7 +136,52 @@ def test_failed_write_keeps_kicad_common(
     kicad_common.write_text(original, encoding="utf-8")
     monkeypatch.setattr(json.JSONEncoder, "iterencode", _failing_iterencode)
 
-    with pytest.raises(_EncoderFailure):
+    with pytest.raises(_DiskFullError):
         update(tmp_path)
 
     assert kicad_common.read_text(encoding="utf-8") == original
+
+
+class _FakeConfig:
+    """A KiLM configuration whose current symbol library is library_path."""
+
+    library_path: str | None = None
+
+    def get_symbol_library_path(self) -> str | None:
+        """The configured symbol library path."""
+        return self.library_path
+
+
+@pytest.fixture
+def isolated_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """No source defines KICAD_USER_LIB; returns the empty home directory."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("KICAD_USER_LIB", raising=False)
+    monkeypatch.setattr(env_vars, "Config", _FakeConfig)
+    monkeypatch.setattr(env_vars.shutil, "which", lambda _name: None)
+    monkeypatch.chdir(tmp_path)
+    return home
+
+
+def test_sources_are_tried_in_order(
+    isolated_sources: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Shell files < environment < library in cwd < KiLM configuration."""
+    assert find_environment_variables("KICAD_USER_LIB") is None
+
+    (isolated_sources / ".zshrc").write_text(
+        'export KICAD_USER_LIB="/from/zshrc"\n', encoding="utf-8"
+    )
+    assert find_environment_variables("KICAD_USER_LIB") == "/from/zshrc"
+
+    monkeypatch.setenv("KICAD_USER_LIB", "/from/environment")
+    assert find_environment_variables("KICAD_USER_LIB") == "/from/environment"
+
+    (tmp_path / "kilm.yaml").write_text("name: here\n", encoding="utf-8")
+    assert find_environment_variables("KICAD_USER_LIB") == str(tmp_path.resolve())
+
+    monkeypatch.setattr(_FakeConfig, "library_path", "/from/config")
+    assert find_environment_variables("KICAD_USER_LIB") == "/from/config"
