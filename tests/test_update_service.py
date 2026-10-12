@@ -28,6 +28,7 @@ class TestInstallationDetection:
         for var in (
             "PIPX_HOME",
             "CONDA_DEFAULT_ENV",
+            "CONDA_PREFIX",
             "UV_TOOL_DIR",
             "UV_TOOL_BIN_DIR",
             "VIRTUAL_ENV",
@@ -58,13 +59,26 @@ class TestInstallationDetection:
         assert detector.detect_conda() is True
         assert detector.detect() == "conda"
 
-    def test_detect_conda_installation_with_env_var(self, monkeypatch):
-        """Test detection of conda installation via environment variable."""
-        monkeypatch.setenv("CONDA_DEFAULT_ENV", "kilm-env")
+    def test_detect_conda_installation_in_active_prefix(self, monkeypatch):
+        """An executable inside the active CONDA_PREFIX is a conda install."""
+        monkeypatch.setenv("CONDA_PREFIX", "/opt/envs/kilm-env")
 
-        detector = InstallationDetector(executable_path=Path("/usr/bin/python"))
+        detector = InstallationDetector(
+            executable_path=Path("/opt/envs/kilm-env/bin/python")
+        )
         assert detector.detect_conda() is True
         assert detector.detect() == "conda"
+
+    def test_active_conda_env_alone_is_not_a_conda_install(self, monkeypatch):
+        """Many shells activate conda's base env, whatever installed kilm."""
+        monkeypatch.setenv("CONDA_DEFAULT_ENV", "base")
+        monkeypatch.setenv("CONDA_PREFIX", "/opt/envs/base")
+
+        detector = InstallationDetector(
+            executable_path=Path("/Users/user/.local/share/uv/tools/kilm/bin/python")
+        )
+        assert detector.detect_conda() is False
+        assert detector.detect() == "uv"
 
     def test_detect_uv_installation_in_custom_tool_dir(self, monkeypatch):
         """An executable inside UV_TOOL_DIR is a uv tool install."""

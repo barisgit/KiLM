@@ -51,9 +51,16 @@ class InstallationDetector:
         return bool(pipx_home and "pipx" in self.executable_str)
 
     def detect_conda(self) -> bool:
-        """Detect conda installation."""
-        return bool(
-            os.environ.get("CONDA_DEFAULT_ENV") or "conda" in self.executable_str
+        """Detect a conda install: the interpreter lives in a conda environment.
+
+        An activated environment (``CONDA_DEFAULT_ENV``) is no evidence on its
+        own, since many shells activate conda's base environment by default.
+        """
+        if "conda" in self.executable_str:
+            return True
+        prefix = os.environ.get("CONDA_PREFIX")
+        return bool(prefix) and self.executable_path.is_relative_to(
+            type(self.executable_path)(prefix)
         )
 
     def detect_uv(self) -> bool:
