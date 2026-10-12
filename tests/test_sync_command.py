@@ -146,6 +146,7 @@ def test_sync_auto_setup_runs_setup_with_its_defaults(
 
     assert "Running 'kilm setup'" in result.output
     assert "KICAD_USER_LIB not set and not provided" in result.output
+    assert "Error: 1" not in result.output
     assert result.exit_code == 1
 
 
@@ -189,6 +190,7 @@ def test_check_for_library_changes_without_history(tmp_path: Path) -> None:
         "footprints",
         "templates",
     ]
+
 
 def test_check_for_library_changes_detects_a_renamed_library(tmp_path: Path) -> None:
     """A renamed library file is a new library name that setup must add."""

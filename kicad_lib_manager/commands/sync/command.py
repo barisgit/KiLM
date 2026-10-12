@@ -198,6 +198,9 @@ def sync(
                 "[blue]Use 'kilm status' to check your current configuration.[/blue]"
             )
 
+    except typer.Exit:
+        # setup reports its own errors
+        raise
     except Exception as e:
         get_console().print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
