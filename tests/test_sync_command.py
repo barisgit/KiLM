@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from kicad_lib_manager.commands.setup import command as setup_command
 from kicad_lib_manager.commands.sync import command as sync_command
+from kicad_lib_manager.commands.sync.command import check_for_library_changes
 from kicad_lib_manager.main import app
 from kicad_lib_manager.services.config_service import LibraryDict
 
@@ -91,6 +92,20 @@ def test_sync_reports_an_up_to_date_library(library: Path) -> None:
     assert "No new libraries detected" in result.output
 
 
+def test_sync_pulls_and_detects_new_libraries(upstream: Path, library: Path) -> None:
+    """New symbol libraries anywhere in the pulled commits are reported."""
+    _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")
+    _commit_file(upstream, "docs/notes.md", "add notes")
+
+    result = CliRunner().invoke(app, ["sync"])
+
+    assert result.exit_code == 0, result.output
+    assert (library / "symbols" / "New.kicad_sym").exists()
+    assert "1 libraries synced" in result.output
+    assert "demo: symbols" in result.output
+    assert "kilm sync --auto-setup" in result.output
+
+
 def test_sync_dry_run_does_not_pull(upstream: Path, library: Path) -> None:
     """A dry run names the library and leaves it untouched."""
     _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")
@@ -106,7 +121,9 @@ def test_sync_auto_setup_runs_setup_with_its_defaults(
     upstream: Path, library: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Setup runs with its option defaults, so it looks up the library itself."""
-    monkeypatch.setattr(setup_command, "find_environment_variables", lambda _name: None)
+    monkeypatch.setattr(
+        setup_command, "find_environment_variables", lambda _name: None
+    )
     _commit_file(upstream, "symbols/New.kicad_sym", "add symbols")
 
     result = CliRunner().invoke(app, ["sync", "--auto-setup"])
@@ -140,3 +157,19 @@ def test_sync_without_libraries(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert result.exit_code == 0
     assert "No GitHub libraries configured" in result.output
+
+
+def test_check_for_library_changes_without_history(tmp_path: Path) -> None:
+    """Without a previous commit the current content is reported."""
+    repo = tmp_path / "fresh"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _commit_file(repo, "footprints/Part.pretty/Part.kicad_mod", "footprint")
+    _commit_file(repo, "templates/basic/metadata.yaml", "template")
+    (repo / "symbols").mkdir()
+
+    assert check_for_library_changes(repo) == ["templates"]
+    assert sorted(check_for_library_changes(repo, "HEAD~5")) == [
+        "footprints",
+        "templates",
+    ]

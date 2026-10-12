@@ -97,6 +97,9 @@ def sync(
                 continue
 
             try:
+                # Remember HEAD so the change check covers every pulled commit
+                revision_before_pull = _head_revision(lib_path)
+
                 # Run git pull
                 result = subprocess.run(
                     ["git", "pull"],
@@ -130,7 +133,9 @@ def sync(
 
                     # Check if there are new library files that would require setup
                     if is_updated:
-                        changes_require_setup = check_for_library_changes(lib_path)
+                        changes_require_setup = check_for_library_changes(
+                            lib_path, revision_before_pull or "HEAD~1"
+                        )
                         if changes_require_setup:
                             libraries_with_changes.append(
                                 (lib_name, lib_path, changes_require_setup)
@@ -198,12 +203,25 @@ def sync(
 
 
 # TODO: Should be in services or utils
-def check_for_library_changes(lib_path: Path) -> list[str]:
+def _head_revision(lib_path: Path) -> str | None:
+    """Return the commit HEAD points at, or None when git cannot tell."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
+        cwd=lib_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() or None if result.returncode == 0 else None
+
+
+def check_for_library_changes(lib_path: Path, since: str = "HEAD~1") -> list[str]:
     """Check if git pull changes indicate new libraries that would require setup.
-    Uses git diff to analyze what files were added/changed in the pull.
+    Uses git diff to analyze what files were added/changed since `since`.
 
     Args:
         lib_path: Path to the library directory
+        since: Revision to compare HEAD with, normally HEAD before the pull
 
     Returns:
         List of change types found ('symbols', 'footprints', 'templates') or empty list if none
@@ -213,7 +231,7 @@ def check_for_library_changes(lib_path: Path) -> list[str]:
     try:
         # Get the diff between HEAD~1 and HEAD to see what changed in the pull
         result = subprocess.run(
-            ["git", "diff", "--name-status", "HEAD~1", "HEAD"],
+            ["git", "diff", "--name-status", since, "HEAD"],
             cwd=lib_path,
             capture_output=True,
             text=True,
