@@ -153,9 +153,22 @@ class TestInstallationDetector:
     def test_running_interpreter_and_metadata(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """detect_installation_method inspects the running interpreter."""
+        """detect_installation_method reads the interpreter and INSTALLER record."""
         monkeypatch.setattr(sys, "executable", PIPX_PYTHON)
         assert detect_installation_method() == "pipx"
+
+        class Distribution:
+            @staticmethod
+            def read_text(filename: str) -> str | None:
+                return "pip\n" if filename == "INSTALLER" else None
+
+        monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+        monkeypatch.setattr(
+            install_method.importlib.metadata,
+            "distribution",
+            lambda _name: Distribution,
+        )
+        assert detect_installation_method() == "pip"
 
 
 class TestUpgradeCommand:

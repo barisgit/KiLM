@@ -157,14 +157,18 @@ def test_set_default_prompts_without_name(
 ) -> None:
     """Without a name the libraries of the type are numbered and one is picked."""
     library = libraries[index]
+    config = stored(config_file)
+    config.add_library("second-lib", "/second", library["type"])
+    second = config.get_libraries()[-1]
 
-    result = invoke("set-default", *arguments, user_input="5\n1\n")
+    result = invoke("set-default", *arguments, user_input="5\n2\n")
 
     assert result.exit_code == 0
     assert f"Available {library['type']} libraries:" in result.output
     assert f"1. {library['name']}" in result.output
-    assert "5 is not in the range 1<=x<=1" in result.output
-    assert stored(config_file).get_current_library() == library["path"]
+    assert "2. second-lib" in result.output
+    assert "5 is not in the range 1<=x<=2" in result.output
+    assert stored(config_file).get_current_library() == second["path"]
 
 
 @pytest.mark.usefixtures("config_file")
@@ -207,7 +211,9 @@ def test_remove_default_library_reports_cleared_default(config_file: Path) -> No
     assert stored(config_file).get_current_library() is None
 
 
-def test_remove_asks_for_confirmation(config_file: Path) -> None:
+def test_remove_asks_for_confirmation(
+    config_file: Path, libraries: list[LibraryDict]
+) -> None:
     """Without --force the libraries are described and removal needs a yes."""
     result = invoke("remove", "test-github-lib", user_input="y\n")
 
@@ -215,7 +221,7 @@ def test_remove_asks_for_confirmation(config_file: Path) -> None:
     assert "Will remove github library 'test-github-lib'" in result.output
     assert "This is the current default library" in result.output
     assert "Removed library 'test-github-lib'" in result.output
-    assert len(stored(config_file).get_libraries()) == 1
+    assert stored(config_file).get_libraries() == [libraries[1]]
 
 
 def test_remove_cancelled_keeps_library(config_file: Path) -> None:
@@ -227,7 +233,9 @@ def test_remove_cancelled_keeps_library(config_file: Path) -> None:
     assert len(stored(config_file).get_libraries()) == 2
 
 
-def test_remove_only_the_given_type(config_file: Path) -> None:
+def test_remove_only_the_given_type(
+    config_file: Path, libraries: list[LibraryDict]
+) -> None:
     """--type removes one entry of a name registered for both types."""
     config = stored(config_file)
     config.add_library("test-github-lib", "/elsewhere", "cloud")
@@ -235,13 +243,12 @@ def test_remove_only_the_given_type(config_file: Path) -> None:
     result = invoke("remove", "test-github-lib", "--type", "cloud", "--force")
 
     assert result.exit_code == 0
-    assert [library["type"] for library in stored(config_file).get_libraries()] == [
-        "github",
-        "cloud",
-    ]
+    assert stored(config_file).get_libraries() == libraries
 
 
-def test_remove_every_type_reports_count(config_file: Path) -> None:
+def test_remove_every_type_reports_count(
+    config_file: Path, libraries: list[LibraryDict]
+) -> None:
     """Without --type every entry with the name goes, and the count is given."""
     stored(config_file).add_library("test-github-lib", "/elsewhere", "cloud")
 
@@ -249,6 +256,7 @@ def test_remove_every_type_reports_count(config_file: Path) -> None:
 
     assert result.exit_code == 0
     assert "Removed 2 instances of library 'test-github-lib'" in result.output
+    assert stored(config_file).get_libraries() == [libraries[1]]
 
 
 @pytest.mark.usefixtures("config_file")
