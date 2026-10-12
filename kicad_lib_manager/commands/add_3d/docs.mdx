@@ -32,7 +32,8 @@ The command performs the following main actions:
 1. **Creates/Updates Metadata**: Creates or modifies `.kilm_metadata` in the target directory containing:
    - Library name, description, and associated environment variable
    - Count of detected model files
-   - Last updated timestamp
+
+   Other fields already in the file are kept as they are, unless an option replaces them or `--force` starts the file afresh.
 
 2. **Updates Global Configuration**: Adds library entry (type `cloud`) to main `config.yaml`
 
