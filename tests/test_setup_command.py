@@ -71,6 +71,22 @@ def _fail_writes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(io, "open", failing_open)
 
 
+def test_setup_backs_up_library_tables_before_changing_them(
+    kicad_config: Path, library: Path
+) -> None:
+    """The backup holds the table as it was before setup added libraries."""
+    result = CliRunner().invoke(
+        app, ["setup", "--kicad-lib-dir", str(library), "--no-pin-libraries"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '(name "Demo")' in (kicad_config / "sym-lib-table").read_text(
+        encoding="utf-8"
+    )
+    backups = sorted(kicad_config.glob("sym-lib-table.backup.*"))
+    assert [b.read_text(encoding="utf-8") for b in backups] == [EMPTY_SYM_TABLE]
+
+
 def test_fix_invalid_uris_rewrites_wrapped_paths(kicad_config: Path) -> None:
     """A path wrapped in ``${}`` becomes a plain path."""
     table = kicad_config / "sym-lib-table"

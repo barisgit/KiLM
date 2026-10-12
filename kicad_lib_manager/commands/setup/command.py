@@ -477,16 +477,16 @@ def setup(
         if kicad_3d_dir and "KICAD_3D_LIB" not in three_d_dirs:
             three_d_dirs["KICAD_3D_LIB"] = kicad_3d_dir
 
-        # Call add_libraries with the main library and all 3D libraries
+        # Plan first: the tables are backed up only when they will change, and
+        # the backup must hold the content from before the change.
         added_libraries, changes_needed = LibraryService.add_libraries(
             kicad_lib_dir,
             kicad_config,
             kicad_3d_dir=kicad_3d_dir,
             additional_3d_dirs=three_d_dirs,
-            dry_run=dry_run,
+            dry_run=True,
         )
 
-        # Create backups only if changes are needed
         if changes_needed and not dry_run:
             sym_table = kicad_config / "sym-lib-table"
             fp_table = kicad_config / "fp-lib-table"
@@ -502,6 +502,14 @@ def setup(
                 get_console().print(
                     "[blue]Created backup of footprint library table[/blue]"
                 )
+
+            added_libraries, changes_needed = LibraryService.add_libraries(
+                kicad_lib_dir,
+                kicad_config,
+                kicad_3d_dir=kicad_3d_dir,
+                additional_3d_dirs=three_d_dirs,
+                dry_run=False,
+            )
 
         if added_libraries:
             if dry_run:
