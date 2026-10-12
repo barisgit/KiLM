@@ -35,7 +35,8 @@ UPDATE_CHECK_INTERVALS: Final[dict[str, float]] = {
 }
 """Seconds between update checks for each `update_check_frequency`.
 
-"never" disables checks; any other value never triggers one.
+"never" disables checks; any other value triggers one only while no
+previous check is recorded.
 """
 
 LAST_UPDATE_CHECK_FILE: Final = "last_update_check"

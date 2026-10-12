@@ -44,16 +44,15 @@ def perform_update_command(
         typer.Option("--no-cache", help="Skip cache and force fresh version check"),
     ] = False,
 ) -> None:
-    """Perform KiLM update installation.
+    """Install a newer KiLM release.
 
-    This command updates KiLM itself by downloading and installing the latest
-    version from PyPI. The update method depends on how KiLM was installed
-    (pip, pipx, uv tool, etc.).
+    Installs the latest release from PyPI, or --target-version, with the
+    installer that installed KiLM (pip, pipx, uv tool, etc.). Without --force
+    it stops when that version is already installed. Installations KiLM
+    cannot update get the command to run by hand and exit 1.
 
-    DEPRECATION NOTICE:
-    In KiLM 0.4.0, the 'update' command now updates KiLM itself.
-    To update library content, use 'kilm sync' instead.
-    This banner will be removed in a future version.
+    Since KiLM 0.4.0 'kilm update' updates KiLM itself; 'kilm sync' updates
+    library content.
     """
     console = get_console()
     console.print(Panel(BREAKING_CHANGE_NOTICE, expand=False, border_style="yellow"))

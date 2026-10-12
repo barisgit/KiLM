@@ -12,6 +12,8 @@ from typing import Final
 
 import requests
 
+from kicad_lib_manager.services.user_paths import user_cache_dir
+
 CACHE_TTL_SECONDS: Final = 24 * 60 * 60
 """How long a cached answer is returned without asking PyPI."""
 
@@ -19,9 +21,8 @@ REQUEST_TIMEOUT_SECONDS: Final = 10
 """How long a PyPI request may take before the check gives up."""
 
 
-def default_cache_file() -> Path:
-    """Return where the version check is cached for the current user."""
-    return Path.home() / ".cache" / "kilm" / "version_check.json"
+VERSION_CHECK_FILE: Final = "version_check.json"
+"""Cache file, in the user cache directory, holding the last PyPI answer."""
 
 
 @dataclass(frozen=True)
@@ -73,15 +74,16 @@ class PyPIVersionChecker:
             cache_file: Where answers are cached; defaults to the user cache.
         """
         self.base_url = f"https://pypi.org/pypi/{package_name}/json"
-        self.cache_file = cache_file or default_cache_file()
+        self.cache_file = cache_file or user_cache_dir() / VERSION_CHECK_FILE
         self.user_agent = f"KiLM/{version} (+https://github.com/barisgit/KiLM)"
 
     def check_latest_version(self, *, use_cache: bool = True) -> str | None:
         """Return the latest released version, or None when it is unknown.
 
         With `use_cache` a fresh cached answer is returned without a request.
-        Network and response errors return None and never raise, so an
-        offline machine only loses the update notice.
+        Network and response errors return None, even when an older answer
+        is cached, and never raise, so an offline machine only loses the
+        update notice.
         """
         cached = self._load_cache()
         if use_cache and cached is not None and cached.is_fresh():

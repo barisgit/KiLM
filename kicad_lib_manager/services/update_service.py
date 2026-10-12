@@ -34,7 +34,7 @@ class UpdateStatus(TypedDict):
     """Whether a release newer than the installed version exists."""
     current_version: str
     latest_version: str | None
-    """None when PyPI could not be asked and nothing was cached."""
+    """None when no fresh cached answer was used and the PyPI lookup failed."""
     method: InstallMethod
     supports_auto_update: bool
 

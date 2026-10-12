@@ -46,8 +46,9 @@ def _show_title() -> None:
 def _check_for_updates_if_needed() -> None:
     """Show a notice when a newer KiLM is available, unless disabled.
 
-    PyPI is queried only as often as the configured frequency allows; between
-    queries the cached answer still produces the notice. Any failure is logged
+    Both branches answer from the day-long PyPI cache and refresh it from
+    PyPI once it has expired; a check the configured frequency calls for is
+    recorded only when it finds an update. Any failure is logged
     at debug level and ignored, because an update check must never break the
     command the user ran.
     """

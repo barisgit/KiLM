@@ -227,8 +227,8 @@ def sync(
 def check_for_library_changes(lib_path: Path, since: str = "HEAD~1") -> list[str]:
     """Return the kinds of library content added between ``since`` and HEAD.
 
-    The kinds are ``symbols``, ``footprints``, and ``templates``: content that
-    KiCad only sees after ``kilm setup``. Added, modified, and renamed paths
+    The kinds are ``symbols``, ``footprints``, and ``templates``. Added,
+    modified, and renamed paths
     count; deletions do not. When git cannot compare the revisions (for
     example, ``since`` predates the first commit), every kind the library
     currently contains is returned instead.

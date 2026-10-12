@@ -169,7 +169,13 @@ def unpin(  # noqa: PLR0913 -- each CLI option is a Typer parameter
         typer.Option("--verbose", "-v", help="Show verbose output for debugging"),
     ] = False,
 ) -> None:
-    """Unpin libraries in KiCad."""
+    """Remove libraries from KiCad's pinned lists in kicad_common.json.
+
+    Takes the named --symbols and --footprints, or every pinned library with
+    --all, and backs up the file before changing it. A missing file or
+    session leaves nothing to unpin. Exits 1 when no library is named,
+    --all is combined with names, or the file cannot be updated.
+    """
     console = get_console()
     selected_symbols = symbols or []
     selected_footprints = footprints or []
