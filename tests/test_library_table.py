@@ -1,5 +1,6 @@
 """Tests for adding KiLM libraries to KiCad's library tables."""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -89,6 +90,45 @@ def test_add_entries_escapes_quotes_and_backslashes(tmp_path: Path) -> None:
     assert '(descr "The \\"main\\"\\nparts")' in content
 
 
+def test_written_entries_read_back_unchanged(tmp_path: Path) -> None:
+    """Escaped names, URIs, and descriptions decode to what was written."""
+    table = write_table(tmp_path / "sym-lib-table")
+    entries = [
+        TableEntry("back\\slash", "C:\\libs\\a.kicad_sym", 'The "main"\nparts\\t'),
+        TableEntry('quote"d (name "x")', "/žćš/b.kicad_sym", "Ünïcode"),
+    ]
+
+    add_entries_to_table(table, entries)
+
+    symbols, _footprints = list_configured_libraries(tmp_path)
+    assert symbols == [
+        {"name": e.name, "type": "KiCad", "uri": e.uri, "description": e.description}
+        for e in entries
+    ]
+
+
+def test_reader_decodes_strings_as_kicad_does(tmp_path: Path) -> None:
+    """Unquoted atoms, hex and octal bytes, and unknown escapes read like KiCad."""
+    (tmp_path / "sym-lib-table").write_text(
+        "(sym_lib_table\n"
+        '  (lib (name "\\x41\\101\\305\\276\\q\\8")(type Legacy)(uri ${X}/a.lib)'
+        '(descr "tab\\there"))\n'
+        ")\n",
+        encoding="utf-8",
+    )
+
+    symbols, _footprints = list_configured_libraries(tmp_path)
+
+    assert symbols == [
+        {
+            "name": "AAž\\q\\8",
+            "type": "Legacy",
+            "uri": "${X}/a.lib",
+            "description": "tab\there",
+        }
+    ]
+
+
 def test_add_entries_requires_an_existing_table(tmp_path: Path) -> None:
     """A missing table is an error rather than created."""
     with pytest.raises(ValueError, match="not found"):
@@ -138,6 +178,21 @@ def test_add_libraries_writes_new_entries_once(
     ]
     assert footprints[0]["description"] == "test_šž footprint library"
     assert add_libraries(str(library), kicad_config) == (set(), False)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="names a file with a backslash")
+def test_backslash_named_library_is_added_once(
+    tmp_path: Path, kicad_config: Path
+) -> None:
+    """A second setup finds the escaped entry and adds no duplicate."""
+    library = tmp_path / "lib"
+    (library / "symbols").mkdir(parents=True)
+    (library / "symbols" / "a\\b.kicad_sym").touch()
+
+    assert add_libraries(str(library), kicad_config) == ({"a\\b"}, True)
+    assert add_libraries(str(library), kicad_config) == (set(), False)
+    symbols, _footprints = list_configured_libraries(kicad_config)
+    assert [entry["name"] for entry in symbols] == ["a\\b"]
 
 
 @pytest.mark.parametrize("reference", ["KICAD_LIB", "${KICAD_LIB}"])

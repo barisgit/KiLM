@@ -6,7 +6,7 @@ import shutil
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Literal, NamedTuple, TypedDict
 
 from kicad_lib_manager.utils.constants import FOOTPRINT_TABLE_FILE, SYMBOL_TABLE_FILE
 
@@ -14,13 +14,38 @@ _DEFAULT_ENCODINGS = ("utf-8", "utf-16", "iso-8859-1")
 
 # One (lib ...) entry per line, as KiCad writes library tables.
 _LIB_ENTRY_RE = re.compile(r"^\s*\(lib\s+(.*?)\)\s*$", re.MULTILINE)
-_LIB_NAME_RE = re.compile(r'\(name\s+"([^"]+)"\)')
-# Optional properties of an entry; "url" is accepted for "uri" too.
-_LIB_PROPERTY_RES: dict[Literal["uri", "type", "description"], re.Pattern[str]] = {
-    "uri": re.compile(r'\((?:uri|url)\s+"([^"]+)"\)'),
-    "type": re.compile(r'\(type\s+"([^"]+)"\)'),
-    "description": re.compile(r'\(descr\s+"([^"]+)"\)'),
+# A token of an entry: a quoted string (group 1, escapes undecoded) or else a
+# parenthesis or an unquoted atom (group 2).
+_TOKEN_RE = re.compile(r'"((?:[^"\\]|\\.)*)"|([()]|[^\s()"]+)', re.DOTALL)
+# An escape in a quoted string: hex bytes, octal bytes, or any other character.
+_ESCAPE_RE = re.compile(rb"\\(?:x[0-9A-Fa-f]{1,2}|[0-7]{1,3}|.)", re.DOTALL)
+_OCTAL_DIGITS = frozenset(b"01234567")
+_NAMED_ESCAPES = {
+    b'"': b'"',
+    b"\\": b"\\",
+    b"a": b"\a",
+    b"b": b"\b",
+    b"f": b"\f",
+    b"n": b"\n",
+    b"r": b"\r",
+    b"t": b"\t",
+    b"v": b"\v",
+    b"x": b"x",
 }
+_Property = Literal["name", "uri", "type", "description"]
+# Entry properties by keyword; "url" is accepted for "uri" too.
+_PROPERTY_KEYWORDS: dict[str, _Property] = {
+    "name": "name",
+    "uri": "uri",
+    "url": "uri",
+    "type": "type",
+    "descr": "description",
+}
+_OPTIONAL_PROPERTIES: tuple[Literal["uri", "type", "description"], ...] = (
+    "uri",
+    "type",
+    "description",
+)
 
 
 class _LibraryTableProperties(TypedDict, total=False):
@@ -171,6 +196,8 @@ def list_configured_libraries(
     """List the libraries in KiCad's sym-lib-table and fp-lib-table.
 
     A missing table lists no libraries; entries without a name are skipped.
+    Quoted values are decoded as KiCad reads them, so they equal the values
+    that KiCad or KiLM wrote.
 
     Returns:
         (symbol library entries, footprint library entries)
@@ -193,13 +220,67 @@ def _read_lib_table(table_path: Path) -> list[LibraryTableEntry]:
     return entries
 
 
+class _Token(NamedTuple):
+    """A token of a table entry; text is decoded when quoted."""
+
+    text: str
+    quoted: bool
+
+
+_OPEN = _Token("(", quoted=False)
+_CLOSE = _Token(")", quoted=False)
+
+
 def _parse_lib_entry(entry: str) -> LibraryTableEntry | None:
-    name = _LIB_NAME_RE.search(entry)
+    """Read the `(keyword value)` properties of one entry's content.
+
+    The first non-empty value of each property counts. Returns None when the
+    entry has no name.
+    """
+    tokens = [
+        _Token(_unescape(match.group(1)), quoted=True)
+        if match.group(2) is None
+        else _Token(match.group(2), quoted=False)
+        for match in _TOKEN_RE.finditer(entry)
+    ]
+    found: dict[_Property, str] = {}
+    for opening, keyword, value, closing in zip(
+        tokens, tokens[1:], tokens[2:], tokens[3:], strict=False
+    ):
+        prop = _PROPERTY_KEYWORDS.get(keyword.text) if not keyword.quoted else None
+        is_value = value.quoted or value not in {_OPEN, _CLOSE}
+        if opening == _OPEN and closing == _CLOSE and prop and is_value and value.text:
+            found.setdefault(prop, value.text)
+    name = found.get("name")
     if name is None:
         return None
-    parsed: LibraryTableEntry = {"name": str(name.group(1))}
-    for key, pattern in _LIB_PROPERTY_RES.items():
-        value = pattern.search(entry)
-        if value is not None:
-            parsed[key] = str(value.group(1))
+    parsed: LibraryTableEntry = {"name": name}
+    for key in _OPTIONAL_PROPERTIES:
+        if key in found:
+            parsed[key] = found[key]
     return parsed
+
+
+def _unescape(text: str) -> str:
+    """Decode the escapes of a quoted string as KiCad's S-expression reader does.
+
+    KiCad decodes escapes to bytes and reads the result as UTF-8, so this
+    works on the UTF-8 bytes too; other characters pass through unchanged.
+    An unknown escape keeps its backslash.
+    """
+    return _ESCAPE_RE.sub(_escaped_bytes, text.encode("utf-8")).decode(
+        "utf-8", errors="replace"
+    )
+
+
+def _escaped_bytes(match: re.Match[bytes]) -> bytes:
+    r"""Return the bytes that one escape, such as `\n` or `\x41`, stands for."""
+    body = match.string[match.start() + 1 : match.end()]  # after the backslash
+    if body in _NAMED_ESCAPES:
+        return _NAMED_ESCAPES[body]
+    if body.startswith(b"x"):
+        return bytes([int(body[1:], 16)])
+    if body[0] in _OCTAL_DIGITS:
+        # KiCad stores the value in a char, keeping the low byte.
+        return bytes([int(body, 8) & 0xFF])
+    return b"\\" + body
