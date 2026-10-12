@@ -3,73 +3,88 @@ title: update
 description: Update KiLM to the latest version from PyPI.
 ---
 
-import { LinkCard, Card, CardGrid } from "@astrojs/starlight/components";
-
-The `kilm update` command updates KiLM itself to the latest version available on PyPI. It automatically detects your installation method and uses the appropriate update mechanism.
+The `kilm update` command group updates KiLM itself. It detects how KiLM was installed and uses the matching upgrade mechanism.
 
 :::caution[Breaking Change in v0.4.0]
 The `kilm update` command behavior changed in KiLM v0.4.0:
 - **Now:** Updates KiLM itself (self-update)
 - **Previously:** Updated library content (now use `kilm sync`)
-
-A deprecation banner will guide users during the transition period.
 :::
 
 ## Usage
 
 ```bash
-kilm update [OPTIONS]
+kilm update check [OPTIONS]
+kilm update info [OPTIONS]
+kilm update perform [OPTIONS]
 ```
 
-## Options
+Running `kilm update` without a subcommand prints the available subcommands.
 
-- `--check`:
-  Check for available updates without installing them. Shows current version, latest version, and update instructions.
-  _Example:_ `kilm update --check`
+## Subcommands
 
-- `--force`:
-  Force update even if already up to date. Useful for reinstalling the current version.
-  _Example:_ `kilm update --force`
+### check
 
-- `--help`:
-  Show the help message and exit.
+Checks PyPI for a newer version without installing it. Exits with status `1` when an update is available and `0` otherwise, so it can be used in scripts.
 
-## Behavior
+- `--force` / `--no-force`: Bypass the cached version check and query PyPI. Default: `--no-force`.
+- `--quiet`, `-q`: Print output only when an update is available.
 
-1.  **Installation Detection:** Automatically detects how KiLM was installed (pipx, pip, uv).
-2.  **Version Check:** Queries PyPI for the latest available version using cached requests.
-3.  **Update Execution:** For supported methods (pipx, pip, uv), automatically executes the update command.
-4.  **Unavailable Methods:** For conda and homebrew (not yet published), provides information about planned availability.
+### info
+
+Shows the current version, whether a newer one exists, the detected installation method, whether automatic updates are supported, and the manual update command.
+
+- `--force-check` / `--no-force-check`: Bypass the cached version check and query PyPI. Default: `--no-force-check`.
+
+### perform
+
+Installs the update. If KiLM is already up to date, it exits without changes unless `--force` is given.
+
+- `--target-version`, `-t` `TEXT`: Version to install. Currently only `--dry-run` output uses it; an actual update always installs the latest release.
+- `--force`, `-f`: Reinstall even if KiLM is already up to date.
+- `--dry-run`: Show what would be updated without changing anything.
+- `--no-cache`: Bypass the cached version check and query PyPI.
+
+Every subcommand also accepts `--help`.
 
 ## Supported Installation Methods
 
-| Method | Auto-Update | Update Command |
-|--------|-------------|----------------|
-| **pipx** ✅ | Yes | `pipx upgrade kilm` |
-| **pip** ✅ | Yes | `pip install --upgrade kilm` |
-| **pip (venv)** ✅ | Yes | `pip install --upgrade kilm` |
-| **uv** ✅ | Yes | `uv tool upgrade kilm` |
-| **conda** | Unavailable | N/A (planned for future) |
-| **homebrew** | Unavailable | N/A (planned for future) |
+| Method | Automatic update | Update command |
+|--------|------------------|----------------|
+| **pipx** | Yes | `pipx upgrade kilm` |
+| **pip** | Yes | `pip install --upgrade kilm` |
+| **pip (venv)** | Yes | `pip install --upgrade kilm` |
+| **uv** | Yes | `uv tool upgrade kilm` |
+| **conda** | No | Not yet published |
+| **homebrew** | No | Not yet published |
+
+For methods without automatic updates, `kilm update perform` prints the manual command and exits with status `1`.
 
 ## Examples
 
 **Check for updates:**
 
 ```bash
-kilm update --check
+kilm update check
 ```
 
-**Update KiLM to latest version:**
+**Show installation details:**
 
 ```bash
-kilm update
+kilm update info
 ```
 
-**Force reinstall current version:**
+**Update KiLM to the latest version:**
 
 ```bash
-kilm update --force
+kilm update perform
+```
+
+**Preview the update, then reinstall the current version:**
+
+```bash
+kilm update perform --dry-run
+kilm update perform --force
 ```
 
 ## Troubleshooting
@@ -79,8 +94,8 @@ kilm update --force
 - For pipx: Reinstall with `pipx uninstall kilm && pipx install kilm`
 
 **Cannot detect installation method:**
-- Install via pipx for best CLI tool experience: `pipx install kilm`
+- Install via pipx for the best CLI tool experience: `pipx install kilm`
 
 **Network/PyPI connection issues:**
-- Check internet connection
+- Check your internet connection
 - Try again later (PyPI may be temporarily unavailable)

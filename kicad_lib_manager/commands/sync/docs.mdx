@@ -21,15 +21,15 @@ kilm sync [OPTIONS]
 
 ## Options
 
-- `--dry-run`:
+- `--dry-run` / `--no-dry-run`:
   Show which libraries are detected as Git repositories and would be updated, but do not actually run `git pull`.
   _Example:_ `kilm sync --dry-run`
 
-- `--verbose`:
+- `--verbose` / `--no-verbose`:
   Show detailed output during the update process, including the full output from the `git pull` commands.
   _Example:_ `kilm sync --verbose`
 
-- `--auto-setup`:
+- `--auto-setup` / `--no-auto-setup`:
   If the `git pull` operation results in changes that likely require updating KiCad's configuration (e.g., new symbol or footprint libraries detected), automatically run `kilm setup` after the updates are complete. Default: `False`.
   _Example:_ `kilm sync --auto-setup`
 
