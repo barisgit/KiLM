@@ -44,7 +44,7 @@ Before submitting, ensure your code meets our standards:
 pyrefly
 
 # Code formatting
-black .
+ruff format .
 
 # Linting 
 ruff check --fix .

@@ -15,7 +15,7 @@ The documentation is organized into the following sections:
 
 ## Commands
 
-All commands are run from the root of the project, from a terminal:
+Requires Node.js 22.12 or later (Astro 6) and pnpm. All commands are run from the `docs/` directory:
 
 | Command        | Action                                       |
 | :------------- | :------------------------------------------- |

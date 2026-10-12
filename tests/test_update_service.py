@@ -3,7 +3,7 @@ Tests for the update service functionality including installation detection and 
 """
 
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import Mock, patch
 
 import pytest
@@ -19,6 +19,22 @@ from kicad_lib_manager.services.update_service import (
 
 class TestInstallationDetection:
     """Test installation method detection logic using the modular detector."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_detection_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep detection hermetic: CI runners and dev shells may export these.
+
+        setup-uv on Windows runners sets UV_TOOL_DIR, for example, which made
+        the venv tests detect "uv" instead of "pip-venv".
+        """
+        for var in (
+            "PIPX_HOME",
+            "CONDA_DEFAULT_ENV",
+            "UV_TOOL_DIR",
+            "UV_TOOL_BIN_DIR",
+            "VIRTUAL_ENV",
+        ):
+            monkeypatch.delenv(var, raising=False)
 
     def test_detect_pipx_installation_path_pattern(self):
         """Test detection of pipx installation via path pattern."""
@@ -67,6 +83,23 @@ class TestInstallationDetection:
         )
         assert detector.detect_uv() is True
         assert detector.detect() == "uv"
+
+    @pytest.mark.parametrize(
+        ("executable", "expected"),
+        [
+            (r"C:\Users\user\pipx\venvs\kilm\Scripts\python.exe", "pipx"),
+            (
+                r"C:\Users\user\AppData\Roaming\uv\tools\kilm\Scripts\python.exe",
+                "uv",
+            ),
+        ],
+    )
+    def test_detect_windows_path_patterns(self, executable: str, expected: str) -> None:
+        """Path patterns match Windows executables with backslash separators."""
+        detector = InstallationDetector(
+            executable_path=PureWindowsPath(executable), platform_name="nt"
+        )
+        assert detector.detect() == expected
 
     def test_detect_pip_venv_installation_env_var(self, monkeypatch):
         """Test detection of pip in virtual environment via VIRTUAL_ENV."""

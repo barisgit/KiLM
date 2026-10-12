@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Optional
 
 import requests
@@ -20,12 +20,14 @@ class InstallationDetector:
 
     def __init__(
         self,
-        executable_path: Optional[Path] = None,
+        executable_path: Optional[PurePath] = None,
         platform_name: Optional[str] = None,
     ):
         self.executable_path = executable_path or Path(sys.executable)
         self.platform_name = platform_name or os.name
-        self.executable_str = str(self.executable_path)
+        # Forward slashes on every platform so the path patterns below
+        # (".local/share/pipx", "uv/tools", ...) also match Windows paths.
+        self.executable_str = self.executable_path.as_posix()
 
     def is_windows(self) -> bool:
         """Check if running on Windows."""
