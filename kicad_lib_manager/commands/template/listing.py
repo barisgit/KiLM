@@ -38,6 +38,12 @@ def list_templates(
     """
     templates = find_all_templates(Config(), library)
     if not templates:
+        if json_output:
+            # The machine-readable answer to an empty library set is the
+            # same empty mapping a populated listing would render, and
+            # nothing else: the explanation below would break parsers.
+            typer.echo(json.dumps({}))
+            return
         _print_no_templates(library)
         return
     if json_output:

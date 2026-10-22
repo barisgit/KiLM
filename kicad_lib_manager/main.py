@@ -59,10 +59,10 @@ def _check_for_updates_if_needed() -> None:
             return
         update_service = UpdateService(importlib.metadata.version("kilm"))
         if config.should_check_updates():
-            if update_service.show_update_notification(quiet=True):
+            if update_service.show_update_notification(quiet=True, stderr=True):
                 config.mark_update_check_performed()
         elif update_service.check_for_updates(use_cache=True)["has_update"]:
-            update_service.show_update_notification(quiet=True)
+            update_service.show_update_notification(quiet=True, stderr=True)
     except Exception:
         logger.debug("Update check failed", exc_info=True)
 

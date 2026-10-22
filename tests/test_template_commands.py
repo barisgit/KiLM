@@ -64,6 +64,70 @@ def test_list_json_is_valid_json_for_long_values(home: Path) -> None:
     assert templates["board"]["description"] == "x" * 150
 
 
+def test_list_json_with_no_templates_prints_an_empty_object(home: Path) -> None:
+    """--json answers an empty library set with `{}`, not rich text."""
+    result = CliRunner().invoke(template_app, ["list", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {}
+
+
+def test_create_without_templates_exits_nonzero(home: Path) -> None:
+    """`template create` fails when no library has any templates."""
+    result = CliRunner().invoke(template_app, ["create", "Widget"])
+
+    assert result.exit_code == 1
+    assert "No templates found" in result.output
+
+
+def test_create_unknown_template_exits_nonzero(home: Path) -> None:
+    """`template create` fails when the requested template does not exist."""
+    add_template(add_library(home, "lib"), "board", {})
+
+    result = CliRunner().invoke(
+        template_app, ["create", "Widget", "--template", "missing"]
+    )
+
+    assert result.exit_code == 1
+    assert "Template 'missing' not found." in result.output
+
+
+def test_create_cancelled_selection_exits_nonzero(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cancelled template selection fails the command."""
+    add_template(add_library(home, "lib"), "board", {})
+
+    class Cancelled:
+        def __init__(self, message: str, choices=None, **kwargs) -> None:
+            pass
+
+        def ask(self) -> None:
+            return None
+
+    monkeypatch.setattr(questionary, "select", Cancelled)
+
+    result = CliRunner().invoke(template_app, ["create", "Widget"])
+
+    assert result.exit_code == 1
+    assert "Template selection cancelled." in result.output
+
+
+def test_make_existing_template_exits_nonzero(home: Path, tmp_path: Path) -> None:
+    """`template make` refuses to overwrite without --force."""
+    library = add_library(home, "lib")
+    (library / TEMPLATES_DIR / "source").mkdir(parents=True)
+    source = tmp_path / "source"
+    source.mkdir()
+
+    result = CliRunner().invoke(
+        template_app, ["make", "source", str(source), "--non-interactive"]
+    )
+
+    assert result.exit_code == 1
+    assert "already exists" in result.output
+
+
 def test_list_json_keeps_custom_metadata(home: Path) -> None:
     """Keys KiLM does not know, YAML dates included, appear in the JSON."""
     template_dir = add_template(add_library(home, "lib"), "board", {})

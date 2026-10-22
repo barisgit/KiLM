@@ -48,9 +48,9 @@ def post_create(context):
     #         "Created with KiCad Library Manager\n"
     #     )
 
-    # Print message to user
-    print(f"Project {context['variables']['project_name']} created successfully!")
-    print(f"Location: {context['project_dir']}")
+    # Example: Print a message to the user
+    # print(f"Project {context['variables']['project_name']} created successfully!")
+    # print(f"Location: {context['project_dir']}")
 '''
 
 
