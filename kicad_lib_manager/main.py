@@ -48,7 +48,7 @@ def _check_for_updates_if_needed() -> None:
 
     Both branches answer from the day-long PyPI cache and refresh it from
     PyPI once it has expired; a check the configured frequency calls for is
-    recorded only when it finds an update. Any failure is logged
+    recorded once it has run, update found or not. Any failure is logged
     at debug level and ignored, because an update check must never break the
     command the user ran.
     """
@@ -59,8 +59,8 @@ def _check_for_updates_if_needed() -> None:
             return
         update_service = UpdateService(importlib.metadata.version("kilm"))
         if config.should_check_updates():
-            if update_service.show_update_notification(quiet=True, stderr=True):
-                config.mark_update_check_performed()
+            update_service.show_update_notification(quiet=True, stderr=True)
+            config.mark_update_check_performed()
         elif update_service.check_for_updates(use_cache=True)["has_update"]:
             update_service.show_update_notification(quiet=True, stderr=True)
     except Exception:
@@ -72,9 +72,12 @@ class BannerGroup(TyperGroup):
 
     @override
     def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        """Print the banner and any update notice, then the regular help."""
+        """Print the banner, then the regular help.
+
+        The update check is deliberately left out: help output must not
+        depend on the network or on the cache being fresh.
+        """
         _show_title()
-        _check_for_updates_if_needed()
         super().format_help(ctx, formatter)
 
 

@@ -21,13 +21,13 @@ kilm update perform [OPTIONS]
 
 Running `kilm update` without a subcommand prints the available subcommands.
 
-The latest version found on PyPI is cached for a day in `~/.cache/kilm/version_check.json`; within that day `check`, `info`, `perform`, and the update notice in `kilm --help` reuse it unless a bypass option is given.
+The latest version found on PyPI is cached for a day in `~/.cache/kilm/version_check.json`; within that day `check`, `info`, `perform`, and the update notice shown before other commands reuse it unless a bypass option is given. `kilm --help` never runs the check, so help output does not depend on the network or on the cache being fresh.
 
 ## Subcommands
 
 ### check
 
-Checks PyPI for a newer version without installing it. Exits with status `1` when an update is available and `0` otherwise, so it can be used in scripts.
+Checks PyPI for a newer version without installing it. Exits with status `1` when an update is available or the latest version cannot be determined, and `0` otherwise, so it can be used in scripts. When PyPI cannot be reached or answers unusably, `check` reports that the latest version is unknown instead of claiming KiLM is up to date.
 
 - `--force` / `--no-force`: Bypass the cached version check and query PyPI. Default: `--no-force`.
 - `--quiet`, `-q`: Print output only when an update is available.
