@@ -43,6 +43,8 @@ kilm template make [template_name] [project_path] [OPTIONS]
   Overwrite the template directory if it already exists. Default: `False`.
 - `--help`: Show help message.
 
+`kilm template make` exits with status `1` when no GitHub library is configured, when no library path is known in `--non-interactive` mode, or when the template already exists and `--force` is not given.
+
 #### Behavior
 
 1.  **Scans Project:** Analyzes the source project directory.
@@ -96,6 +98,8 @@ kilm template create [project_name_or_path] [output_path] [OPTIONS]
 - `--dry-run`: Preview project creation without creating files.
 - `--help`: Show help message.
 
+`kilm template create` exits with status `1` when no template can be created: no templates are configured, the requested template is not found, a prompt is cancelled, the project directory cannot be determined, or project creation fails.
+
 #### Behavior
 
 1.  **Finds Template:** Locates the specified (or selected) template within the configured KiLM libraries.
@@ -148,7 +152,7 @@ kilm template list [OPTIONS]
 
 - `--library TEXT`: List templates only from the specified KiLM library name.
 - `-v, --verbose`: Add the template variables and the parent template (`extends`) to the table.
-- `--json`: Output the list in JSON format.
+- `--json`: Output the list in JSON format. In JSON mode stdout carries only JSON: an empty library set prints `{}`, and the update notice, when one is due, goes to stderr.
 - `--help`: Show help message.
 
 #### Examples

@@ -66,6 +66,8 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
     directory), named by the ``directory_name`` variable or derived from the
     project name. A NAME with a path separator gives both the parent directory
     and the name. Variables not set by NAME or ``--set-var`` are prompted for.
+    Exits with status 1 when no template can be created or selected, or when
+    project creation fails.
     """
     templates = find_all_templates(Config(), library)
     if not templates:
@@ -74,15 +76,15 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
         )
         get_console().print(f"No templates found in {where}.")
         get_console().print("Use 'kilm template make' to create a template first.")
-        return
+        raise typer.Exit(1)
 
     name, base_directory = _split_name_and_directory(name, directory)
     selected = _select_template(templates, template)
     if selected is None:
-        return
+        raise typer.Exit(1)
     variables = _collect_variables(selected, name, set_var or [])
     if variables is None:
-        return
+        raise typer.Exit(1)
     get_console().print()
     get_console().print(f"Final variables: {json.dumps(variables, indent=2)}")
 
@@ -90,7 +92,7 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
         base_directory, selected, variables, dry_run=dry_run
     )
     if project_dir is None:
-        return
+        raise typer.Exit(1)
     if os.name == "nt":
         _warn_old_filename_syntax(Path(selected["path"]) / TEMPLATE_CONTENT_DIR)
     try:
@@ -103,6 +105,7 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
     if not success:
         get_console().print()
         get_console(stderr=True).print("Project creation failed.")
+        raise typer.Exit(1)
     elif not dry_run:
         get_console().print()
         get_console().print(

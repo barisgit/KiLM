@@ -21,11 +21,19 @@ def check_update_command(
 ) -> None:
     """Check for available updates without installing.
 
-    Exits with status 1 when an update is available, 0 otherwise.
+    Exits with status 1 when an update is available or the latest version
+    cannot be determined, and 0 otherwise.
     """
     console = get_console()
     update_service = UpdateService(importlib.metadata.version("kilm"))
     status = update_service.check_for_updates(use_cache=not force)
+
+    if status["latest_version"] is None:
+        console.print(
+            "[red]Could not determine the latest version;"
+            " the PyPI check failed[/red]"
+        )
+        raise typer.Exit(1)
 
     if not status["has_update"]:
         if not quiet:

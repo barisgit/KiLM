@@ -108,16 +108,17 @@ class UpdateService:
         }
 
     def show_update_notification(
-        self, *, quiet: bool = False, force_check: bool = False
+        self, *, quiet: bool = False, stderr: bool = False
     ) -> bool:
         """Print a panel when a newer release exists; return whether one does.
 
         Args:
             quiet: Print nothing when KiLM is up to date.
-            force_check: Ask PyPI even when a recent answer is cached.
+            stderr: Write the notice to stderr, for commands whose stdout
+                output must stay pure, such as ``--json`` modes.
         """
-        console = get_console()
-        status = self.check_for_updates(use_cache=not force_check)
+        console = get_console(stderr=stderr)
+        status = self.check_for_updates(use_cache=True)
         if not status["has_update"]:
             if not quiet:
                 console.print("[green]You are using the latest version.[/green]")

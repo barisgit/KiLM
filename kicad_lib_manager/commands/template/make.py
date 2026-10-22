@@ -103,7 +103,9 @@ def make(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
     use case, target library) and offers values found in the project as
     variables. With ``--non-interactive``, the name defaults to the source
     directory's and the output to ``templates/<name>`` in the symbol library.
-    Exits with status 1 when no GitHub library is configured.
+    Exits with status 1 when no GitHub library is configured, when no
+    library path is known in ``--non-interactive`` mode, or when the template
+    already exists and ``--force`` is not given.
     """
     config = Config()
     libraries = config.get_libraries(library_type=GITHUB_LIBRARY)
@@ -132,13 +134,13 @@ def make(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
             has_output=output_directory is not None,
         )
     if target is None:
-        return
+        raise typer.Exit(1)
     if target.output.exists() and not force:
         get_console().print(
             f"Template '{target.name}' already exists at {target.output}"
         )
         get_console().print("Use --force to overwrite.")
-        return
+        raise typer.Exit(1)
 
     excludes = exclude or []
     _print_request(target, excludes, extends)
