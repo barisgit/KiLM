@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kilm"
-version = "0.6.0"
+version = "0.6.1"
 description = "A command-line tool for managing KiCad libraries across projects and workstations"
 readme = "README.md"
 license = "MIT"
@@ -41,8 +41,7 @@ keywords = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "click>=8.0",
-    "typer>=0.17.4",
+    "typer>=0.27.2",
     "rich>=14.0.0",
     "packaging>=25.0",
     "pyyaml>=6.0",

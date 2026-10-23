@@ -5,7 +5,7 @@ import traceback
 from pathlib import Path
 from typing import NamedTuple
 
-import click
+import typer
 
 from kicad_lib_manager.utils.constants import HOOKS_DIR, TEMPLATE_CONTENT_DIR
 from kicad_lib_manager.utils.template.constants import (
@@ -60,16 +60,16 @@ def create_project_from_template(
     template_dir = Path(template["path"])
     content_dir = template_dir / TEMPLATE_CONTENT_DIR
     if not content_dir.is_dir():
-        click.echo(
+        typer.echo(
             f"Error: Template content directory {content_dir} does not exist",
             err=True,
         )
         return False
     if not dry_run and project_dir.is_dir() and any(project_dir.iterdir()):
-        click.echo(f"Warning: Target directory {project_dir} is not empty", err=True)
+        typer.echo(f"Warning: Target directory {project_dir} is not empty", err=True)
     extends = template.get("extends")
     if extends is not None and extends:
-        click.echo("Warning: Template inheritance not fully implemented yet", err=True)
+        typer.echo("Warning: Template inheritance not fully implemented yet", err=True)
 
     plan = plan_project(content_dir, project_dir, variables)
     if dry_run:
@@ -82,7 +82,7 @@ def create_project_from_template(
         if not render_template_file(
             planned.source, planned.target, variables, is_binary=planned.is_binary
         ):
-            click.echo(f"Warning: Failed to create {planned.target}", err=True)
+            typer.echo(f"Warning: Failed to create {planned.target}", err=True)
     if not skip_hooks:
         _run_hook(
             template_dir / HOOKS_DIR / POST_CREATE_HOOK,
@@ -125,11 +125,11 @@ def plan_project(
 def _print_plan(plan: ProjectPlan) -> None:
     """Show what a dry run would create."""
     for directory in plan.directories:
-        click.echo(f"Would create directory: {directory}")
-    click.echo()
-    click.echo("The following files would be created:")
+        typer.echo(f"Would create directory: {directory}")
+    typer.echo()
+    typer.echo("The following files would be created:")
     for planned in plan.files:
-        click.echo(f"  {planned.target}")
+        typer.echo(f"  {planned.target}")
 
 
 def _run_hook(
@@ -142,5 +142,5 @@ def _run_hook(
     try:
         run_post_create_hook(hook_script, project_dir, variables, template)
     except Exception as error:  # noqa: BLE001 -- the hook is template code and may raise anything
-        click.echo(f"Error running post-creation hook: {error}", err=True)
+        typer.echo(f"Error running post-creation hook: {error}", err=True)
         traceback.print_exc()

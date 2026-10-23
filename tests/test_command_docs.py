@@ -12,12 +12,16 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import click
 import pytest
 import typer
+from typer.core import TyperGroup, TyperOption
 
 from kicad_lib_manager.main import app
+
+if TYPE_CHECKING:
+    from typer._click import Command
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMMANDS_DIR = REPO_ROOT / "kicad_lib_manager" / "commands"
@@ -36,9 +40,9 @@ LONG_FLAG = re.compile(r"(?<![\w-])--[a-z0-9][a-z0-9-]*")
 SEGMENT_SEPARATOR = re.compile(r"`|&&|\|\||\||;")
 
 
-def _root_group() -> click.Group:
+def _root_group() -> TyperGroup:
     root = typer.main.get_command(app)
-    assert isinstance(root, click.Group)
+    assert isinstance(root, TyperGroup)
     return root
 
 
@@ -46,28 +50,28 @@ ROOT = _root_group()
 COMMAND_NAMES = sorted(ROOT.commands)
 
 
-def _own_flags(command: click.Command) -> frozenset[str]:
+def _own_flags(command: Command) -> frozenset[str]:
     """Return the flags of ``command`` itself that ``--help`` shows."""
     return frozenset(
         flag
         for param in command.params
-        if isinstance(param, click.Option) and not param.hidden
+        if isinstance(param, TyperOption) and not param.hidden
         for flag in (*param.opts, *param.secondary_opts)
     )
 
 
-def _subtree(command: click.Command) -> list[click.Command]:
+def _subtree(command: Command) -> list[Command]:
     """Return ``command`` and, for groups, all of its nested subcommands."""
-    nested = command.commands.values() if isinstance(command, click.Group) else ()
+    nested = command.commands.values() if isinstance(command, TyperGroup) else ()
     return [command, *(sub for child in nested for sub in _subtree(child))]
 
 
-def _subtree_flags(command: click.Command) -> frozenset[str]:
+def _subtree_flags(command: Command) -> frozenset[str]:
     """Return the flags of ``command`` and every nested subcommand."""
     return frozenset(flag for sub in _subtree(command) for flag in _own_flags(sub))
 
 
-def _package_dir(command: click.Command) -> Path:
+def _package_dir(command: Command) -> Path:
     """Return the ``commands/<package>`` directory implementing ``command``."""
     packages = {
         callback.__module__.removeprefix(COMMANDS_PACKAGE).split(".")[0]
@@ -87,12 +91,12 @@ def _mentions(text: str, flag: str) -> bool:
     return re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", text) is not None
 
 
-def _resolve(words: list[str]) -> tuple[click.Command, str]:
+def _resolve(words: list[str]) -> tuple[Command, str]:
     """Resolve the words after ``kilm`` to the deepest matching command."""
-    command: click.Command = ROOT
+    command: Command = ROOT
     path = ["kilm"]
     for word in words:
-        if not isinstance(command, click.Group) or word not in command.commands:
+        if not isinstance(command, TyperGroup) or word not in command.commands:
             break
         command = command.commands[word]
         path.append(word)

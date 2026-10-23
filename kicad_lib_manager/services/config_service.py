@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Final, TypedDict, cast
 
-import click
+import typer
 import yaml
 
 from kicad_lib_manager.services.user_paths import user_cache_dir, user_config_file
@@ -86,7 +86,7 @@ class Config:
         except FileNotFoundError:
             return
         except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
-            click.echo(f"Error loading config file: {e}", err=True)
+            typer.echo(f"Error loading config file: {e}", err=True)
             return
         if isinstance(loaded, dict):
             self._config.update(loaded)
@@ -226,7 +226,7 @@ def _normalize_libraries(value: object) -> list[LibraryDict]:
     name, path, and type are dropped; both are reported on stderr.
     """
     if not isinstance(value, list):
-        click.echo(
+        typer.echo(
             f"Warning: libraries field in config was {type(value).__name__},"
             " resetting to empty list",
             err=True,
@@ -236,7 +236,7 @@ def _normalize_libraries(value: object) -> list[LibraryDict]:
     for entry in cast("list[object]", value):
         library = _library_entry(entry)
         if library is None:
-            click.echo(f"Warning: Skipping invalid library entry: {entry}", err=True)
+            typer.echo(f"Warning: Skipping invalid library entry: {entry}", err=True)
         else:
             libraries.append(library)
     return libraries

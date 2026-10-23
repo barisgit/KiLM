@@ -4,10 +4,13 @@ import importlib.metadata
 import logging
 from typing import Annotated
 
-import click
 import typer
 from rich.align import Align
 from rich.text import Text
+
+# Typer vendors Click and exports neither type publicly, but overriding
+# TyperGroup.format_help needs the exact parameter types of the base method.
+from typer._click import Context, HelpFormatter
 from typer.core import TyperGroup
 from typing_extensions import override
 
@@ -71,7 +74,7 @@ class BannerGroup(TyperGroup):
     """Root command group that prints the banner above its help."""
 
     @override
-    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+    def format_help(self, ctx: Context, formatter: HelpFormatter) -> None:
         """Print the banner and any update notice, then the regular help."""
         _show_title()
         _check_for_updates_if_needed()

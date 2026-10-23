@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Final
 
-import click
 import typer
 from rich.console import Console
 from rich.markup import escape
@@ -306,14 +305,14 @@ def _prompt_for_library(
     for number, library in enumerate(libraries, start=1):
         marker = " (current)" if library["path"] == current else ""
         console.print(f"{number}. {library['name']}{marker}", markup=False)
-    selection = int(
-        typer.prompt(
-            "Select library (number)",
-            type=click.IntRange(1, len(libraries)),
-            default=1,
+    while True:
+        selection = int(typer.prompt("Select library (number)", type=int, default=1))
+        if 1 <= selection <= len(libraries):
+            return libraries[selection - 1]
+        console.print(
+            f"Error: {selection} is not in the range 1<=x<={len(libraries)}.",
+            markup=False,
         )
-    )
-    return libraries[selection - 1]
 
 
 def remove(

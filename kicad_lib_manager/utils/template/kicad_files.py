@@ -11,7 +11,7 @@ import shutil
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-import click
+import typer
 
 from kicad_lib_manager.utils.template.constants import (
     JINJA_SUFFIX,
@@ -70,7 +70,7 @@ def process_kicad_project_file(
         try:
             project: object = json.loads(content)
         except json.JSONDecodeError:
-            click.echo(
+            typer.echo(
                 f"Warning: Could not parse {source_file.name} as JSON."
                 " Copying without changes."
             )
@@ -86,7 +86,7 @@ def process_kicad_schematic_file(source_file: Path, target_file: Path) -> None:
     """Template the ``(project "...")`` references of a ``.kicad_sch`` file."""
 
     def template_project(content: str) -> str:
-        click.echo(
+        typer.echo(
             "  Templated schematic project name references with"
             f" '{PROJECT_FILENAME_TEMPLATE}'"
         )
@@ -111,7 +111,7 @@ def process_kicad_pcb_file(source_file: Path, target_file: Path) -> None:
         return match.group(0)
 
     def template_sheets(content: str) -> str:
-        click.echo(f"  Templated PCB sheet references with '{schematic}'")
+        typer.echo(f"  Templated PCB sheet references with '{schematic}'")
         return PCB_SHEETFILE_PATTERN.sub(template_sheet, content)
 
     _write_template(source_file, target_file, "KiCad PCB file", template_sheets)
@@ -129,7 +129,7 @@ def _with_templated_filename(project: object) -> object:
     if "filename" not in meta:
         return project
     templated = f"{PROJECT_FILENAME_TEMPLATE}{KICAD_PROJECT_EXT}"
-    click.echo(f"  Templated project filename: '{meta['filename']}' → '{templated}'")
+    typer.echo(f"  Templated project filename: '{meta['filename']}' → '{templated}'")
     meta["filename"] = templated
     fields["meta"] = meta
     return fields
@@ -152,9 +152,9 @@ def _write_template(
         if content is not None:
             target_template.write_text(content, encoding="utf-8")
     except (OSError, UnicodeError) as error:
-        click.echo(f"Error processing {kind} {source_file.name}: {error}", err=True)
+        typer.echo(f"Error processing {kind} {source_file.name}: {error}", err=True)
         content = None
     if content is None:
         shutil.copy2(source_file, target_file)
         return
-    click.echo(f"Processed {kind}: {source_file.name} → {target_template.name}")
+    typer.echo(f"Processed {kind}: {source_file.name} → {target_template.name}")

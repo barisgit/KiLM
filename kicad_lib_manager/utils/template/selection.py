@@ -15,8 +15,8 @@ from enum import Enum
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
-import click
 import pathspec
+import typer
 
 if TYPE_CHECKING:
     from pathspec import PathSpec
@@ -94,7 +94,7 @@ def get_gitignore_spec(directory: Path) -> pathspec.PathSpec | None:
     try:
         lines = gitignore_file.read_text(encoding="utf-8").splitlines(keepends=True)
     except (OSError, UnicodeDecodeError) as error:
-        click.echo(f"Warning: Error reading .gitignore file: {error}", err=True)
+        typer.echo(f"Warning: Error reading .gitignore file: {error}", err=True)
         return None
     lines += [
         f"{pattern}\n"
