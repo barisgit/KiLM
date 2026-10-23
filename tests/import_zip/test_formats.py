@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from click.testing import Result
+from typer.testing import Result
 
 from kicad_lib_manager.main import app
 from tests.import_zip.helpers import (

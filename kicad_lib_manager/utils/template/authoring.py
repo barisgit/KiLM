@@ -7,8 +7,8 @@ import shutil
 from collections.abc import Mapping
 from pathlib import Path, PurePath
 
-import click
 import pathspec
+import typer
 
 from kicad_lib_manager.utils.constants import HOOKS_DIR, TEMPLATE_CONTENT_DIR
 from kicad_lib_manager.utils.template.constants import (
@@ -97,8 +97,8 @@ def create_template_structure(
     create_hook_script(hooks_dir)
 
     if gitignore_spec is not None:
-        click.echo("Using .gitignore patterns for exclusion")
-    click.echo("Scanning for main KiCad files...")
+        typer.echo("Using .gitignore patterns for exclusion")
+    typer.echo("Scanning for main KiCad files...")
     plan = plan_template_files(
         source_directory,
         template_directory=template_directory,
@@ -106,15 +106,15 @@ def create_template_structure(
         additional_excludes=additional_excludes,
     )
     for kind, path in plan.main_files.items():
-        click.echo(f"Found main {kind.label} file: {path.name}")
+        typer.echo(f"Found main {kind.label} file: {path.name}")
     for exclusion in plan.excluded:
-        click.echo(exclusion.message)
+        typer.echo(exclusion.message)
 
     skipped: set[PurePath] = set()
     for relative in plan.directories:
         target_dir = content_dir / relative
         if len(str(target_dir)) > MAX_TEMPLATE_PATH_LENGTH:
-            click.echo(f"Skipping directory due to path length: {relative}")
+            typer.echo(f"Skipping directory due to path length: {relative}")
             skipped.add(relative)
         else:
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +128,7 @@ def create_template_structure(
         if kind is not None:
             target = target.with_name(f"%{{{PROJECT_FILENAME_VARIABLE}}}{kind.value}")
         if len(str(target)) > MAX_TEMPLATE_PATH_LENGTH:
-            click.echo(f"Skipping file due to path length: {relative}")
+            typer.echo(f"Skipping file due to path length: {relative}")
             continue
         _add_file(source_directory / relative, target, kind, variables)
 
@@ -152,7 +152,7 @@ def _add_file(
         try:
             shutil.copy2(source, target)
         except OSError as error:
-            click.echo(f"Error copying file {source.name}: {error}", err=True)
+            typer.echo(f"Error copying file {source.name}: {error}", err=True)
 
 
 def _predefined_variables(name: str) -> dict[str, TemplateVariable]:

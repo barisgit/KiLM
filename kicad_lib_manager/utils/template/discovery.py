@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, TypedDict
 
-import click
+import typer
 
 from kicad_lib_manager.utils.constants import TEMPLATE_METADATA, TEMPLATES_DIR
 from kicad_lib_manager.utils.template.models import (
@@ -47,7 +47,7 @@ def list_templates_in_directory(directory: Path) -> list[DiscoveredTemplate]:
         try:
             metadata = read_template_metadata(template_dir)
         except MetadataError as error:
-            click.echo(str(error), err=True)
+            typer.echo(str(error), err=True)
             continue
         if metadata is not None:
             templates.append(discovered_template(metadata, template_dir, directory))
@@ -92,6 +92,6 @@ def find_all_templates(
 def _report_duplicate(
     name: str, kept: DiscoveredTemplate, ignored: DiscoveredTemplate
 ) -> None:
-    click.echo(f"Warning: Duplicate template name '{name}' found.", err=True)
-    click.echo(f"  Using: {kept['path']}", err=True)
-    click.echo(f"  Ignoring: {ignored['path']}", err=True)
+    typer.echo(f"Warning: Duplicate template name '{name}' found.", err=True)
+    typer.echo(f"  Using: {kept['path']}", err=True)
+    typer.echo(f"  Ignoring: {ignored['path']}", err=True)

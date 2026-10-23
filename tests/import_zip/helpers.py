@@ -4,8 +4,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from click.testing import Result
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from kicad_lib_manager.main import app
 

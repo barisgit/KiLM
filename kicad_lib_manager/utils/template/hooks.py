@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 from typing import Protocol, TypedDict, runtime_checkable
 
-import click
+import typer
 
 from kicad_lib_manager.utils.template.constants import POST_CREATE_HOOK
 from kicad_lib_manager.utils.template.models import RenderVariables, TemplateMetadata
@@ -96,13 +96,13 @@ def run_post_create_hook(
         return
     spec = importlib.util.spec_from_file_location(HOOK_MODULE_NAME, hook_script)
     if spec is None or spec.loader is None:
-        click.echo(f"Error: Could not load hook script {hook_script}", err=True)
+        typer.echo(f"Error: Could not load hook script {hook_script}", err=True)
         return
     hook = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(hook)
     post_create: object = getattr(hook, HOOK_FUNCTION, None)
     if not isinstance(post_create, PostCreateHook):
-        click.echo(
+        typer.echo(
             f"Warning: Hook script {hook_script} does not have a post_create function",
             err=True,
         )
