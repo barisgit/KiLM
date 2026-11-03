@@ -112,6 +112,33 @@ def test_stale_cache_is_revalidated_with_its_etag(
     pypi_get.assert_not_called()
 
 
+def test_invalid_version_is_unknown(
+    checker: PyPIVersionChecker, pypi_get: Mock
+) -> None:
+    """A version PEP 440 cannot parse is not reported as the latest release."""
+    pypi_get.return_value = pypi_response("not a version")
+    assert checker.check_latest_version() is None
+
+
+def test_cached_invalid_version_is_refetched_without_its_etag(
+    checker: PyPIVersionChecker, cache_file: Path, pypi_get: Mock
+) -> None:
+    """A fresh cache with an invalid version asks PyPI for a full answer.
+
+    Sending its ETag could earn a 304 that keeps the invalid entry forever.
+    """
+    cache_file.parent.mkdir()
+    cache_file.write_text(
+        json.dumps(
+            {"version": "not a version", "etag": "etag123", "timestamp": time.time()}
+        ),
+        encoding="utf-8",
+    )
+
+    assert checker.check_latest_version() == "1.1.0"
+    assert "If-None-Match" not in pypi_get.call_args.kwargs["headers"]
+
+
 @pytest.mark.usefixtures("pypi_get")
 def test_unreadable_cache_is_ignored(
     checker: PyPIVersionChecker, cache_file: Path

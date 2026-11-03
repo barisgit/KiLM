@@ -50,7 +50,6 @@ def default_config() -> dict[str, ConfigValue]:
         "libraries": [],
         "update_check": True,
         "update_check_frequency": "daily",
-        "auto_update": False,
     }
 
 

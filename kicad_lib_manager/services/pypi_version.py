@@ -1,7 +1,7 @@
 """Latest-release lookup on PyPI, cached on disk for a day."""
 
 # PEP 810: on Python 3.15+ these imports load on first use.
-__lazy_modules__ = {"requests"}
+__lazy_modules__ = {"packaging.version", "requests"}
 
 import json
 import time
@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Final
 
 import requests
+from packaging.version import InvalidVersion, Version
 
 from kicad_lib_manager.services.user_paths import user_cache_dir
 
@@ -23,6 +24,19 @@ REQUEST_TIMEOUT_SECONDS: Final = 10
 
 VERSION_CHECK_FILE: Final = "version_check.json"
 """Cache file, in the user cache directory, holding the last PyPI answer."""
+
+
+def _is_valid_version(version: str) -> bool:
+    """Return whether `version` is a PEP 440 version, as PyPI releases are.
+
+    A cached or answered version that is not PEP 440 cannot be compared to
+    the running version, so it must not be reported as the latest release.
+    """
+    try:
+        Version(version)
+    except InvalidVersion:
+        return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -80,17 +94,27 @@ class PyPIVersionChecker:
     def check_latest_version(self, *, use_cache: bool = True) -> str | None:
         """Return the latest released version, or None when it is unknown.
 
-        With `use_cache` a fresh cached answer is returned without a request.
-        Network and response errors return None, even when an older answer
-        is cached, and never raise, so an offline machine only loses the
-        update notice.
+        With `use_cache` a fresh cached answer is returned without a request;
+        an answer whose version is not a valid PEP 440 version is not
+        trusted, so a request is made instead. Network and response errors
+        return None, even when an older answer is cached, and never raise,
+        so an offline machine only loses the update notice.
         """
         cached = self._load_cache()
-        if use_cache and cached is not None and cached.is_fresh():
+        if (
+            use_cache
+            and cached is not None
+            and cached.is_fresh()
+            and _is_valid_version(cached.version)
+        ):
             return cached.version
 
         headers = {"User-Agent": self.user_agent}
-        if cached is not None and cached.etag is not None:
+        if (
+            cached is not None
+            and cached.etag is not None
+            and _is_valid_version(cached.version)
+        ):
             headers["If-None-Match"] = cached.etag
         try:
             response = requests.get(
@@ -108,13 +132,13 @@ class PyPIVersionChecker:
     def _read_response(
         response: requests.Response, cached: CachedVersion | None
     ) -> CachedVersion | None:
-        """Turn a PyPI answer into a cache entry; None when it holds no version.
+        """Turn a PyPI answer into a cache entry; None without a PEP 440 version.
 
         Raises:
             ValueError: The body is not JSON.
         """
         if response.status_code == HTTPStatus.NOT_MODIFIED:
-            if cached is None:
+            if cached is None or not _is_valid_version(cached.version):
                 return None
             return CachedVersion(cached.version, cached.etag, time.time())
         if response.status_code != HTTPStatus.OK:
@@ -122,7 +146,7 @@ class PyPIVersionChecker:
         body = response.json()
         info = body.get("info") if isinstance(body, dict) else None
         version = info.get("version") if isinstance(info, dict) else None
-        if not isinstance(version, str):
+        if not isinstance(version, str) or not _is_valid_version(version):
             return None
         return CachedVersion(version, response.headers.get("ETag"), time.time())
 

@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 import pytest
 from typer.testing import CliRunner, Result
 
+from kicad_lib_manager import main
 from kicad_lib_manager.commands.update import check, info, perform
 from kicad_lib_manager.commands.update.command import update_app
+from kicad_lib_manager.main import app
 from kicad_lib_manager.services import update_service
 from kicad_lib_manager.services.install_method import InstallMethod
 from kicad_lib_manager.services.update_service import UpdateService
@@ -99,6 +101,15 @@ class TestCheck:
         result = kilm_update("check")
         assert result.exit_code == 1
         assert "Manual update required: nix flake update" in result.stdout
+
+    def test_unknown_latest_version_is_not_up_to_date(
+        self, installation: FakeInstallation
+    ) -> None:
+        """A failed PyPI check is not reported as being up to date."""
+        installation.latest = None
+        result = kilm_update("check")
+        assert result.exit_code == 1
+        assert "Could not determine the latest version" in result.stdout
 
 
 class TestInfo:
@@ -206,6 +217,39 @@ class TestPerform:
         """--no-cache asks PyPI even when a recent answer is cached."""
         kilm_update("perform", "--no-cache")
         assert installation.use_cache_calls == [False]
+
+
+class TestStartupUpdateCheck:
+    """The update check the root group runs before its subcommands."""
+
+    @pytest.fixture
+    def startup(self, monkeypatch: pytest.MonkeyPatch) -> FakeInstallation:
+        """Route the root group's update check to a simulated installation."""
+        fake = FakeInstallation()
+        monkeypatch.setattr(importlib.metadata, "version", lambda _name: "1.0.0")
+        monkeypatch.setattr(main, "UpdateService", fake.service)
+        return fake
+
+    @pytest.mark.usefixtures("home")
+    @pytest.mark.parametrize("latest", ["1.0.0", "1.1.0"])
+    def test_check_runs_only_when_due(
+        self, startup: FakeInstallation, latest: str
+    ) -> None:
+        """After a check, found update or not, the next command checks nothing."""
+        startup.latest = latest
+        for _ in range(2):
+            assert CliRunner().invoke(app, ["config", "list"]).exit_code == 0
+
+        assert startup.use_cache_calls == [True]
+
+    def test_help_does_not_check_for_updates(self, startup: FakeInstallation) -> None:
+        """`kilm --help` answers without the network."""
+        startup.latest = "1.1.0"
+        result = CliRunner().invoke(app, ["--help"])
+
+        assert result.exit_code == 0
+        assert "Update available" not in result.output
+        assert startup.use_cache_calls == []
 
 
 class TestGroup:
