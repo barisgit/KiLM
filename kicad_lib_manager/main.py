@@ -72,7 +72,7 @@ class BannerGroup(TyperGroup):
 
     @override
     def format_help(self, ctx: Context, formatter: HelpFormatter) -> None:
-        """Print the banner and any update notice, then the regular help."""
+        """Print the banner, then the regular help; help never checks for updates."""
         _show_title()
         super().format_help(ctx, formatter)
 
