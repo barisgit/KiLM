@@ -1,7 +1,7 @@
 """Latest-release lookup on PyPI, cached on disk for a day."""
 
 # PEP 810: on Python 3.15+ these imports load on first use.
-__lazy_modules__ = {"requests"}
+__lazy_modules__ = {"packaging.version", "requests"}
 
 import json
 import time

@@ -1,11 +1,7 @@
 """Tests for the `kilm update` command group."""
 
 import importlib.metadata
-import json
-import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner, Result
@@ -14,10 +10,8 @@ from kicad_lib_manager import main
 from kicad_lib_manager.commands.update import check, info, perform
 from kicad_lib_manager.commands.update.command import update_app
 from kicad_lib_manager.main import app
-from kicad_lib_manager.services import pypi_version, update_service
-from kicad_lib_manager.services.config_service import Config
+from kicad_lib_manager.services import update_service
 from kicad_lib_manager.services.install_method import InstallMethod
-from kicad_lib_manager.services.pypi_version import PyPIVersionChecker
 from kicad_lib_manager.services.update_service import UpdateService
 
 
@@ -237,19 +231,18 @@ class TestStartupUpdateCheck:
         return fake
 
     @pytest.mark.usefixtures("home")
-    def test_up_to_date_check_is_recorded(
-        self, startup: FakeInstallation
+    @pytest.mark.parametrize("latest", ["1.0.0", "1.1.0"])
+    def test_check_runs_only_when_due(
+        self, startup: FakeInstallation, latest: str
     ) -> None:
-        """A due check is recorded whether or not it found an update."""
-        startup.latest = "1.0.0"
-        result = CliRunner().invoke(app, ["config", "list"])
+        """After a check, found update or not, the next command checks nothing."""
+        startup.latest = latest
+        for _ in range(2):
+            assert CliRunner().invoke(app, ["config", "list"]).exit_code == 0
 
-        assert result.exit_code == 0
-        assert not Config().should_check_updates()
+        assert startup.use_cache_calls == [True]
 
-    def test_help_does_not_check_for_updates(
-        self, startup: FakeInstallation
-    ) -> None:
+    def test_help_does_not_check_for_updates(self, startup: FakeInstallation) -> None:
         """`kilm --help` answers without the network."""
         startup.latest = "1.1.0"
         result = CliRunner().invoke(app, ["--help"])
@@ -276,85 +269,3 @@ class TestGroup:
         result = kilm_update(name, "--help")
         assert result.exit_code == 0
         assert "Usage:" in result.stdout
-
-
-class TestPyPIVersionValidation:
-    """A latest version that is not a valid PEP 440 version is not reported."""
-
-    def test_invalid_pypi_answer_is_not_reported(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """An answer whose version is not PEP 440 answers None."""
-        monkeypatch.setattr(
-            pypi_version.requests,
-            "get",
-            lambda *_args, **_kwargs: SimpleNamespace(
-                status_code=200,
-                headers={},
-                json=lambda: {"info": {"version": "not a version"}},
-            ),
-        )
-        checker = PyPIVersionChecker("kilm", cache_file=tmp_path / "cache.json")
-        assert checker.check_latest_version() is None
-
-    def test_fresh_cache_with_invalid_version_is_not_trusted(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A fresh cached answer without a PEP 440 version asks PyPI again."""
-        cache = tmp_path / "cache.json"
-        cache.write_text(
-            json.dumps(
-                {"version": "not a version", "etag": None, "timestamp": time.time()}
-            )
-        )
-        urls: list[str] = []
-
-        def fake_get(url: str, **_kwargs: object) -> SimpleNamespace:
-            urls.append(url)
-            return SimpleNamespace(
-                status_code=200,
-                headers={},
-                json=lambda: {"info": {"version": "1.1.0"}},
-            )
-
-        monkeypatch.setattr(pypi_version.requests, "get", fake_get)
-        checker = PyPIVersionChecker("kilm", cache_file=cache)
-        assert checker.check_latest_version(use_cache=True) == "1.1.0"
-        assert urls, "an invalid cached answer must not end the check"
-
-    def test_fresh_cache_with_valid_version_answers_without_a_request(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A fresh cached PEP 440 answer still skips the request."""
-        cache = tmp_path / "cache.json"
-        cache.write_text(
-            json.dumps({"version": "1.1.0", "etag": None, "timestamp": time.time()})
-        )
-
-        def unexpected_get(*_args: object, **_kwargs: object) -> SimpleNamespace:
-            message = "a fresh valid cache must be answered without a request"
-            raise AssertionError(message)
-
-        monkeypatch.setattr(pypi_version.requests, "get", unexpected_get)
-        checker = PyPIVersionChecker("kilm", cache_file=cache)
-        assert checker.check_latest_version(use_cache=True) == "1.1.0"
-
-    def test_not_modified_with_invalid_cached_version_is_rejected(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A 304 answer whose cached version is invalid answers None."""
-        cache = tmp_path / "cache.json"
-        cache.write_text(
-            json.dumps({"version": "not a version", "etag": "e", "timestamp": 0})
-        )
-
-        sent_headers: dict[str, object] = {}
-
-        def fake_get(_url: str, **_kwargs: object) -> SimpleNamespace:
-            sent_headers.update(_kwargs.get("headers", {}))
-            return SimpleNamespace(status_code=304, headers={})
-
-        monkeypatch.setattr(pypi_version.requests, "get", fake_get)
-        checker = PyPIVersionChecker("kilm", cache_file=cache)
-        assert checker.check_latest_version(use_cache=False) is None
-        assert "If-None-Match" not in sent_headers

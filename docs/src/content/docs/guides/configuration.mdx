@@ -39,6 +39,8 @@ The `config.yaml` file manages KiLM's global settings and library registry:
   - `type`: Library type (`github`, `cloud`, etc.)
 - **`current_library`**: Path to the active library (used by `kilm status`)
 - **`max_backups`**: Number of backup files to retain (default: 5)
+- **`update_check`**: Whether commands check PyPI for a newer KiLM (default: `true`)
+- **`update_check_frequency`**: How often that check runs: `daily` (default), `weekly`, or `never`. A check counts as done even when PyPI cannot be reached, so the next one waits for the following period.
 
 ### Example Configuration
 

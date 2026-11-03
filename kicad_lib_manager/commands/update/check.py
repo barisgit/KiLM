@@ -30,8 +30,7 @@ def check_update_command(
 
     if status["latest_version"] is None:
         console.print(
-            "[red]Could not determine the latest version;"
-            " the PyPI check failed[/red]"
+            "[red]Could not determine the latest version; the PyPI check failed[/red]"
         )
         raise typer.Exit(1)
 
