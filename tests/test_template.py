@@ -257,7 +257,12 @@ def test_create_project_dry_run_writes_nothing(
 
 
 def test_starting_hook_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """The hook that template make writes loads and runs as written."""
+    """The hook that template make writes loads and runs as written.
+
+    `template create` prints its own success message with the project
+    location, so the written hook stays silent (it used to duplicate the
+    message).
+    """
     create_hook_script(tmp_path)
 
     run_post_create_hook(
@@ -267,7 +272,7 @@ def test_starting_hook_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
         create_template_metadata("tpl"),
     )
 
-    assert "Project MyProject created successfully!" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
 
 
 class _LibraryConfig:
