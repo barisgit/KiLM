@@ -37,19 +37,14 @@ def list_templates(
     ``--json`` prints the discovered templates as JSON on stdout instead.
     """
     templates = find_all_templates(Config(), library)
-    if not templates:
-        if json_output:
-            # The machine-readable answer to an empty library set is the
-            # same empty mapping a populated listing would render, and
-            # nothing else: the explanation below would break parsers.
-            typer.echo(json.dumps({}))
-            return
-        _print_no_templates(library)
-        return
     if json_output:
         # Plain echo: a Rich console would wrap long values and break the JSON.
-        # Custom keys may hold YAML dates and such, which print as text.
+        # Custom keys may hold YAML dates and such, which print as text. An
+        # empty library set prints `{}`, keeping stdout pure JSON.
         typer.echo(json.dumps(_json_keys(templates), indent=2, default=str))
+        return
+    if not templates:
+        _print_no_templates(library)
         return
 
     by_library: dict[str, list[tuple[str, DiscoveredTemplate]]] = {}

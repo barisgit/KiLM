@@ -106,7 +106,7 @@ def create(  # noqa: PLR0913 -- Typer maps each CLI option to one parameter
         get_console().print()
         get_console(stderr=True).print("Project creation failed.")
         raise typer.Exit(1)
-    elif not dry_run:
+    if not dry_run:
         get_console().print()
         get_console().print(
             f"Project '{variables.get(PROJECT_NAME, name)}' created successfully"

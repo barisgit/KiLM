@@ -64,7 +64,8 @@ def test_list_json_is_valid_json_for_long_values(home: Path) -> None:
     assert templates["board"]["description"] == "x" * 150
 
 
-def test_list_json_with_no_templates_prints_an_empty_object(home: Path) -> None:
+@pytest.mark.usefixtures("home")
+def test_list_json_with_no_templates_prints_an_empty_object() -> None:
     """--json answers an empty library set with `{}`, not rich text."""
     result = CliRunner().invoke(template_app, ["list", "--json"])
 
@@ -72,7 +73,8 @@ def test_list_json_with_no_templates_prints_an_empty_object(home: Path) -> None:
     assert json.loads(result.output) == {}
 
 
-def test_create_without_templates_exits_nonzero(home: Path) -> None:
+@pytest.mark.usefixtures("home")
+def test_create_without_templates_exits_nonzero() -> None:
     """`template create` fails when no library has any templates."""
     result = CliRunner().invoke(template_app, ["create", "Widget"])
 
@@ -99,7 +101,9 @@ def test_create_cancelled_selection_exits_nonzero(
     add_template(add_library(home, "lib"), "board", {})
 
     class Cancelled:
-        def __init__(self, message: str, choices=None, **kwargs) -> None:
+        def __init__(
+            self, message: str, choices: object = None, **kwargs: object
+        ) -> None:
             pass
 
         def ask(self) -> None:
