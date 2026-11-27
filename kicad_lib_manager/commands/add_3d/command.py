@@ -4,6 +4,7 @@ The directory's settings live in a cloud metadata file inside it, so the same
 name and environment variable apply on every machine that syncs the folder.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -48,6 +49,20 @@ class _Overrides:
 def _present(value: str | int | None) -> bool:
     """Return whether a metadata value is set to something non-empty."""
     return value is not None and bool(value)
+
+
+def _save_metadata(
+    directory: Path,
+    metadata: CloudMetadata,
+    unsupported: Mapping[object, object] | None = None,
+) -> None:
+    """Write the metadata; exit with status 1 when the write fails.
+
+    The failure is reported by the metadata writer, so a failed write must not
+    be followed by a success message.
+    """
+    if not write_cloud_metadata(directory, metadata, unsupported):
+        raise typer.Exit(1)
 
 
 def _apply_overrides(metadata: CloudMetadata, overrides: _Overrides) -> None:
@@ -96,7 +111,7 @@ def _update_existing(
     if overrides.given():
         _apply_overrides(metadata, overrides)
         metadata["updated_with"] = "kilm"
-        write_cloud_metadata(directory, metadata, unsupported)
+        _save_metadata(directory, metadata, unsupported)
         console.print("[green]Updated metadata file with new information[/green]")
     return metadata
 
@@ -129,7 +144,7 @@ def _create_new(
     elif overrides.no_env_var:
         metadata["env_var"] = None
 
-    write_cloud_metadata(directory, metadata)
+    _save_metadata(directory, metadata)
     console.print("[green]Metadata file created[/green]")
     return metadata
 
@@ -255,7 +270,7 @@ def add_3d(  # noqa: PLR0913 -- each CLI option is a Typer parameter
     model_count = count_model_files(directory)
     _confirm_models(model_count)
     metadata["model_count"] = model_count
-    write_cloud_metadata(directory, metadata, unsupported)
+    _save_metadata(directory, metadata, unsupported)
 
     raw_name = metadata.get("name")
     library_name = directory.name if raw_name is None else str(raw_name)
