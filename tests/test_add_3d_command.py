@@ -87,5 +87,5 @@ def test_add_3d_fails_when_metadata_cannot_be_written(
 
     result = CliRunner().invoke(app, ["add-3d", "--directory", str(directory)])
 
-    assert result.exit_code != 0, result.output
+    assert result.exit_code == 1, result.output
     assert "added successfully" not in result.output, result.output
