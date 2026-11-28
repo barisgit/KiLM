@@ -35,6 +35,8 @@ The command performs the following main actions:
 
    Other fields already in the file are kept as they are, unless an option replaces them or `--force` starts the file afresh.
 
+   If the `.kilm_metadata` file cannot be written, `kilm add-3d` exits with status 1 and leaves the global configuration unchanged.
+
 2. **Updates Global Configuration**: Adds library entry (type `cloud`) to main `config.yaml`
 
 3. **Verification**: Scans directory for common 3D model file extensions (`.step`, `.stp`, `.wrl`, `.wings`)
