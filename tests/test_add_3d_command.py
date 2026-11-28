@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 from typing import cast
 
+import pytest
 from typer.testing import CliRunner
 
 from kicad_lib_manager.main import app
+from kicad_lib_manager.utils import metadata as metadata_module
 from kicad_lib_manager.utils.constants import CLOUD_METADATA_FILE
 
 
@@ -68,3 +70,22 @@ def test_add_3d_force_starts_fresh(tmp_path: Path) -> None:
 
     assert metadata["name"] == "models"
     assert metadata["version"] == "1.0.0"
+
+
+def test_add_3d_fails_when_metadata_cannot_be_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed metadata write makes add-3d exit non-zero, not report success."""
+    directory = _models_dir(tmp_path, {"name": "models"})
+
+    def no_space(_path: Path, _data: bytes) -> None:
+        """Fail the metadata write only; the library configuration stays writable."""
+        msg = "No space left on device"
+        raise OSError(msg)
+
+    monkeypatch.setattr(metadata_module, "write_atomically", no_space)
+
+    result = CliRunner().invoke(app, ["add-3d", "--directory", str(directory)])
+
+    assert result.exit_code == 1, result.output
+    assert "added successfully" not in result.output, result.output
